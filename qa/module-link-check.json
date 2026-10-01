@@ -1,0 +1,153 @@
+{
+  "method": "Static ES module import/export and file existence check; not browser runtime",
+  "result": "PASS",
+  "links": [
+    {
+      "module": "app.mjs",
+      "dependency": "ui.mjs",
+      "exports": [
+        "root",
+        "h",
+        "msg",
+        "button"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "app.mjs",
+      "dependency": "public.mjs",
+      "exports": [
+        "publicPage"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "app.mjs",
+      "dependency": "admin.mjs",
+      "exports": [
+        "adminPage"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "public.mjs",
+      "dependency": "icons.mjs",
+      "exports": [
+        "icon"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "public.mjs",
+      "dependency": "catalog.mjs",
+      "exports": [
+        "sectionsMeta",
+        "snippet",
+        "route",
+        "sectionLink",
+        "itemLink"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "public.mjs",
+      "dependency": "ui.mjs",
+      "exports": [
+        "h",
+        "root",
+        "api",
+        "field",
+        "selectField",
+        "check",
+        "button",
+        "modal",
+        "toast",
+        "brand",
+        "media",
+        "msg",
+        "labels"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "public.mjs",
+      "dependency": "offline.mjs",
+      "exports": [
+        "bundle",
+        "enqueue",
+        "prepare",
+        "status",
+        "backup",
+        "sync",
+        "activate"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "public.mjs",
+      "dependency": "questions.mjs",
+      "exports": [
+        "question",
+        "visible"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "questions.mjs",
+      "dependency": "ui.mjs",
+      "exports": [
+        "h",
+        "field",
+        "selectField"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "admin.mjs",
+      "dependency": "icons.mjs",
+      "exports": [
+        "icon"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "admin.mjs",
+      "dependency": "ui.mjs",
+      "exports": [
+        "h",
+        "root",
+        "api",
+        "field",
+        "selectField",
+        "check",
+        "button",
+        "modal",
+        "toast",
+        "brand",
+        "labels",
+        "types",
+        "setCSRF",
+        "msg"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "admin.mjs",
+      "dependency": "offline.mjs",
+      "exports": [
+        "backup"
+      ],
+      "result": "PASS"
+    },
+    {
+      "module": "offline.mjs",
+      "dependency": "ui.mjs",
+      "exports": [
+        "api",
+        "toast",
+        "download"
+      ],
+      "result": "PASS"
+    }
+  ]
+}

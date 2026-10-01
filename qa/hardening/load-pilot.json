@@ -1,0 +1,50 @@
+{
+  "status": "passed",
+  "profile": "pilot",
+  "profile_config": {
+    "reads": 1000,
+    "read_workers": 50,
+    "writes": 1000,
+    "write_workers": 8,
+    "batch": 25
+  },
+  "backend": "SQLite",
+  "server_workers": 1,
+  "not_production_capacity_certificate": true,
+  "reads": {
+    "requests": 1000,
+    "workers": 50,
+    "errors": 0,
+    "elapsed_s": 12.442,
+    "rps": 80.4,
+    "p50_s": 0.6057,
+    "p95_s": 1.0557,
+    "p99_s": 1.4002
+  },
+  "writes": {
+    "submissions": 1000,
+    "batch_size": 25,
+    "concurrent_clients": 8,
+    "errors": 0,
+    "elapsed_s": 1.354,
+    "submissions_per_s": 738.7,
+    "batch_p50_s": 0.2335,
+    "batch_p95_s": 0.4141,
+    "batch_p99_s": 0.4311
+  },
+  "resource": {
+    "rss_mb_before": 134.7,
+    "rss_mb_after": 150.9,
+    "rss_growth_mb": 16.1,
+    "cpu_user_s": 10.9,
+    "cpu_system_s": 6.07
+  },
+  "limitations": [
+    "SQLite",
+    "single Uvicorn process",
+    "localhost",
+    "synthetic data",
+    "not simultaneous human browser sessions",
+    "no Redis/WebSocket/PostgreSQL/network latency"
+  ]
+}

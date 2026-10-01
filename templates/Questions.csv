@@ -1,0 +1,4 @@
+﻿code,title,qtype,form_id,required,order,min,max,options,rows,show_if_code,show_if_equals
+IMP-Q01,اختر ما يهمك,single_choice,imported-survey,True,1,0,10,سهولة الاستخدام|سرعة الخدمة|تعدد الخدمات,,,
+IMP-Q02,قيّم جوانب التجربة,matrix,imported-survey,False,2,1,5,,الوضوح|السرعة|التنوع,,
+IMP-Q03,اكتب رأيك,long_text,imported-survey,False,3,0,10,,,,

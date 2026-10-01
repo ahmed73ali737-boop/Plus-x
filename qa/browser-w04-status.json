@@ -1,0 +1,19 @@
+{
+  "status": "partial_environment_timeout",
+  "latest_observed_checks": [
+    "platform public sections",
+    "agency 10 sections",
+    "service detail navigation",
+    "survey submit through HTTP bridge",
+    "vote submit/results",
+    "rating+note submit",
+    "responsive widths 360/390/768/1440",
+    "admin login",
+    "manual question save",
+    "record search",
+    "CSV preview+commit",
+    "analytics page",
+    "identity/sections/content/poll/ads/facts/audit/settings tabs in one attempt"
+  ],
+  "not_counted_as_full_pass": true
+}

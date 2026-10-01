@@ -1,0 +1,1 @@
+{'rts_template': True, 'easy_template': True, 'public_role_signup': True, 'optional_control_account': True, 'admin_signup_review': True, 'display_only_org': True, 'temporary_password': True, 'agency_org_visibility': True, 'rts_layout_profile': True, 'easy_layout_profile': True}

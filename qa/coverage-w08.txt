@@ -1,0 +1,40 @@
+Name                                        Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------------------------
+app/__init__.py                                 0      0      0      0   100%
+app/api/__init__.py                             0      0      0      0   100%
+app/api/middleware.py                          58      9     28      5    79%   21-22, 24, 32, 48, 51, 54-56
+app/application/__init__.py                     0      0      0      0   100%
+app/application/access.py                      35      2     18      3    91%   32, 43->52, 69
+app/application/access_request_service.py      13      0      0      0   100%
+app/application/audit_service.py                9      0      0      0   100%
+app/application/auth_service.py                17      1      6      1    91%   18
+app/application/collection_service.py         151     27     82     19    78%   24-25, 30, 36, 39, 50, 53, 65, 67-70, 73, 77, 84, 88, 91, 94, 112-117, 132, 152->154, 155-156, 161->163
+app/application/device_service.py              49      3      8      4    88%   16, 44->47, 50-51, 75->78
+app/application/public_service.py              43      0     18      1    98%   19->21
+app/application/publishing.py                  20      1      4      1    92%   23
+app/core/__init__.py                            0      0      0      0   100%
+app/core/security.py                           37      3      4      1    90%   43, 54-55
+app/core/serialization.py                       4      0      0      0   100%
+app/db.py                                      45      0      6      3    94%   76->exit, 79->82, 83->87
+app/domain.py                                 224     12     78      6    94%   27, 33, 42->exit, 53, 182-183, 189, 194-196, 200, 207, 221
+app/imports.py                                 65      5     20      2    92%   17->16, 28, 36, 39, 52, 63
+app/infrastructure/__init__.py                  0      0      0      0   100%
+app/infrastructure/repository.py               11      0      2      0   100%
+app/infrastructure/seed.py                     66      1     16      1    98%   17
+app/server.py                                 431     36     46     10    89%   58-59, 82-84, 243->242, 258->264, 268-272, 298->302, 352-354, 367, 376->exit, 389, 393->396, 394->396, 420->406, 443-452, 459->462, 460->462, 467-471, 475-478, 485-486
+app/xlsx_reader.py                             92     19     30      6    80%   15, 32, 38, 42->49, 45-48, 74-77, 78->84, 83, 93-99
+sdk/python/pulsex_sdk/__init__.py               2      0      0      0   100%
+sdk/python/pulsex_sdk/client.py                79     31      6      2    61%   12-14, 37, 39, 45-51, 54, 62-64, 67-69, 72, 75, 78, 84, 87, 90, 93, 96, 99, 102, 105, 108
+tests/load_profiles.py                         67     55      8      0    16%   17, 20-24, 27-85
+tests/test_api_contract.py                     16      0      2      0   100%
+tests/test_pilot.py                           148      0     16      0   100%
+tests/test_windows03.py                        72      0      2      0   100%
+tests/test_windows04.py                       119      0      2      0   100%
+tests/test_windows05.py                        79      2     16      3    95%   13, 14->17, 71
+tests/test_windows06.py                        32      0      0      0   100%
+tests/test_windows07.py                        84      0      0      0   100%
+tests/test_windows08.py                        53      1      0      0    98%   11
+tools/backup_local.py                          35      8     12      5    68%   14, 17, 25, 30-31, 35-37
+tools/launcher.py                              99     69     28      1    24%   29, 34-45, 48-58, 61-71, 74-105, 108-112
+---------------------------------------------------------------------------------------
+TOTAL                                        2255    285    458     74    85%

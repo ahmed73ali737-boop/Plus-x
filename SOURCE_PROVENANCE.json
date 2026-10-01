@@ -1,0 +1,11 @@
+{
+  "build": "windows-07",
+  "version": "0.7.0",
+  "based_on": "PulseX_Windows_06_Source.zip",
+  "refactoring": [
+    "device_service",
+    "access_request_service",
+    "public_service"
+  ],
+  "notes": "Local/UAT hardened candidate; external production gates remain."
+}

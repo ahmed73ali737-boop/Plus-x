@@ -1,0 +1,141 @@
+{
+  "/api/access-request": [
+    "post"
+  ],
+  "/api/admin/audit": [
+    "get"
+  ],
+  "/api/admin/events/{event_id}/participations": [
+    "get",
+    "post"
+  ],
+  "/api/admin/media": [
+    "post"
+  ],
+  "/api/admin/organizations": [
+    "get",
+    "post"
+  ],
+  "/api/admin/organizations/{oid}/members": [
+    "get"
+  ],
+  "/api/admin/organizations/{oid}/members/{member_id}": [
+    "patch"
+  ],
+  "/api/admin/organizations/{oid}/people": [
+    "get",
+    "post"
+  ],
+  "/api/admin/organizations/{oid}/people/{pid}": [
+    "patch"
+  ],
+  "/api/admin/organizations/{oid}/people/{pid}/account": [
+    "post"
+  ],
+  "/api/admin/organizations/{oid}/users": [
+    "post"
+  ],
+  "/api/admin/participations/{pid}": [
+    "patch"
+  ],
+  "/api/admin/signup-requests": [
+    "get"
+  ],
+  "/api/admin/signup-requests/{rid}": [
+    "patch"
+  ],
+  "/api/admin/sites": [
+    "get",
+    "post"
+  ],
+  "/api/admin/sites/{sid}": [
+    "get",
+    "put"
+  ],
+  "/api/admin/sites/{sid}/access-requests/{rid}": [
+    "patch"
+  ],
+  "/api/admin/sites/{sid}/devices": [
+    "get",
+    "post"
+  ],
+  "/api/admin/sites/{sid}/devices/{did}": [
+    "patch"
+  ],
+  "/api/admin/sites/{sid}/export": [
+    "get"
+  ],
+  "/api/admin/sites/{sid}/imports/preview": [
+    "post"
+  ],
+  "/api/admin/sites/{sid}/imports/{iid}/commit": [
+    "post"
+  ],
+  "/api/admin/sites/{sid}/metrics": [
+    "get"
+  ],
+  "/api/admin/sites/{sid}/preview": [
+    "get"
+  ],
+  "/api/admin/sites/{sid}/publish": [
+    "post"
+  ],
+  "/api/admin/sites/{sid}/qr": [
+    "get"
+  ],
+  "/api/admin/sites/{sid}/users": [
+    "get",
+    "post"
+  ],
+  "/api/admin/sites/{sid}/users/{user_id}": [
+    "patch"
+  ],
+  "/api/auth/login": [
+    "post"
+  ],
+  "/api/auth/logout": [
+    "post"
+  ],
+  "/api/auth/me": [
+    "get"
+  ],
+  "/api/auth/password": [
+    "post"
+  ],
+  "/api/collect": [
+    "post"
+  ],
+  "/api/device/heartbeat": [
+    "post"
+  ],
+  "/api/health": [
+    "get"
+  ],
+  "/api/health/live": [
+    "get"
+  ],
+  "/api/health/ready": [
+    "get"
+  ],
+  "/api/public/site/{slug}": [
+    "get"
+  ],
+  "/api/public/site/{slug}/results": [
+    "get"
+  ],
+  "/api/signup-request": [
+    "post"
+  ],
+  "/media/{name}": [
+    "get"
+  ],
+  "/sw.js": [
+    "get"
+  ],
+  "/templates/{name}": [
+    "get"
+  ],
+  "/{path}": [
+    "get"
+  ]
+}

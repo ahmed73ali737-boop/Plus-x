@@ -1,0 +1,6 @@
+{
+  "status": "blocked",
+  "reason": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://127.0.0.1:4431/\nCall log:\n  - navigating to \"http://127.0.0.1:4431/\", waiting until \"load\"\n",
+  "not_passed": true,
+  "not_offline_test": true
+}

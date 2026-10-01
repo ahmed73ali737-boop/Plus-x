@@ -1,0 +1,8 @@
+{
+  "host_os": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "target": "temporary isolated QA server on loopback",
+  "native_windows": false,
+  "python_http_status": 200,
+  "status": "BLOCKED",
+  "error": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://127.0.0.1:4433/e/demo/p/agency-01\nCall log:\n  - navigating to \"http://127.0.0.1:4433/e/demo/p/agency-01\", waiting until \"domcontentloaded\"\n"
+}

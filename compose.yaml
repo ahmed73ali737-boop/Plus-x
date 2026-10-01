@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pulsex
+      POSTGRES_USER: pulsex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a long random database password}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulsex -d pulsex"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  app:
+    build:
+      context: .
+      dockerfile: ops/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://pulsex:${POSTGRES_PASSWORD}@postgres:5432/pulsex
+      REQUIRE_POSTGRES: "true"
+      PUBLIC_ORIGIN: https://${DOMAIN:?Set your domain}
+      HOST: 0.0.0.0
+      SEED_DEMO: "false"
+      WEB_WORKERS: ${WEB_WORKERS:-4}
+      PX_NATIVE_POSTGRES_ACCEPTED: ${PX_NATIVE_POSTGRES_ACCEPTED:-false}
+      PX_LOAD_ACCEPTED: ${PX_LOAD_ACCEPTED:-false}
+      PX_SECURITY_ACCEPTED: ${PX_SECURITY_ACCEPTED:-false}
+      PX_FIELD_OFFLINE_ACCEPTED: ${PX_FIELD_OFFLINE_ACCEPTED:-false}
+    volumes:
+      - app_data:/app/data
+    expose: ["4310"]
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+volumes:
+  postgres_data:
+  app_data:
+  caddy_data:

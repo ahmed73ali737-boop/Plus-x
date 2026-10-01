@@ -1,0 +1,21 @@
+{
+  "release": "Windows 04",
+  "status": "LOCAL_SOURCE_UAT_CANDIDATE",
+  "host": "Linux",
+  "test_database": "SQLite",
+  "pytest_passed": 112,
+  "http_local_acceptance_passed": 29,
+  "javascript_syntax": "PASSED",
+  "python_compile": "PASSED",
+  "browser_latest_full_suite": "ENVIRONMENT_TIMEOUT_AFTER_PARTIAL_PASSES",
+  "browser_previous_bridge_report": "STALE_WINDOWS03_REFERENCE_NOT_COUNTED_FOR_W04",
+  "native_windows": "NOT_RUN",
+  "browser_native_transport": "BLOCKED_OR_UNSTABLE_IN_ENVIRONMENT",
+  "postgresql_native": "NOT_RUN",
+  "physical_two_kiosk_outage": "NOT_RUN",
+  "five_day_soak": "NOT_RUN",
+  "load_1000_concurrent": "NOT_RUN",
+  "security_full_audit": "NOT_RUN",
+  "live_site_updated": false,
+  "no_production_data_in_package": true
+}

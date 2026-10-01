@@ -1,0 +1,192 @@
+........................................................................ [ 47%]
+........................................................................ [ 94%]
+.........                                                                [100%]
+=============================== warnings summary ===============================
+tests/test_pilot.py::test_health_backend_is_explicit
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4350: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99941d6a70>
+    return {k: v for k, v in kwargs.items() if v is not None}
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows03.py::test_build_identification
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/compiler.py:4785: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594d5d0>
+    def visit_select(
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99864863e0>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594e5c0>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594d7b0>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9995324400>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986485120>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986485210>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_health_v04
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/type_api.py:2357: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99856156c0>
+    pass
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:2438: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594e2f0>
+    return CallbackGetCoreSchemaHandler(new_handler, self)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:2438: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99864848b0>
+    return CallbackGetCoreSchemaHandler(new_handler, self)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:2438: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9985614040>
+    return CallbackGetCoreSchemaHandler(new_handler, self)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /usr/lib/python3.13/asyncio/base_events.py:2060: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9994153c40>
+    def get_debug(self):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /usr/lib/python3.13/asyncio/base_events.py:2060: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594c310>
+    def get_debug(self):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_platform_access_request_is_public_signup_request
+  /usr/lib/python3.13/asyncio/base_events.py:2060: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9985616200>
+    def get_debug(self):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_public_event_agencies_expose_participation_metadata
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_config.py:93: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986486020>
+    def __init__(self, config: ConfigDict | dict[str, Any] | type[Any] | None, *, check: bool = True):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_public_event_agencies_expose_participation_metadata
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_config.py:93: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986d962f0>
+    def __init__(self, config: ConfigDict | dict[str, Any] | type[Any] | None, *, check: bool = True):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows04.py::test_public_event_agencies_expose_participation_metadata
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/_internal/_config.py:93: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986484310>
+    def __init__(self, config: ConfigDict | dict[str, Any] | type[Any] | None, *, check: bool = True):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows05.py::test_security_headers_hsts_only_under_https
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/fields.py:237: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986d96a70>
+    self._attributes_set = {k: v for k, v in kwargs.items() if v is not _Unset and k not in self.metadata_lookup}
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows05.py::test_security_headers_hsts_only_under_https
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/fields.py:237: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986df0040>
+    self._attributes_set = {k: v for k, v in kwargs.items() if v is not _Unset and k not in self.metadata_lookup}
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows05.py::test_security_headers_hsts_only_under_https
+  /opt/pyvenv/lib/python3.13/site-packages/pydantic/fields.py:237: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99856144f0>
+    self._attributes_set = {k: v for k, v in kwargs.items() if v is not _Unset and k not in self.metadata_lookup}
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows07.py::test_device_scope_isolation
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/base.py:1685: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9986d97970>
+    return iter([col for _, col, _ in self._collection])
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows07.py::test_device_scope_isolation
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/base.py:1685: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f998594c8b0>
+    return iter([col for _, col, _ in self._collection])
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows07.py::test_device_scope_isolation
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/base.py:1685: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9985615030>
+    return iter([col for _, col, _ in self._collection])
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows08.py::test_time_question_end_to_end_api
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/base.py:673: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f9985141210>
+    return util.PopulateDict(self._kw_reg_for_dialect_cls)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_windows08.py::test_time_question_end_to_end_api
+  /opt/pyvenv/lib/python3.13/site-packages/sqlalchemy/sql/base.py:673: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f99853ff3d0>
+    return util.PopulateDict(self._kw_reg_for_dialect_cls)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.5-final-0 ________________
+
+Name                                        Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------------------------
+app/__init__.py                                 0      0      0      0   100%
+app/api/__init__.py                             0      0      0      0   100%
+app/api/middleware.py                          58      9     28      5    79%   21-22, 24, 32, 48, 51, 54-56
+app/application/__init__.py                     0      0      0      0   100%
+app/application/access.py                      35      2     18      3    91%   32, 43->52, 69
+app/application/access_request_service.py      13      0      0      0   100%
+app/application/audit_service.py                9      0      0      0   100%
+app/application/auth_service.py                17      1      6      1    91%   18
+app/application/collection_service.py         151     27     82     19    78%   24-25, 30, 36, 39, 50, 53, 65, 67-70, 73, 77, 84, 88, 91, 94, 112-117, 132, 152->154, 155-156, 161->163
+app/application/device_service.py              49      3      8      4    88%   16, 44->47, 50-51, 75->78
+app/application/public_service.py              43      0     18      1    98%   19->21
+app/application/publishing.py                  20      1      4      1    92%   23
+app/core/__init__.py                            0      0      0      0   100%
+app/core/security.py                           37      3      4      1    90%   43, 54-55
+app/core/serialization.py                       4      0      0      0   100%
+app/db.py                                      45      0      6      3    94%   76->exit, 79->82, 83->87
+app/domain.py                                 234      9     80      6    95%   27, 42->exit, 53, 190->193, 199, 204-206, 210, 217, 231
+app/imports.py                                 65      5     20      2    92%   17->16, 28, 36, 39, 52, 63
+app/infrastructure/__init__.py                  0      0      0      0   100%
+app/infrastructure/repository.py               11      0      2      0   100%
+app/infrastructure/seed.py                     66      1     16      1    98%   17
+app/server.py                                 431     36     46     10    89%   58-59, 82-84, 243->242, 258->264, 268-272, 298->302, 352-354, 367, 376->exit, 389, 393->396, 394->396, 420->406, 443-452, 459->462, 460->462, 467-471, 475-478, 485-486
+app/xlsx_reader.py                             92     19     30      6    80%   15, 32, 38, 42->49, 45-48, 74-77, 78->84, 83, 93-99
+---------------------------------------------------------------------------------------
+TOTAL                                        1380    116    368     63    89%
+153 passed, 26 warnings in 20.83s

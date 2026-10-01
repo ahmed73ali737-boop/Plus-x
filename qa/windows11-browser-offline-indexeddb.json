@@ -1,0 +1,8 @@
+{
+  "scope": "Chromium IndexedDB component on synthetic http origin; no Service Worker/physical outage claim",
+  "checks": [],
+  "status": "blocked",
+  "not_passed": true,
+  "reason": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://pulsex.test/\nCall log:\n  - navigating to \"http://pulsex.test/\", waiting until \"load\"\n",
+  "passed": 0
+}

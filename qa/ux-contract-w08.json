@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "passed": 12,
+  "checks": [
+    "time_type_catalog",
+    "datetime_type_catalog",
+    "time_native_input",
+    "datetime_native_input",
+    "survey_manager",
+    "question_type_dynamic",
+    "poll_manager",
+    "schedule_native_datetime",
+    "contact_email_message",
+    "rating_star_ui",
+    "survey_metadata_public",
+    "poll_requires_answer"
+  ]
+}
