@@ -1,8 +1,8 @@
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-admin=(ROOT/'web/admin.mjs').read_text()
-public=(ROOT/'web/public.mjs').read_text()
-domain=(ROOT/'app/domain.py').read_text()
+admin=(ROOT/'web/admin.mjs').read_text(encoding='utf-8')
+public=(ROOT/'web/public.mjs').read_text(encoding='utf-8')
+domain=(ROOT/'app/domain.py').read_text(encoding='utf-8')
 checks={
  'rts_template':"rts_tech:'RTS Tech'" in admin and "'rts_tech'" in domain,
  'easy_template':"easy_finance:'Easy Finance & Payments'" in admin and "'easy_finance'" in domain,
