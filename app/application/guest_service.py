@@ -4,6 +4,7 @@ import hashlib
 import re
 
 from sqlalchemy import insert, select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.application.audit_service import new_id
 from app.db import event_guests, guest_checkins, guests
@@ -74,10 +75,8 @@ def register_guest(conn, event: dict, body: dict) -> dict:
             conn.execute(update(guests).where(guests.c.id==guest["id"]).values(**updates))
             guest={**dict(guest),**updates}
     else:
-        gid=new_id()
-        created=True
-        guest={
-            "id":gid,
+        candidate={
+            "id":new_id(),
             "phone_e164":phone,
             "phone_hash":p_hash,
             "guest_number":g_number,
@@ -85,7 +84,24 @@ def register_guest(conn, event: dict, body: dict) -> dict:
             "status":"active",
             "created_at":now(),
         }
-        conn.execute(insert(guests).values(**guest))
+        try:
+            # A savepoint converts simultaneous "same phone" inserts into a
+            # deterministic lookup instead of aborting the outer transaction.
+            with conn.begin_nested():
+                conn.execute(insert(guests).values(**candidate))
+            guest=candidate
+            created=True
+        except IntegrityError:
+            guest=conn.execute(
+                select(guests).where(
+                    (guests.c.phone_e164==phone) |
+                    (guests.c.phone_hash==p_hash) |
+                    (guests.c.guest_number==g_number)
+                )
+            ).mappings().first()
+            if not guest:
+                raise
+            guest=dict(guest)
 
     reg=conn.execute(
         select(event_guests).where(
@@ -95,8 +111,7 @@ def register_guest(conn, event: dict, body: dict) -> dict:
     ).mappings().first()
     event_registration_created=False
     if not reg:
-        event_registration_created=True
-        reg={
+        candidate_reg={
             "id":new_id(),
             "event_id":event["id"],
             "guest_id":guest["id"],
@@ -106,7 +121,21 @@ def register_guest(conn, event: dict, body: dict) -> dict:
             "registered_at":now(),
             "updated_at":now(),
         }
-        conn.execute(insert(event_guests).values(**reg))
+        try:
+            with conn.begin_nested():
+                conn.execute(insert(event_guests).values(**candidate_reg))
+            reg=candidate_reg
+            event_registration_created=True
+        except IntegrityError:
+            reg=conn.execute(
+                select(event_guests).where(
+                    event_guests.c.event_id==event["id"],
+                    event_guests.c.guest_id==guest["id"],
+                )
+            ).mappings().first()
+            if not reg:
+                raise
+            reg=dict(reg)
     return {
         "id":guest["id"],
         "guest_number":guest["guest_number"],
