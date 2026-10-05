@@ -114,7 +114,7 @@ def normalize_config(raw):
     for key,default in [('primary','#176B73'),('secondary','#0F3D46'),('accent','#29B8A8'),('background','#F5F8FA'),('surface','#FFFFFF'),('text_color','#17313B')]:
         c[key]=text(raw.get(key) or default,7)
         if not re.fullmatch(r'#[0-9A-Fa-f]{6}',c[key]): fail('COLOR_INVALID')
-    c['template']=raw.get('template') if raw.get('template') in ('fintech','technology','corporate','exhibition','minimal','dynamic','sponsor','startup','rts_tech','easy_finance') else 'fintech'
+    c['template']=raw.get('template') if raw.get('template') in ('fintech','technology','corporate','exhibition','minimal','dynamic','sponsor','startup','rts_tech','easy_finance','tharawat_finance') else 'fintech'
     c['font']=raw.get('font') if raw.get('font') in ('system','modern','classic','geometric') else 'system'
     c['card_style']=raw.get('card_style') if raw.get('card_style') in ('soft','bordered','glass','flat') else 'soft'
     c['hero_style']=raw.get('hero_style') if raw.get('hero_style') in ('split','centered','cover','minimal') else 'split'
