@@ -21,13 +21,22 @@ with tempfile.TemporaryDirectory(prefix='px-sdk-') as td:
         sdk=PulseXClient(base)
         assert sdk.health()['build']=='windows-08'
         assert sdk.public_site('agency-01')['slug']=='agency-01'
+        assert sdk.guest_config('demo')['event_id']=='event-demo'
+        guest=sdk.register_guest('demo','0777 606 060',name='SDK Guest')
+        assert guest['guest_number'].startswith('G-')
+        assert sdk.public_guest('demo',guest['guest_number'])['status']=='registered'
         user=sdk.login(accounts[2]['email'],accounts[2]['password']); assert user['scope_id']=='agency-01'
         assert sdk.admin_site('agency-01')['id']=='agency-01'
         assert 'counts' in sdk.metrics('agency-01')
         dev=sdk.create_device('agency-01','SDK Tablet','tablet','0.9.0'); assert dev['token_shown_once']
         assert any(x['id']==dev['id'] for x in sdk.devices('agency-01')['devices'])
         sdk.logout()
-        report={'status':'passed','checks':8,'transport':'real localhost HTTP','sdk':'python'}
+        organizer=sdk.login(accounts[1]['email'],accounts[1]['password']); assert organizer['scope_id']=='event-demo'
+        event_guests=sdk.event_guests('event-demo')['guests']; assert any(x['guest_number']==guest['guest_number'] for x in event_guests)
+        gate=sdk.create_device('event-demo','SDK Gate','operator','0.9.0'); assert gate['token_shown_once']
+        manifest=sdk.device_guest_manifest('event-demo',gate['device_token']); assert any(x['guest_number']==guest['guest_number'] for x in manifest['guests'])
+        sdk.logout()
+        report={'status':'passed','checks':14,'transport':'real localhost HTTP','sdk':'python','guest_qr_api':True}
     finally:
         proc.terminate();proc.wait(timeout=10);log.close()
 (ROOT/'qa/hardening/sdk-python-smoke.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
