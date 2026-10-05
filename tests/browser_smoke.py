@@ -62,7 +62,7 @@ try:
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         page.goto(URL)
-        page.get_by_role("heading", name="الفعاليات والتجارب").wait_for()
+        page.get_by_role("heading", name="الفعاليات الجارية والقادمة").wait_for()
         page.screenshot(path=str(ROOT / "qa/platform-desktop.png"), full_page=True)
         mark("platform_real_http_render")
 
@@ -162,11 +162,26 @@ try:
     (ROOT / "qa/browser-smoke.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False))
 except Exception as exc:
+    failure_page = locals().get("page")
+    failure_errors = locals().get("errors", [])
+    failure_state = {}
+    if failure_page is not None:
+        try:
+            failure_state = {
+                "url": failure_page.url,
+                "title": failure_page.title(),
+                "body_text": failure_page.locator("body").inner_text()[:2000],
+            }
+            failure_page.screenshot(path=str(ROOT / "qa/browser-failure-http.png"), full_page=True)
+        except Exception as diagnostic_exc:
+            failure_state = {"diagnostic_error": str(diagnostic_exc)}
     report = {
         "status": "failed",
         "reason": str(exc),
         "passed_before_failure": len(locals().get("checks", [])),
         "checks": locals().get("checks", []),
+        "page_errors": failure_errors,
+        "failure_state": failure_state,
         "not_passed": True,
     }
     (ROOT / "qa/browser-smoke.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
