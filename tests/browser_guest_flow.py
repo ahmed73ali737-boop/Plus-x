@@ -150,6 +150,34 @@ try:
         page.get_by_text("تمت المزامنة",exact=False).first.wait_for()
         mark("offline_checkin_synced_after_reconnect")
 
+        # Guest can register while the already-loaded page is offline. The local
+        # provisional number must reconcile automatically to a server-issued
+        # opaque guest number and QR when connectivity returns.
+        page.goto(URL+"/e/demo/guest")
+        context.set_offline(True)
+        page.get_by_label("رقم الهاتف",exact=True).fill("0777 808 080")
+        page.get_by_label("الاسم — اختياري",exact=True).fill("زائر أوفلاين")
+        page.get_by_text("أوافق على استخدام رقم الهاتف",exact=False).click()
+        page.get_by_role("button",name="إنشاء / فتح بطاقة الزائر",exact=True).click()
+        page.get_by_role("heading",name="زائر أوفلاين",exact=True).wait_for()
+        provisional=page.locator(".guest-number strong").inner_text().strip()
+        assert provisional.startswith("P-")
+        assert page.locator("img.guest-qr").count()==0
+        pending_guests=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('guest_outbox');return xs.filter(x=>x.status==='pending').length}""")
+        assert pending_guests>=1
+        mark("offline_guest_registration_provisional")
+
+        context.set_offline(False)
+        page.wait_for_function("navigator.onLine === true")
+        page.evaluate("window.dispatchEvent(new Event('online'))")
+        page.wait_for_url(lambda u: "/guest/G-" in u,timeout=15000)
+        final_number=page.locator(".guest-number strong").inner_text().strip()
+        assert final_number.startswith("G-") and final_number!=provisional
+        page.locator("img.guest-qr").wait_for()
+        pending_guests_after=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('guest_outbox');return xs.filter(x=>x.status==='pending').length}""")
+        assert pending_guests_after==0
+        mark("offline_guest_auto_reconciled_to_secure_qr")
+
         # Mobile guest registration view must not overflow.
         mobile_context=browser.new_context(viewport={"width":390,"height":844},is_mobile=True,locale="ar-YE")
         mobile=mobile_context.new_page()
