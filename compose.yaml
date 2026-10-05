@@ -29,6 +29,9 @@ services:
       HOST: 0.0.0.0
       SEED_DEMO: "false"
       WEB_WORKERS: ${WEB_WORKERS:-4}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?Set first platform administrator email}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Platform Administrator}
+      BOOTSTRAP_CREDENTIALS_PATH: /app/data/bootstrap-admin.json
       PX_NATIVE_POSTGRES_ACCEPTED: ${PX_NATIVE_POSTGRES_ACCEPTED:-false}
       PX_LOAD_ACCEPTED: ${PX_LOAD_ACCEPTED:-false}
       PX_SECURITY_ACCEPTED: ${PX_SECURITY_ACCEPTED:-false}
