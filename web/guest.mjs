@@ -183,6 +183,8 @@ export async function scanPage(slug){
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
+  const flushAfterReconnect=async()=>{manifest=await loadManifest(page.id,token);await syncCheckins(page.id,token);status.textContent=token?'الجهاز مرتبط · تمت مزامنة السجل والطابور':'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.';};
+  window.addEventListener('online',flushAfterReconnect);
   if('BarcodeDetector'in window&&navigator.mediaDevices?.getUserMedia){
     try{
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;const detector=new BarcodeDetector({formats:['qr_code']});
