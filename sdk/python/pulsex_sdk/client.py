@@ -77,6 +77,19 @@ class PulseXClient:
     def collect(self, items: list[dict]):
         return self._request('POST', '/api/collect', {'items': items})
 
+    def guest_config(self, event_slug: str):
+        return self._request('GET', f'/api/public/events/{urllib.parse.quote(event_slug)}/guest-config')
+
+    def register_guest(self, event_slug: str, phone: str, country_code: str = '+967', **profile):
+        payload={'phone': phone, 'country_code': country_code, 'consent': True, **profile}
+        return self._request('POST', f'/api/public/events/{urllib.parse.quote(event_slug)}/guests/register', payload)
+
+    def sync_guests(self, event_slug: str, items: list[dict]):
+        return self._request('POST', f'/api/public/events/{urllib.parse.quote(event_slug)}/guests/sync', {'items': items})
+
+    def public_guest(self, event_slug: str, guest_number: str):
+        return self._request('GET', f'/api/public/events/{urllib.parse.quote(event_slug)}/guests/{urllib.parse.quote(guest_number)}')
+
     def admin_sites(self):
         return self._request('GET', '/api/admin/sites')
 
@@ -106,3 +119,22 @@ class PulseXClient:
 
     def review_access_request(self, site_id: str, request_id: str, status: str):
         return self._request('PATCH', f'/api/admin/sites/{urllib.parse.quote(site_id)}/access-requests/{urllib.parse.quote(request_id)}', {'status': status})
+
+
+    def event_guests(self, event_id: str):
+        return self._request('GET', f'/api/admin/events/{urllib.parse.quote(event_id)}/guests')
+
+    def register_event_guest(self, event_id: str, payload: dict):
+        return self._request('POST', f'/api/admin/events/{urllib.parse.quote(event_id)}/guests', payload)
+
+    def guest_checkins(self, event_id: str):
+        return self._request('GET', f'/api/admin/events/{urllib.parse.quote(event_id)}/guest-checkins')
+
+    def checkin_guest(self, event_id: str, payload: dict):
+        return self._request('POST', f'/api/admin/events/{urllib.parse.quote(event_id)}/guest-checkins', payload)
+
+    def device_guest_manifest(self, event_id: str, device_token: str):
+        return self._request('GET', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-manifest', headers={'X-PulseX-Device-Token': device_token})
+
+    def device_guest_checkins(self, event_id: str, device_token: str, items: list[dict]):
+        return self._request('POST', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-checkins', {'items': items}, headers={'X-PulseX-Device-Token': device_token})
