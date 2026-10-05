@@ -30,7 +30,7 @@ def normalize_phone(raw, country_code="+967") -> str:
         digits=compact[1:]
     else:
         digits=re.sub(r"\D","",compact)
-        cc=re.sub(r"\D","",text(country_code,8,True))
+        cc=re.sub(r"\D","",text(country_code,8,True).translate(PHONE_DIGIT_TRANSLATION))
         if not cc:
             fail("COUNTRY_CODE_INVALID")
         local=digits.lstrip("0")
