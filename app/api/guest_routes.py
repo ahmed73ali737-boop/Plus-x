@@ -17,7 +17,7 @@ from app.application.guest_service import (
     register_guest,
 )
 from app.application.access import require_scope
-from app.db import sites
+from app.db import guest_checkins, sites
 from app.domain import fail, now, text
 
 
@@ -104,6 +104,32 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
             return {"guests":list_event_guests(c,event_id)}
+
+    @app.post("/api/admin/events/{event_id}/guests")
+    def admin_register_guest(event_id: str, body: dict, request: Request):
+        with engine.begin() as c:
+            u,_=identify(request,c,True)
+            event=require_scope(c,u,event_id)
+            if event["kind"]!="event":
+                fail("EVENT_REQUIRED",404)
+            guest=register_guest(c,event,{**body,"consent":body.get("consent") is True})
+            log(c,u,event_id,"guest_registered",{"guest_number":guest["guest_number"],"created":guest["created"]})
+            return {**guest,"qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin)}
+
+    @app.get("/api/admin/events/{event_id}/guest-checkins")
+    def admin_guest_checkins(event_id: str, request: Request):
+        with engine.connect() as c:
+            u,_=identify(request,c)
+            event=require_scope(c,u,event_id)
+            if event["kind"]!="event":
+                fail("EVENT_REQUIRED",404)
+            rows=c.execute(
+                select(guest_checkins)
+                .where(guest_checkins.c.event_id==event_id)
+                .order_by(guest_checkins.c.scanned_at.desc())
+                .limit(500)
+            ).mappings()
+            return {"checkins":[dict(x) for x in rows]}
 
     @app.post("/api/admin/events/{event_id}/guest-checkins")
     def admin_guest_checkin(event_id: str, body: dict, request: Request):
