@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
+import os
 import re
 
 from sqlalchemy import insert, select, update
@@ -36,14 +38,31 @@ def normalize_phone(raw, country_code="+967") -> str:
     return "+"+digits
 
 
+def _guest_identity_key() -> bytes:
+    # Production requires GUEST_ID_SECRET via the release gate. The deterministic
+    # fallback exists only so local/demo/test databases remain reproducible.
+    raw=os.environ.get("GUEST_ID_SECRET") or "pulsex-local-development-guest-identity-v1"
+    return raw.encode("utf-8")
+
+
+def _guest_hmac(namespace: str, phone_e164: str) -> str:
+    return hmac.new(
+        _guest_identity_key(),
+        (namespace+":"+phone_e164).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def phone_hash(phone_e164: str) -> str:
-    return hashlib.sha256(phone_e164.encode("utf-8")).hexdigest()
+    # A keyed digest prevents an exported hash column from becoming a simple
+    # phone-number enumeration oracle.
+    return _guest_hmac("phone",phone_e164)
 
 
 def guest_number_for_phone(phone_e164: str) -> str:
-    # 64 bits of SHA-256 is enough for a human-facing identifier at event scale,
-    # while the database still enforces the full phone hash as the canonical key.
-    h=phone_hash(phone_e164).upper()
+    # Public guest numbers are keyed/opaque. They are associated with the phone
+    # identity, but cannot be reproduced from the phone without the server key.
+    h=_guest_hmac("guest-number",phone_e164).upper()
     return f"G-{h[:4]}-{h[4:8]}-{h[8:12]}-{h[12:16]}"
 
 
@@ -60,7 +79,11 @@ def register_guest(conn, event: dict, body: dict) -> dict:
     p_hash=phone_hash(phone)
     g_number=guest_number_for_phone(phone)
     guest=conn.execute(
-        select(guests).where((guests.c.phone_hash==p_hash)|(guests.c.guest_number==g_number))
+        select(guests).where(
+            (guests.c.phone_e164==phone) |
+            (guests.c.phone_hash==p_hash) |
+            (guests.c.guest_number==g_number)
+        )
     ).mappings().first()
     created=False
     values={
