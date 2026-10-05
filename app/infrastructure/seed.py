@@ -56,6 +56,24 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                 {'kind':'ad','code':'ad-1','title':'مساحة إعلان الجهة','body':'محتوى ترويجي قابل للتغيير من لوحة الإدارة.','placement':'all','media':'/media/ad-demo.svg'},
                 {'kind':'contact','code':'contact-1','title':'فريق الجهة','body':'أضف طرق التواصل المعتمدة.'},
             ]
+            if i == 1:
+                cfg.update(title='ثروات', subtitle='رؤية مالية تتفاعل مع اللحظة، لا صفحة تعريفية ثابتة.', description='مساحة ثروات الحيّة داخل الفعالية: استكشف المبادرات والخدمات والرؤى، شارك في التصويت، واترك ملاحظتك ضمن تجربة متغيرة مع تفاعل الجمهور.', template='tharawat_finance', primary='#7A5B19', secondary='#1E1A12', accent='#C9A552', background='#FBF8F0', cover='')
+                cfg['records'][0].update(title='منظومة ثروات الرقمية', body='استكشف المبادرات والمنصات والخدمات من نقطة واحدة، ثم انتقل مباشرة إلى التفاعل المناسب.')
+                cfg['records'][1].update(title='حلول مالية للأفراد والأعمال', body='رحلة مختصرة من التعرف إلى الاهتمام ثم طلب المتابعة، مع حفظ قرار الزائر بوضوح.')
+                cfg['records'][2].update(title='نبض التجربة', value=91, source='قيمة عرض تجريبية لواجهة ثروات الحيّة', display='trend')
+                cfg['records'][7].update(title='فرصة للاستكشاف', body='محتوى حي يتبدل مع أولويات الفعالية بدل بطاقة عرض ثابتة.')
+            elif i == 2:
+                cfg.update(title='Easy', subtitle='محفظتك وخدماتك اليومية — اكتشفها وتفاعل معها في لمسة.', description='تجربة Easy في المعرض مصممة لتكون عملية وسريعة: خدمات المحفظة، الخصوصية، الحصالة، بطاقات Wi-Fi وحسابات الأطفال، مع تصويت وأسئلة لحظية.', template='easy_finance', primary='#12A594', secondary='#073F45', accent='#E8B74A', background='#F4FBF9', cover='')
+                cfg['records'][0].update(title='الخصوصية والرقم البديل', body='اكتشف كيف يمكن إنجاز التعاملات مع خيارات خصوصية أكثر وضوحًا.')
+                cfg['records'][1].update(title='الحصالة والحسابات العائلية', body='الحصالة مع الكسر المباشر وحسابات الأطفال ضمن تجربة مالية يومية أبسط.')
+                cfg['records'][2].update(title='خدمات في لمسة', value=4, unit='تجارب', source='محتوى توضيحي: الخصوصية، الحصالة، Wi-Fi، حسابات الأطفال', display='number')
+                cfg['records'][7].update(title='جرّب مسار Easy', body='اختر الخدمة التي تهمك ثم صوّت وقيّم التجربة مباشرة.')
+            elif i == 3:
+                cfg.update(title='RTS', subtitle='من الحلول إلى المنصات إلى الأنظمة البيئية الرقمية.', description='RTS تعرض تجربة تقنية حيّة للتحول الرقمي والتكنولوجيا المالية وبوابات الدفع والتحصيل والمنصات المتكاملة، مع مؤشرات وتفاعل مباشر بدل موقع تعريفي جامد.', template='rts_tech', primary='#0B5CFF', secondary='#071D49', accent='#00C2FF', background='#F4F8FF', cover='')
+                cfg['records'][0].update(title='Digital Transformation', body='الاستراتيجية والرقمنة والأتمتة والتكامل والتحديث ضمن رحلة تنفيذ مترابطة.')
+                cfg['records'][1].update(title='FinTech & Payment Platforms', body='محافظ ومدفوعات وتحصيل ومنصات مالية وتكاملات قابلة للتوسع.')
+                cfg['records'][2].update(title='RTS Live Capabilities', value=8, unit='مسارات', source='بيانات عرض تجريبية لمساحة RTS التفاعلية', display='comparison')
+                cfg['records'][7].update(title='ادخل التجربة التقنية', body='استكشف قدرة، شاهد المؤشر، ثم شارك رأيك أو طلب المتابعة.')
             seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', sid, cfg))
 
         for sid, parent, event_id, kind, slug, cfg in seed_sites:
@@ -70,7 +88,13 @@ def seed_demo_data(engine, credentials_path=None, count=10):
             oid = f'org-{i:02}'
             site_id = f'agency-{i:02}'
             orgmap[site_id] = oid
-            c.execute(insert(organizations).values(id=oid, slug=f'organization-{i:02}', name=f'المؤسسة التجريبية {i:02}', profile={'description':'ملف مؤسسة دائم يمكن ربطه بأكثر من فعالية','logo':'','primary':['#176B73','#2759A5','#8047A1','#9B6724'][i % 4]}, status='active', created_at=now()))
+            brand_orgs={
+                1:('ثروات','ملف ثروات الدائم وربطه بمشاركاتها عبر الفعاليات','#7A5B19'),
+                2:('Easy','ملف Easy الدائم للمحفظة والخدمات المالية الرقمية','#12A594'),
+                3:('RTS','ملف RTS الدائم للتقنية والتحول الرقمي والتكنولوجيا المالية','#0B5CFF'),
+            }
+            org_name,org_desc,org_primary=brand_orgs.get(i,(f'المؤسسة التجريبية {i:02}','ملف مؤسسة دائم يمكن ربطه بأكثر من فعالية',['#176B73','#2759A5','#8047A1','#9B6724'][i % 4]))
+            c.execute(insert(organizations).values(id=oid, slug=f'organization-{i:02}', name=org_name, profile={'description':org_desc,'logo':'','primary':org_primary}, status='active', created_at=now()))
             c.execute(insert(event_participations).values(id=new_id(), event_id='event-demo', organization_id=oid, agency_site_id=site_id, participation_type='exhibitor', status='active', booth=f'A-{i:02}', summary='مشاركة تجريبية مرتبطة بالمؤسسة الدائمة', services=[], valid_from=event['start'], valid_until=event['end'], created_at=now()))
 
         accounts = [('platform','platform','admin@pulsex.test','مدير المنصة'), ('organizer','event-demo','organizer@pulsex.test','الجهة المنظمة')]
