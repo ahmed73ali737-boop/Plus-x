@@ -139,6 +139,7 @@ try:
         mark("offline_checkin_queued")
 
         context.set_offline(False)
+        page.wait_for_function("navigator.onLine === true")
         page.evaluate("window.dispatchEvent(new Event('online'))")
         for _ in range(120):
             sync_state=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return {accepted:xs.filter(x=>x.status==='accepted').length,pending:xs.filter(x=>x.status==='pending').length}}""")
