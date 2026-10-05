@@ -9,7 +9,7 @@ import tempfile
 import time
 import urllib.request
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMP = Path(tempfile.mkdtemp(prefix="pulsex-browser-"))
@@ -55,6 +55,15 @@ try:
         checks.append(name)
         print("PASS", name, flush=True)
 
+    def dismiss_welcome(target):
+        welcome = target.get_by_role("button", name="الدخول دون بيانات", exact=True)
+        try:
+            welcome.wait_for(state="visible", timeout=3000)
+            welcome.click()
+            target.locator("dialog").wait_for(state="detached", timeout=3000)
+        except PlaywrightTimeoutError:
+            pass
+
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = browser.new_context(viewport={"width": 1440, "height": 1000}, locale="ar-YE")
@@ -67,16 +76,15 @@ try:
         mark("platform_real_http_render")
 
         page.goto(URL + "/e/demo/p/agency-01")
-        welcome = page.get_by_role("button", name="الدخول دون بيانات", exact=True)
-        if welcome.count():
-            welcome.click()
         page.get_by_role("heading", name="الجهة التجريبية 01", exact=True, level=1).wait_for()
+        dismiss_welcome(page)
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
         page.screenshot(path=str(ROOT / "qa/agency-desktop.png"), full_page=True)
         mark("agency_real_http_render_no_overflow")
 
         page.locator("#questions").get_by_role("link", name="ابدأ الاستبيان", exact=True).click()
         page.locator('fieldset[data-code="q-interest"] input').first.check()
+        page.locator('fieldset[data-code="q-rate"] button').last.click()
         page.locator('form[data-form="main"]').get_by_role("button", name="إرسال الاستبيان", exact=True).click()
         page.get_by_text(re.compile("تم استلام|استلام إجابات")).first.wait_for()
         mark("public_survey_ui_to_database")
@@ -85,9 +93,8 @@ try:
         mobile = mobile_context.new_page()
         mobile.on("pageerror", lambda e: errors.append(str(e)))
         mobile.goto(URL + "/e/demo/p/agency-01")
-        mobile_welcome = mobile.get_by_role("button", name="الدخول دون بيانات", exact=True)
-        if mobile_welcome.count():
-            mobile_welcome.click()
+        mobile.get_by_role("heading", name="الجهة التجريبية 01", exact=True, level=1).wait_for()
+        dismiss_welcome(mobile)
         assert mobile.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
         mobile.screenshot(path=str(ROOT / "qa/agency-mobile.png"), full_page=False)
         mark("mobile_layout_no_overflow")
@@ -115,9 +122,8 @@ try:
         public_after_publish = context.new_page()
         public_after_publish.on("pageerror", lambda e: errors.append(str(e)))
         public_after_publish.goto(URL + "/e/demo/p/agency-01")
-        w = public_after_publish.get_by_role("button", name="الدخول دون بيانات", exact=True)
-        if w.count():
-            w.click()
+        public_after_publish.get_by_role("heading", name="الجهة التجريبية 01", exact=True, level=1).wait_for()
+        dismiss_welcome(public_after_publish)
         public_after_publish.locator("#questions").get_by_role("link", name="ابدأ الاستبيان", exact=True).click()
         time_question = public_after_publish.locator('fieldset[data-code="UI-TIME"]')
         time_question.wait_for()
