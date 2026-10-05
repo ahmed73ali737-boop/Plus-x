@@ -7,13 +7,13 @@ def test_api_contract_snapshot_and_operation_ids():
     schema=create_app('sqlite:///:memory:',origin='http://testserver',seed_demo=False).openapi()
     methods={'get','post','put','patch','delete'}
     current={path:sorted(m for m in item if m in methods) for path,item in sorted(schema['paths'].items())}
-    expected=json.loads((ROOT/'ops/api-contract-v1.json').read_text())
+    expected=json.loads((ROOT/'ops/api-contract-v1.json').read_text(encoding='utf-8'))
     assert current==expected
     ops=[item[m]['operationId'] for item in schema['paths'].values() for m in item if m in methods]
     assert len(ops)==len(set(ops)) and len(ops)>=40
 
 def test_critical_api_surface_present():
-    contract=json.loads((ROOT/'ops/api-contract-v1.json').read_text())
+    contract=json.loads((ROOT/'ops/api-contract-v1.json').read_text(encoding='utf-8'))
     for path in [
         '/api/auth/login','/api/public/site/{slug}','/api/collect','/api/admin/sites',
         '/api/admin/sites/{sid}/publish','/api/admin/sites/{sid}/imports/preview',
