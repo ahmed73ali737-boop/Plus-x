@@ -95,7 +95,9 @@ def test_organizer_lists_guests_and_device_manifest_is_scoped(tmp_path):
     c.headers.pop('Origin',None)
     manifest=c.get('/api/device/events/event-demo/guest-manifest',headers={'X-PulseX-Device-Token':token})
     assert manifest.status_code==200
-    assert any(x['guest_number']==guest['guest_number'] for x in manifest.json()['guests'])
+    manifest_guests=manifest.json()['guests']
+    assert any(x['guest_number']==guest['guest_number'] for x in manifest_guests)
+    assert all('phone' not in x and 'phone_e164' not in x for x in manifest_guests)
 
 
 def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
