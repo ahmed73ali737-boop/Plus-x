@@ -1,6 +1,6 @@
 import {api,toast,download} from './ui.mjs';
 let dbPromise;
-export function db(){return dbPromise??=new Promise((resolve,reject)=>{const r=indexedDB.open('pulsex-pilot-02',1);r.onupgradeneeded=()=>{for(const name of ['bundles','outbox','receipts'])r.result.createObjectStore(name,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+export function db(){return dbPromise??=new Promise((resolve,reject)=>{const r=indexedDB.open('pulsex-pilot-02',2);r.onupgradeneeded=()=>{for(const name of ['bundles','outbox','receipts','guests','guest_outbox','guest_receipts','guest_manifests','checkin_outbox','checkin_receipts'])if(!r.result.objectStoreNames.contains(name))r.result.createObjectStore(name,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 export async function put(store,value){const d=await db();return new Promise((ok,no)=>{const tx=d.transaction(store,'readwrite');tx.objectStore(store).put(value);tx.oncomplete=()=>ok(value);tx.onerror=()=>no(tx.error);tx.onabort=()=>no(tx.error||new Error('LOCAL_SAVE_ABORTED'));});}
 export async function get(store,id){const d=await db();return new Promise((ok,no)=>{const r=d.transaction(store).objectStore(store).get(id);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
 export async function all(store){const d=await db();return new Promise((ok,no)=>{const r=d.transaction(store).objectStore(store).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
