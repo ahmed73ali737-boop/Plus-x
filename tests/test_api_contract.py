@@ -18,5 +18,9 @@ def test_critical_api_surface_present():
         '/api/auth/login','/api/public/site/{slug}','/api/collect','/api/admin/sites',
         '/api/admin/sites/{sid}/publish','/api/admin/sites/{sid}/imports/preview',
         '/api/admin/sites/{sid}/metrics','/api/admin/sites/{sid}/devices',
-        '/api/device/heartbeat','/api/admin/organizations','/api/admin/audit']:
+        '/api/device/heartbeat','/api/admin/organizations','/api/admin/audit',
+        '/api/public/events/{event_slug}/guests/register',
+        '/api/public/events/{event_slug}/guests/{guest_number}/qr',
+        '/api/device/events/{event_id}/guest-manifest',
+        '/api/device/events/{event_id}/guest-checkins']:
         assert path in contract
