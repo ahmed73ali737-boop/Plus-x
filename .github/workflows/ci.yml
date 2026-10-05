@@ -80,8 +80,10 @@ jobs:
       - name: Run real HTTP browser end-to-end flow
         run: python tests/browser_smoke.py
       - name: Run IndexedDB offline queue component
+        if: always()
         run: python tests/browser_offline_indexeddb.py
       - name: Require IndexedDB evidence
+        if: always()
         run: python -c "import json, pathlib; d=json.loads(pathlib.Path('qa/windows11-browser-offline-indexeddb.json').read_text(encoding='utf-8')); assert d.get('status')=='passed', d"
       - name: Upload browser QA artifacts
         if: always()
