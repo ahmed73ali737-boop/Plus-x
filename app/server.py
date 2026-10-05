@@ -45,7 +45,6 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
 
     install_security_middleware(app, public_origin)
 
-    install_guest_routes(app, engine, public_origin, identify=lambda req,c,write=False: identify(req,c,write), site_row=site_row, log=log)
     app.include_router(create_health_router(engine))
 
     def identify(req,c,write=False):
