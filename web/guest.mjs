@@ -1,5 +1,5 @@
 import {h,root,api,field,check,button,toast,brand} from './ui.mjs';
-import {bundle,get,put,all,activate,localDeviceToken} from './offline.mjs';
+import {bundle,get,put,all,activate} from './offline.mjs';
 
 function cleanLocalPhone(raw,countryCode='+967'){
   let v=String(raw||'').trim().replace(/[\s().-]+/g,'');
@@ -195,7 +195,7 @@ async function syncCheckins(eventId,token){
 }
 export async function scanPage(slug){
   const page=await bundle(slug);applyTheme(page);document.title='ماسح الزوار | '+page.config.title;activate();
-  const auth=(await get('bundles','device-auth'))?.data||{};const token=auth.token||localDeviceToken();
+  const auth=(await get('bundles','device-auth'))?.data||{};const token=auth.token||'';
   let manifest=await loadManifest(page.id,token);
   root.replaceChildren(guestHeader(page,slug));const host=h('main',{class:'scanner-shell'});root.append(host);
   const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
