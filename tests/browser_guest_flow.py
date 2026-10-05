@@ -140,12 +140,13 @@ try:
 
         context.set_offline(False)
         page.evaluate("window.dispatchEvent(new Event('online'))")
-        for _ in range(50):
-            accepted=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return xs.filter(x=>x.status==='accepted').length}""")
-            if accepted:
+        for _ in range(120):
+            sync_state=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return {accepted:xs.filter(x=>x.status==='accepted').length,pending:xs.filter(x=>x.status==='pending').length}}""")
+            if sync_state['accepted']>=1 and sync_state['pending']==0:
                 break
             page.wait_for_timeout(100)
-        assert accepted>=1
+        assert sync_state['accepted']>=1 and sync_state['pending']==0, sync_state
+        page.get_by_text("تمت المزامنة",exact=False).first.wait_for()
         mark("offline_checkin_synced_after_reconnect")
 
         # Mobile guest registration view must not overflow.
