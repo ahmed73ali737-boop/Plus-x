@@ -96,7 +96,7 @@ def test_admin_ui_has_devices_and_request_review():
 
 def test_service_worker_cache_bumped_and_assets_exist():
     sw=(ROOT/'web/sw.js').read_text(encoding='utf-8')
-    assert "px-shell-v09" in sw
+    assert "px-shell-v12" in sw
     import re
     assets=re.findall(r"'/assets/([^']+)'",sw)
     assert assets and all((ROOT/'web'/name).is_file() for name in assets)
