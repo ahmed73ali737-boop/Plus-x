@@ -28,7 +28,7 @@ function facts(records){return h('div',{class:'facts-grid'},records.map(r=>{cons
 function surveyBlock(records){
  const groups=Object.groupBy(records,r=>r.form_id),wrap=h('div',{class:'stack'}),surveyMap=Object.fromEntries((page.config.surveys||[]).map(s=>[s.id,s]));
  for(const[id,qsRaw]of Object.entries(groups)){
-  const qs=qsRaw.sort((a,b)=>a.order-b.order),meta=surveyMap[id]||{id,title:'استبيان',description:'شاركنا رأيك.',completion:'شكرًا لك، تم استلام إجاباتك.',presentation:'one_page',show_progress:true,submit_label:'إرسال الاستبيان'},inputs={};
+  const qs=qsRaw.sort((a,b)=>a.order-b.order),meta=surveyMap[id]||{id,title:'استبيان',description:'شاركنا رأيك.',completion:'تم استلام الإجابات',presentation:'one_page',show_progress:true,submit_label:'إرسال الاستبيان'},inputs={};
   const body=h('form',{class:'survey card survey-'+(meta.presentation||'one_page'),'data-form':id});
   const info=h('div',{class:'card-body'},h('span',{class:'eyebrow'},'استبيان'),h('h3',{},meta.title),meta.description?h('p',{class:'muted'},meta.description):null);
   const progressText=h('p',{class:'survey-progress'},`${qs.length} أسئلة · الحقول المعلّمة * مطلوبة`),progressBar=h('progress',{class:'survey-step-progress',max:Math.max(1,qs.length),value:1});if(meta.show_progress!==false)info.append(progressText,progressBar);body.append(info);
