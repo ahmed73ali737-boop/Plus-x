@@ -4,6 +4,8 @@ Never uses the operator's production database. Records the actual host OS in its
 from pathlib import Path
 import base64, http.cookiejar, json, os, platform, socket, sqlite3, subprocess, sys, tempfile, time, urllib.error, urllib.request, uuid
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
+from app.core.build_info import BUILD_LABEL
 checks=[]
 
 def main():
