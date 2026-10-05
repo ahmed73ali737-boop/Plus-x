@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 from app.domain import normalize_config, normalize_record, answer_value
 
 @pytest.fixture
@@ -19,7 +20,7 @@ def login(c,app,index=0):
 
 def test_health_v04(env):
     _,c=env
-    x=c.get('/api/health').json(); assert x['build']=='windows-08'
+    x=c.get('/api/health').json(); assert x['build']==BUILD_LABEL
 
 def test_seed_permanent_organizations_and_participations(env):
     app,c=env; login(c,app,0)
