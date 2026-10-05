@@ -4,6 +4,7 @@ Never point this script at production.
 """
 from __future__ import annotations
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 import json, os, sys, uuid
 from sqlalchemy import text
 from fastapi.testclient import TestClient
@@ -42,6 +43,23 @@ rec=c.post('/api/collect',json={'items':[env]}).json()['receipts'][0];ok('submis
 rec2=c.post('/api/collect',json={'items':[env]}).json()['receipts'][0];ok('idempotent_replay',rec2['status']=='duplicate')
 with engine.connect() as con:
     ok('foreign_keys_present',con.execute(text("select count(*) from information_schema.table_constraints where constraint_type='FOREIGN KEY' and table_schema='public'")).scalar_one()>0)
+
+def concurrent_guest_register(i):
+    phone='0777 909 090' if i%2==0 else '+967 777 909 090'
+    with TestClient(app) as client:
+        response=client.post('/api/public/events/demo/guests/register',json={
+            'phone':phone,'country_code':'+967','consent':True,'name':'Concurrent Guest'
+        })
+        return response.status_code,response.json()
+
+with ThreadPoolExecutor(max_workers=8) as pool:
+    concurrent_results=list(pool.map(concurrent_guest_register,range(16)))
+ok('concurrent_guest_requests_all_200',all(code==200 for code,_ in concurrent_results))
+numbers={body.get('guest_number') for _,body in concurrent_results}
+ok('concurrent_same_phone_one_guest_number',len(numbers)==1 and None not in numbers)
+with engine.connect() as con:
+    ok('concurrent_same_phone_one_guest_row',con.execute(text("select count(*) from px_guests where phone_e164='+967777909090'")).scalar_one()==1)
+    ok('concurrent_same_phone_one_event_registration',con.execute(text("select count(*) from px_event_guests eg join px_guests g on g.id=eg.guest_id where eg.event_id='event-demo' and g.phone_e164='+967777909090'")).scalar_one()==1)
 report={'status':'passed','checks':checks,'database':'PostgreSQL','warning':'Application scope isolation was exercised; PostgreSQL RLS policies are not claimed by this script.'}
 (ROOT/'qa/postgres-native-acceptance.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 print(json.dumps(report,indent=2))
