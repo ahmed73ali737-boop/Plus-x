@@ -34,7 +34,7 @@ def main():
             status,data,_=req(path,body,method,extra);assert status==code,(path,status,data[:200]);return json.loads(data)
         def mark(name):checks.append(name);print('PASS',name,flush=True)
         try:
-            assert j('/api/health')['build']=='windows-08';mark('application_health')
+            assert j('/api/health')['build']==BUILD_LABEL;mark('application_health')
             for path in ['/','/e/demo','/e/demo/p/agency-01','/admin','/assets/design.css','/assets/catalog.mjs','/assets/public.mjs','/sw.js']:
                 assert req(path)[0]==200;mark('route_'+path)
             assert len(j('/api/public/site/demo')['agencies'])==10;mark('organizer_and_ten_agencies')
