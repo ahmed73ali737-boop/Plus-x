@@ -183,17 +183,16 @@ export async function scanPage(slug){
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
-  const flushAfterReconnect=async()=>{manifest=await loadManifest(page.id,token);await syncCheckins(page.id,token);status.textContent=token?'الجهاز مرتبط · تمت مزامنة السجل والطابور':'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.';};
-  window.addEventListener('online',flushAfterReconnect);
+  const retry=()=>refreshSync(false);
+  const reconnect=()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);await retry();status.textContent=token?'الجهاز مرتبط · تمت مزامنة السجل والطابور':'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.';},350);
+  const retryTimer=setInterval(()=>{if(navigator.onLine)retry();},3000);
+  window.addEventListener('online',reconnect);
+  window.addEventListener('beforeunload',()=>{clearInterval(retryTimer);window.removeEventListener('online',reconnect);},{once:true});
+  await refreshSync(false);
   if('BarcodeDetector'in window&&navigator.mediaDevices?.getUserMedia){
     try{
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;const detector=new BarcodeDetector({formats:['qr_code']});
       let busy=false;const tick=async()=>{if(busy)return;busy=true;try{for(const code of await detector.detect(video)){if(code.rawValue){input.input.value=code.rawValue;await show(code.rawValue);break;}}}catch{}finally{busy=false;}};setInterval(tick,700);
     }catch{cameraBox.append(h('p',{class:'notice'},'تعذر فتح الكاميرا. استخدم الإدخال اليدوي أو ماسح QR متصل بالجهاز.'));}
   }else cameraBox.append(h('p',{class:'notice'},'المتصفح لا يدعم مسح QR بالكاميرا مباشرة. استخدم الإدخال اليدوي أو متصفحًا يدعم BarcodeDetector.'));
-  const retry=()=>refreshSync(false);
-  const retryTimer=setInterval(()=>{if(navigator.onLine)retry();},3000);
-  window.addEventListener('online',()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);await retry();},350));
-  window.addEventListener('beforeunload',()=>clearInterval(retryTimer),{once:true});
-  await refreshSync(false);
 }
