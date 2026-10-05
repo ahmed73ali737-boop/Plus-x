@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pulsex-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python-core:
     runs-on: ubuntu-latest
@@ -73,6 +77,12 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run read-only Chromium component suite
         run: python tests/browser_components.py
+      - name: Run real HTTP browser end-to-end flow
+        run: python tests/browser_smoke.py
+      - name: Run IndexedDB offline queue component
+        run: python tests/browser_offline_indexeddb.py
+      - name: Require IndexedDB evidence
+        run: python -c "import json, pathlib; d=json.loads(pathlib.Path('qa/windows11-browser-offline-indexeddb.json').read_text(encoding='utf-8')); assert d.get('status')=='passed', d"
       - name: Upload browser QA artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,6 +90,9 @@ jobs:
           name: browser-qa
           path: |
             qa/browser-components.json
+            qa/browser-smoke.json
+            qa/windows11-browser-offline-indexeddb.json
+            qa/browser-server.log
             qa/*.png
           if-no-files-found: ignore
 
