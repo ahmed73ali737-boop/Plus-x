@@ -8,12 +8,22 @@ from app.infrastructure.repository import get_site
 
 
 def active_window(record: dict) -> bool:
+    """Time-bounded assignment check.
+
+    Assignments may intentionally expire. Participation access is different:
+    an ended event must remain administrable for reporting, export and archive
+    work; only an explicit participation status change revokes that access.
+    """
     current = now()
     return (
         record.get('status', 'active') == 'active'
         and (not record.get('valid_from') or record['valid_from'] <= current)
         and (not record.get('valid_until') or record['valid_until'] > current)
     )
+
+
+def active_participation(record: dict) -> bool:
+    return record.get('status', 'active') == 'active'
 
 
 def can_manage(conn, user, site) -> bool:
@@ -27,7 +37,7 @@ def can_manage(conn, user, site) -> bool:
         linked = conn.execute(select(event_participations).where(event_participations.c.agency_site_id == site['id'])).mappings().all()
         if not linked:
             return True
-        if any(active_window(dict(p)) for p in linked):
+        if any(active_participation(dict(p)) for p in linked):
             return True
         return False
 
@@ -56,7 +66,7 @@ def can_manage(conn, user, site) -> bool:
                 event_participations.c.agency_site_id == site['id'],
             )
         ).mappings().all()
-        if any(active_window(dict(p)) for p in participations):
+        if any(active_participation(dict(p)) for p in participations):
             return True
     return False
 
