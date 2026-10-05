@@ -138,12 +138,23 @@ async function loadManifest(eventId,token){
   }
 }
 async function syncCheckins(eventId,token){
-  if(!navigator.onLine||!token)return;
-  const items=(await all('checkin_outbox')).filter(x=>x.event_id===eventId&&x.status==='pending').slice(0,100);if(!items.length)return;
+  const pending=()=>all('checkin_outbox').then(xs=>xs.filter(x=>x.event_id===eventId&&x.status==='pending'));
+  if(!token)return{synced:0,pending:(await pending()).length,error:'DEVICE_NOT_PAIRED'};
+  if(!navigator.onLine)return{synced:0,pending:(await pending()).length,offline:true};
+  const items=(await pending()).slice(0,100);if(!items.length)return{synced:0,pending:0};
   try{
-    const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-checkins',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({items:items.map(x=>x.payload)})});if(!r.ok)throw new Error();
-    const out=await r.json();for(const rc of out.receipts||[]){const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});await put('checkin_outbox',{...item,status:rc.status==='rejected'?'rejected':'accepted',error:rc.error||''});}
-  }catch{}
+    const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-checkins',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({items:items.map(x=>x.payload)})});
+    if(!r.ok)throw new Error('CHECKIN_SYNC_'+r.status);
+    const out=await r.json();let synced=0,rejected=0;
+    for(const rc of out.receipts||[]){
+      const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
+      const state=rc.status==='rejected'?'rejected':'accepted';
+      if(state==='accepted')synced++;else rejected++;
+      await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
+      await put('checkin_outbox',{...item,status:state,error:rc.error||''});
+    }
+    return{synced,rejected,pending:(await pending()).length};
+  }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
 }
 export async function scanPage(slug){
   const page=await bundle(slug);applyTheme(page);document.title='ماسح الزوار | '+page.config.title;activate();
@@ -151,17 +162,24 @@ export async function scanPage(slug){
   let manifest=await loadManifest(page.id,token);
   root.replaceChildren(guestHeader(page,slug));const host=h('main',{class:'scanner-shell'});root.append(host);
   const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
+  const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
   const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
+  async function refreshSync(notify=false){
+    const out=await syncCheckins(page.id,token);
+    syncState.textContent=out.pending?'معلّق: '+out.pending:out.error?'المزامنة تحتاج اتصال':'تمت المزامنة';
+    if(notify)toast(out.pending?'ما زالت '+out.pending+' حركة محفوظة محليًا.':'تمت مزامنة حركات الدخول.');
+    return out;
+  }
   async function show(number){
     number=parseGuestNumber(number);if(!number){result.replaceChildren(h('p',{},'رمز غير معروف'));return;}
     let g=(manifest.guests||[]).find(x=>x.guest_number===number);
     if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
     if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
-    const check=button('تسجيل دخول',async()=>{const scan_id=crypto.randomUUID();await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:'entry',checkpoint:'main',client_time:new Date().toISOString()}});await syncCheckins(page.id,token);toast(navigator.onLine?'تم تسجيل الدخول.':'تم الحفظ محليًا وسيتم الإرسال عند عودة الاتصال.');},'btn');
+    const check=button('تسجيل دخول',async()=>{const scan_id=crypto.randomUUID();await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:'entry',checkpoint:'main',client_time:new Date().toISOString()}});const out=await refreshSync(false);toast(out.pending?'تم الحفظ محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل الدخول ومزامنته.');},'btn');
     result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title].filter(Boolean).join(' · ')),h('p',{class:'muted'},g.phone||''),check);
   }
-  const tools=h('div',{class:'scanner-tools'},input.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'));
+  const tools=h('div',{class:'scanner-tools'},input.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
@@ -171,5 +189,9 @@ export async function scanPage(slug){
       let busy=false;const tick=async()=>{if(busy)return;busy=true;try{for(const code of await detector.detect(video)){if(code.rawValue){input.input.value=code.rawValue;await show(code.rawValue);break;}}}catch{}finally{busy=false;}};setInterval(tick,700);
     }catch{cameraBox.append(h('p',{class:'notice'},'تعذر فتح الكاميرا. استخدم الإدخال اليدوي أو ماسح QR متصل بالجهاز.'));}
   }else cameraBox.append(h('p',{class:'notice'},'المتصفح لا يدعم مسح QR بالكاميرا مباشرة. استخدم الإدخال اليدوي أو متصفحًا يدعم BarcodeDetector.'));
-  window.addEventListener('online',async()=>{manifest=await loadManifest(page.id,token);await syncCheckins(page.id,token);});
+  const retry=()=>refreshSync(false);
+  const retryTimer=setInterval(()=>{if(navigator.onLine)retry();},3000);
+  window.addEventListener('online',()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);await retry();},350));
+  window.addEventListener('beforeunload',()=>clearInterval(retryTimer),{once:true});
+  await refreshSync(false);
 }
