@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import uvicorn
 from app.server import create_app
+from app.core.build_info import APP_NAME, BUILD_LABEL
 
 root=Path(__file__).resolve().parent
 os.chdir(root)
@@ -19,7 +20,7 @@ else:
     app=create_app(seed_demo=seed_demo,credentials_path=credentials)
 
 if __name__=='__main__':
-    print(f'PulseX Windows 09 | workers={workers} | seed_demo={seed_demo}')
+    print(f'{APP_NAME} {BUILD_LABEL} | workers={workers} | seed_demo={seed_demo}')
     if workers > 1:
         if seed_demo:
             raise RuntimeError('MULTI_WORKER_REQUIRES_SEED_DEMO_FALSE')
