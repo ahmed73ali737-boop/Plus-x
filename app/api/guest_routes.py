@@ -18,7 +18,7 @@ from app.application.guest_service import (
 )
 from app.application.access import require_scope
 from app.db import sites
-from app.domain import fail, text
+from app.domain import fail, now, text
 
 
 def install_guest_routes(app, engine, public_origin: str, identify, site_row, log):
@@ -126,7 +126,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            return {"event_id":event_id,"generated_at":event["draft"].get("start") or "","guests":list_event_guests(c,event_id)}
+            return {"event_id":event_id,"generated_at":now(),"guests":list_event_guests(c,event_id)}
 
     @app.post("/api/device/events/{event_id}/guest-checkins")
     def device_guest_checkins(event_id: str, body: dict, request: Request):
