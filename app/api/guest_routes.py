@@ -152,7 +152,10 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            return {"event_id":event_id,"generated_at":now(),"guests":list_event_guests(c,event_id)}
+            manifest=[]
+            for guest in list_event_guests(c,event_id):
+                manifest.append({k:v for k,v in guest.items() if k!="phone"})
+            return {"event_id":event_id,"generated_at":now(),"guests":manifest}
 
     @app.post("/api/device/events/{event_id}/guest-checkins")
     def device_guest_checkins(event_id: str, body: dict, request: Request):
