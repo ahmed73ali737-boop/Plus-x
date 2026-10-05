@@ -101,6 +101,47 @@ signup_requests=Table('px_signup_requests',metadata,
     Column('created_at',String(64),nullable=False))
 Index('px_signup_site_status',signup_requests.c.site_id,signup_requests.c.status)
 Index('px_signup_event_status',signup_requests.c.event_id,signup_requests.c.status)
+
+guests=Table('px_guests',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('phone_e164',String(24),unique=True,nullable=False),
+    Column('phone_hash',String(64),unique=True,nullable=False),
+    Column('guest_number',String(32),unique=True,nullable=False),
+    Column('name',String(160)),
+    Column('job_title',String(160)),
+    Column('organization',String(200)),
+    Column('status',String(20),nullable=False,default='active'),
+    Column('created_at',String(64),nullable=False),
+    Column('updated_at',String(64),nullable=False))
+Index('px_guests_phone_hash',guests.c.phone_hash)
+Index('px_guests_guest_number',guests.c.guest_number)
+
+event_guests=Table('px_event_guests',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('event_id',String(64),ForeignKey('px_sites.id'),nullable=False),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
+    Column('status',String(20),nullable=False,default='registered'),
+    Column('guest_type',String(40),nullable=False,default='visitor'),
+    Column('metadata_json',JSON,nullable=False),
+    Column('registered_at',String(64),nullable=False),
+    Column('updated_at',String(64),nullable=False),
+    UniqueConstraint('event_id','guest_id',name='uq_px_event_guest'))
+Index('px_event_guests_event_status',event_guests.c.event_id,event_guests.c.status)
+Index('px_event_guests_guest',event_guests.c.guest_id)
+
+guest_checkins=Table('px_guest_checkins',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('event_id',String(64),ForeignKey('px_sites.id'),nullable=False),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
+    Column('guest_number',String(32),nullable=False),
+    Column('scanner_id',String(64)),
+    Column('source',String(20),nullable=False),
+    Column('direction',String(12),nullable=False,default='entry'),
+    Column('checkpoint',String(80),nullable=False,default='main'),
+    Column('client_time',String(64)),
+    Column('scanned_at',String(64),nullable=False))
+Index('px_guest_checkins_event_time',guest_checkins.c.event_id,guest_checkins.c.scanned_at)
+Index('px_guest_checkins_guest_time',guest_checkins.c.guest_id,guest_checkins.c.scanned_at)
 audit=Table('px_audit',metadata,Column('id',String(64),primary_key=True),Column('user_id',String(64)),Column('site_id',String(64)),Column('action',String(80),nullable=False),Column('at',String(64),nullable=False),Column('details',JSON,nullable=False))
 
 def make_engine(url=None):
