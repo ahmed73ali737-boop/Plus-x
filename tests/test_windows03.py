@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools import launcher, backup_local
@@ -26,7 +27,7 @@ def test_unicode_accounts_are_utf8(isolated):
 
 def test_build_identification(isolated):
     c,_,_=isolated
-    assert c.get('/api/health').json()['build']=='windows-08'
+    assert c.get('/api/health').json()['build']==BUILD_LABEL
 
 def test_non_demo_event_slug_available_to_agency(isolated):
     c,a,_=isolated
