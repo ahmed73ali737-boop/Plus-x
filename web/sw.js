@@ -1,4 +1,4 @@
-const CACHE='px-shell-v12';
+const CACHE='px-shell-v13';
 const ASSETS=['/assets/index.html','/assets/style.css','/assets/design.css','/assets/icons.mjs','/assets/catalog.mjs','/assets/app.mjs','/assets/ui.mjs','/assets/offline.mjs','/assets/questions.mjs','/assets/public.mjs','/assets/admin.mjs','/assets/guest.mjs','/assets/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{for(const key of await caches.keys()){if(key.startsWith('px-shell-')&&key!==CACHE)await caches.delete(key);}await self.clients.claim();})()));
