@@ -54,6 +54,8 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
+    install_guest_routes(app, engine, public_origin, identify=identify, site_row=site_row, log=log)
+
 
     @app.post('/api/auth/login')
     def login(body:dict,request:Request):
