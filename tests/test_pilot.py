@@ -121,7 +121,7 @@ def test_formula_xlsx_rejected(client,app):
     r=client.post('/api/admin/sites/agency-01/imports/preview',json={'name':'bad.xlsx','base64':base64.b64encode(out.getvalue()).decode()});assert r.status_code==422 and 'FORMULA' in r.text
 @pytest.mark.parametrize('sheet,kind',[(k,v) for k,v in [('Participants','participant'),('Sponsors','sponsor'),('Sessions','session'),('Places','place'),('Facts','fact'),('Services','service'),('Questions','question'),('Polls','poll'),('Ads','ad'),('Offers','offer'),('Media','media'),('Contacts','contact'),('News','news')]])
 def test_each_csv_template_valid(client,app,sheet,kind):
-    login(client,app,7);data=(ROOT/'templates'/f'{sheet}.csv').read_text()
+    login(client,app,7);data=(ROOT/'templates'/f'{sheet}.csv').read_text(encoding='utf-8-sig')
     p=client.post('/api/admin/sites/agency-06/imports/preview',json={'kind':kind,'csv':data});assert p.status_code==200,p.text;assert p.json()['valid'],p.text
 @pytest.mark.parametrize('kind',['service','fact','ad','participant','sponsor','place','offer','media','news','contact'])
 def test_manual_record_normalization(kind):
