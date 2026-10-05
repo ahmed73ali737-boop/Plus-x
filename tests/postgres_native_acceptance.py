@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from app.db import make_engine, metadata
+from tools.migrate_postgres import apply_migrations, execute_script
 from app.server import create_app
 
 url=os.environ.get('PX_POSTGRES_TEST_URL','')
@@ -22,7 +23,14 @@ if not url.startswith('postgresql+psycopg://') or not allow:
 
 engine=make_engine(url)
 if engine.dialect.name!='postgresql': raise SystemExit('POSTGRESQL_REQUIRED')
-metadata.drop_all(engine); metadata.create_all(engine)
+metadata.drop_all(engine)
+with engine.begin() as con:
+    con.exec_driver_sql('DROP TABLE IF EXISTS px_schema_migrations')
+    execute_script(con,(ROOT/'ops/001_full_schema_postgres.sql').read_text(encoding='utf-8'))
+migration_result=apply_migrations(engine)
+assert '004_windows12_guest_identity.sql' in migration_result['applied']
+migration_repeat=apply_migrations(engine)
+assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==3
 app=create_app(url,origin='http://testserver',seed_demo=True)
 c=TestClient(app)
 checks=[]
@@ -30,6 +38,8 @@ def ok(name,cond=True):
     assert cond,name; checks.append(name)
 
 ok('postgres_dialect',app.state.engine.dialect.name=='postgresql')
+ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
+ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==3)
 with engine.connect() as con:
     ok('database_roundtrip',con.execute(text('select 1')).scalar_one()==1)
     tables=set(con.execute(text("select tablename from pg_tables where schemaname='public' and tablename like 'px_%'")).scalars())
