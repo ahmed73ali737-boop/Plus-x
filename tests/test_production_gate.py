@@ -10,6 +10,7 @@ def production_env(monkeypatch):
     monkeypatch.setenv("PUBLIC_ORIGIN","https://events.example.com")
     monkeypatch.setenv("WEB_WORKERS","2")
     monkeypatch.setenv("SEED_DEMO","false")
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAIL","admin@events.test")
     monkeypatch.setenv("PX_NATIVE_POSTGRES_ACCEPTED","true")
     monkeypatch.setenv("PX_LOAD_ACCEPTED","true")
     monkeypatch.setenv("PX_SECURITY_ACCEPTED","true")
