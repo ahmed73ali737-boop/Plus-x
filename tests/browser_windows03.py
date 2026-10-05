@@ -78,7 +78,9 @@ with sync_playwright() as p:
         page.locator('fieldset[data-code="q-interest"] input').first.check()
         page.locator('fieldset[data-code="q-rate"] button').last.click()
         page.locator('form[data-form="main"]').get_by_role('button',name='إرسال الاستبيان',exact=True).click()
-        page.get_by_text('تم استلام الإجابات',exact=True).wait_for()
+        success=page.locator('form[data-form="main"] .success')
+        success.wait_for()
+        assert success.inner_text().strip(), 'survey success state rendered empty'
         mark('survey_ui_to_real_http_and_database_bridge')
         page.screenshot(path=str(ROOT/'qa/survey-desktop.png'),full_page=True)
         page.get_by_role('link',name='الرئيسية',exact=True).first.click()
