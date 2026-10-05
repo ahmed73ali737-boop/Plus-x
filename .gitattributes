@@ -1,0 +1,11 @@
+# Windows launchers are native cmd.exe artifacts; keep checkout line endings deterministic.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Source files remain normalized.
+*.py text eol=lf
+*.sh text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
