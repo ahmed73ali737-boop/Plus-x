@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import os
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -19,7 +20,10 @@ def backup() -> Path:
     out=destination/('pulsex-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'.zip')
     with tempfile.TemporaryDirectory(prefix='pulsex-backup-') as td:
         snapshot=Path(td)/'pulsex-pilot.sqlite3'
-        with sqlite3.connect(source.as_uri()+'?mode=ro',uri=True) as src, sqlite3.connect(snapshot) as dst:
+        # sqlite3.Connection's context manager commits/rolls back but does not
+        # close the handle. Explicit closing is required on Windows before the
+        # snapshot can be reopened by zipfile.
+        with closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True)) as src, closing(sqlite3.connect(snapshot)) as dst:
             src.backup(dst)
             if dst.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
                 raise RuntimeError('Snapshot failed integrity check.')
