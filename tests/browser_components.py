@@ -26,7 +26,7 @@ routes=replace_media(routes)
 qr=base64.b64encode(client.get('/api/admin/sites/agency-01/qr').content).decode()
 
 def code(name):
-    s=(ROOT/'web'/name).read_text();s=re.sub(r'^import\s*\{[^}]*\}\s*from\s*[\'\"][^\'\"]+[\'\"];?','',s,flags=re.M);return s.replace('export ','')
+    s=(ROOT/'web'/name).read_text(encoding='utf-8');s=re.sub(r'^import\s*\{[^}]*\}\s*from\s*[\'\"][^\'\"]+[\'\"];?','',s,flags=re.M);return s.replace('export ','')
 ui=code('ui.mjs').replace("else e.setAttribute(k,v===true?'':String(v));","else e.setAttribute(k,k==='src'&&String(v).includes('/qr')?window._qr:v===true?'':String(v));")
 icons='const Icons=(()=>{'+code('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+code('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
