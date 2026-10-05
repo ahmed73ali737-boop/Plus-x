@@ -14,11 +14,11 @@ function cleanLocalPhone(raw,countryCode='+967'){
   if(!/^\d{8,15}$/.test(digits))throw new Error('أدخل رقم هاتف صحيحًا مع رمز الدولة.');
   return '+'+digits;
 }
-async function numberForPhone(phone){
+async function provisionalNumberForPhone(phone){
   if(!crypto?.subtle)throw new Error('إنشاء رقم الزائر دون اتصال يحتاج متصفحًا آمنًا يدعم Web Crypto.');
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(phone));
   const hex=[...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
-  return 'G-'+hex.slice(0,4)+'-'+hex.slice(4,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16);
+  return 'P-'+hex.slice(0,4)+'-'+hex.slice(4,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16);
 }
 function applyTheme(page){
   const c=page.config||{};
@@ -44,9 +44,10 @@ async function cacheQr(slug,g){
   return g;
 }
 async function syncGuestRegistrations(slug){
-  if(!navigator.onLine)return;
+  if(!navigator.onLine)return{synced:0};
   const pending=(await all('guest_outbox')).filter(x=>x.slug===slug&&x.status==='pending').slice(0,100);
-  if(!pending.length)return;
+  if(!pending.length)return{synced:0};
+  let synced=0;
   try{
     const out=await api('/api/public/events/'+encodeURIComponent(slug)+'/guests/sync',{items:pending.map(x=>x.body)});
     for(const receipt of out.receipts||[]){
@@ -54,23 +55,31 @@ async function syncGuestRegistrations(slug){
       if(receipt.status==='accepted'){
         await put('guest_receipts',{id:item.id,...receipt,at:new Date().toISOString()});
         await put('guest_outbox',{...item,status:'accepted'});
-        const local=await get('guests',guestKey(slug,receipt.guest_number));
-        if(local)await cacheQr(slug,{...local,synced:true,created:receipt.created});
+        const local=item.local_id?await get('guests',item.local_id):null;
+        const canonicalId=guestKey(slug,receipt.guest_number);
+        const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,synced:true,provisional:false,created:receipt.created,updated_at:new Date().toISOString()};
+        await put('guests',canonical);await cacheQr(slug,canonical);
+        if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,status:'reconciled',redirect_to:canonicalId,synced:true,updated_at:new Date().toISOString()});
+        synced++;
       }else await put('guest_outbox',{...item,status:'rejected',error:receipt.error});
     }
   }catch{}
+  return{synced};
 }
 async function registerGuestOfflineFirst(slug,values){
   const phone=cleanLocalPhone(values.phone,values.country_code);
-  const guest_number=await numberForPhone(phone);
-  const id=guestKey(slug,guest_number);
+  const provisionalNumber=await provisionalNumberForPhone(phone);
+  const id=guestKey(slug,provisionalNumber);
   const existing=await get('guests',id);
-  const local={id,slug,guest_number,phone,name:values.name||existing?.name||'',job_title:values.job_title||existing?.job_title||'',organization:values.organization||existing?.organization||'',status:'registered',synced:existing?.synced||false,qr_data_url:existing?.qr_data_url||'',updated_at:new Date().toISOString()};
+  if(existing?.redirect_to){const canonical=await get('guests',existing.redirect_to);if(canonical)return canonical;}
+  const local={id,slug,guest_number:provisionalNumber,phone,name:values.name||existing?.name||'',job_title:values.job_title||existing?.job_title||'',organization:values.organization||existing?.organization||'',status:'pending_sync',synced:false,provisional:true,qr_data_url:'',updated_at:new Date().toISOString()};
   await put('guests',local);
   const client_id=crypto.randomUUID();
-  await put('guest_outbox',{id:client_id,slug,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,consent:true}});
+  await put('guest_outbox',{id:client_id,slug,local_id:id,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,consent:true}});
   await syncGuestRegistrations(slug);
-  return await get('guests',id)||local;
+  const reconciled=await get('guests',id);
+  if(reconciled?.redirect_to){const canonical=await get('guests',reconciled.redirect_to);if(canonical)return canonical;}
+  return local;
 }
 function guestHeader(page,slug){
   return h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(),h('nav',{class:'toplinks'},h('a',{href:'/e/'+slug},'الفعالية'),h('a',{href:'/e/'+slug+'/guest'},'بطاقة الزائر'),h('a',{href:'/e/'+slug+'/scan'},'المسح')),h('span',{class:'tag'},navigator.onLine?'متصل':'دون اتصال')));
@@ -89,10 +98,10 @@ async function renderPass(page,slug,g){
       h('div',{class:'guest-pass-glow'}),
       h('div',{class:'guest-pass-head'},h('div',{},h('span',{class:'eyebrow'},'PULSEX GUEST PASS'),h('h1',{},g.name||'زائر')),h('span',{class:'live-pill'},g.synced?'مسجّلة بالخادم':'محفوظة محليًا')),
       h('p',{class:'guest-event'},page.config.title),
-      h('div',{class:'guest-number'},h('span',{},'رقم الزائر'),h('strong',{},g.guest_number)),
-      g.qr_data_url?h('img',{src:g.qr_data_url,alt:'QR '+g.guest_number,class:'guest-qr'}):h('div',{class:'qr-pending'},h('strong',{},'QR ينتظر المزامنة'),h('small',{},'رقم الزائر ثابت ولن يتغير. عند الوصول لخادم الفعالية سيظهر QR تلقائيًا.')),
+      h('div',{class:'guest-number'},h('span',{},g.provisional?'رقم محلي مؤقت':'رقم الزائر'),h('strong',{},g.guest_number)),
+      g.qr_data_url?h('img',{src:g.qr_data_url,alt:'QR '+g.guest_number,class:'guest-qr'}):h('div',{class:'qr-pending'},h('strong',{},g.provisional?'بانتظار خادم الفعالية لإنشاء QR النهائي':'QR ينتظر المزامنة'),h('small',{},g.provisional?'هذا الرقم المحلي لا يكشف هاتفك ولا يُستخدم كبطاقة دخول نهائية. عند الاتصال بخادم الفعالية سيستبدل برقم QR آمن.':'عند الوصول لخادم الفعالية سيظهر QR تلقائيًا.')),
       h('div',{class:'guest-meta'},g.organization?h('span',{},g.organization):null,g.job_title?h('span',{},g.job_title):null),
-      h('div',{class:'guest-pass-actions'},h('a',{class:'btn secondary',href:'/e/'+slug},'موقع الفعالية'),button('تحديث البطاقة',async()=>{await syncGuestRegistrations(slug);location.reload();},'btn'))
+      h('div',{class:'guest-pass-actions'},h('a',{class:'btn secondary',href:'/e/'+slug},'موقع الفعالية'),button('تحديث البطاقة',async()=>{await syncGuestRegistrations(slug);const cur=await get('guests',guestKey(slug,g.guest_number));if(cur?.redirect_to){const target=await get('guests',cur.redirect_to);if(target){location.href='/e/'+slug+'/guest/'+encodeURIComponent(target.guest_number);return;}}location.reload();},'btn'))
     ),
     h('aside',{class:'guest-help'},h('h2',{},'كيف تستخدمها؟'),h('ol',{},h('li',{},'احتفظ بهذه البطاقة على هاتفك.'),h('li',{},'عند البوابة اعرض QR أو رقم الزائر.'),h('li',{},'يمكن للماسح التحقق من البطاقة حتى عند انقطاع الإنترنت إذا تم تجهيز سجل الزوار مسبقًا.')),h('p',{class:'notice'},'رقم الهاتف هو مفتاح منع التكرار. لا نضع رقم الهاتف داخل QR.'))
   ));
