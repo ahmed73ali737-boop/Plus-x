@@ -1,9 +1,9 @@
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-admin=(root/'web/admin.mjs').read_text()
-public=(root/'web/public.mjs').read_text()
-questions=(root/'web/questions.mjs').read_text()
-css=(root/'web/design.css').read_text()
+admin=(root/'web/admin.mjs').read_text(encoding='utf-8')
+public=(root/'web/public.mjs').read_text(encoding='utf-8')
+questions=(root/'web/questions.mjs').read_text(encoding='utf-8')
+css=(root/'web/design.css').read_text(encoding='utf-8')
 checks={
  'survey_templates':'قوالب استبيانات جاهزة' in admin,
  'bulk_questions':'إضافة عدة أسئلة' in admin,
