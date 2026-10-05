@@ -2,13 +2,15 @@ import {h,root,api,field,check,button,toast,brand} from './ui.mjs';
 import {bundle,get,put,all,activate} from './offline.mjs';
 
 function cleanLocalPhone(raw,countryCode='+967'){
-  let v=String(raw||'').trim().replace(/[\s().-]+/g,'');
+  const digitMap={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  const ascii=x=>String(x||'').replace(/[٠-٩۰-۹]/g,d=>digitMap[d]);
+  let v=ascii(raw).trim().replace(/[\s().-]+/g,'');
   if(v.startsWith('00'))v='+'+v.slice(2);
   let digits;
   if(v.startsWith('+'))digits=v.slice(1);
   else{
     digits=v.replace(/\D/g,'').replace(/^0+/,'');
-    const cc=String(countryCode||'+967').replace(/\D/g,'');
+    const cc=ascii(countryCode||'+967').replace(/\D/g,'');
     if(!digits.startsWith(cc)||digits.length<cc.length+6)digits=cc+digits;
   }
   if(!/^\d{8,15}$/.test(digits))throw new Error('أدخل رقم هاتف صحيحًا مع رمز الدولة.');
@@ -138,8 +140,8 @@ export async function guestPage(slug,number=''){
   }
   root.replaceChildren(guestHeader(page,slug));
   const host=h('main',{class:'guest-shell'});
-  const country=field('رمز الدولة','tel','+967',{maxlength:6,inputmode:'tel'});
-  const phone=field('رقم الهاتف','tel','',{required:true,autocomplete:'tel',inputmode:'tel',placeholder:'مثال: 777123456'});
+  const country=field('رمز الدولة','tel','+967',{maxlength:6,inputmode:'tel',dir:'ltr'});
+  const phone=field('رقم الهاتف','tel','',{required:true,autocomplete:'tel',inputmode:'tel',dir:'ltr',placeholder:'مثال: 777123456'});
   const name=field('الاسم — اختياري','text','',{autocomplete:'name',maxlength:160});
   const org=field('الجهة / الشركة — اختياري','text','',{maxlength:200});
   const job=field('المسمى الوظيفي — اختياري','text','',{maxlength:160});
