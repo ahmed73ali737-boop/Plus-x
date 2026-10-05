@@ -4,7 +4,7 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.application.guest_service import guest_number_for_phone, normalize_phone
+from app.application.guest_service import guest_number_for_phone, normalize_phone, phone_hash
 from app.db import event_guests, guest_checkins, guests
 from app.server import create_app
 
@@ -36,11 +36,15 @@ def register(client, phone, **extra):
     return r.json()
 
 
-def test_phone_normalization_and_number_match_offline_contract():
+def test_phone_normalization_and_public_number_is_keyed_not_raw_phone_hash():
     phone=normalize_phone('0777 123 456','+967')
     assert phone=='+967777123456'
-    expected=hashlib.sha256(phone.encode('utf-8')).hexdigest().upper()
-    assert guest_number_for_phone(phone)==f'G-{expected[:4]}-{expected[4:8]}-{expected[8:12]}-{expected[12:16]}'
+    raw=hashlib.sha256(phone.encode('utf-8')).hexdigest()
+    number=guest_number_for_phone(phone)
+    assert number==guest_number_for_phone(phone)
+    assert number.startswith('G-') and len(number)==21
+    assert number!=f"G-{raw[:4]}-{raw[4:8]}-{raw[8:12]}-{raw[12:16]}".upper()
+    assert phone_hash(phone)!=raw
 
 
 def test_same_phone_is_one_guest_and_one_event_registration(tmp_path):
