@@ -117,8 +117,12 @@ with sync_playwright() as p:
         page.get_by_label('كلمة المرور',exact=True).fill(account['password'])
         page.get_by_role('button',name='تسجيل الدخول',exact=True).click()
         page.get_by_role('heading',level=1,name='نظرة عامة').wait_for()
-        assert page.locator('.admin-main .grid .card').count()==10
-        mark('admin_login_and_ten_functional_shortcuts_bridge')
+        shortcuts=['أدخل أسئلتك','استيراد Excel / CSV','الفعالية والخدمات','التصويت والمشاركة','التقييم والملاحظات','الإعلانات والعروض','الحقائق والأرقام','هوية صفحتك','أقسام الموقع','المعاينة قبل النشر','النتائج والتقارير']
+        cards=page.locator('.admin-main .grid .card')
+        assert cards.count()==len(shortcuts),(cards.count(),len(shortcuts))
+        for title in shortcuts:
+            page.get_by_role('heading',level=3,name=title,exact=True).wait_for()
+        mark('admin_login_and_functional_shortcuts_bridge')
         qr=base64.b64encode(client.get('/api/admin/sites/agency-01/qr').content).decode();page.evaluate('data=>{const i=document.querySelector("img.qr");if(i)i.src="data:image/png;base64,"+data}',qr);page.screenshot(path=str(ROOT/'qa/admin-overview.png'),full_page=True)
         page.get_by_role('button',name='إدخال الأسئلة',exact=True).click()
         page.get_by_role('button',name='+ سؤال واحد',exact=True).first.click()
