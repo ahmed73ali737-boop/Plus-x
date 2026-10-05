@@ -91,7 +91,15 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             if not guest:
                 fail("GUEST_NOT_FOUND",404)
         link=guest_qr_payload(event_slug,guest["guest_number"],public_origin)
-        image=qrcode.make(link)
+        qr=qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_Q,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(link)
+        qr.make(fit=True)
+        image=qr.make_image(fill_color="black",back_color="white")
         buff=io.BytesIO()
         image.save(buff,format="PNG")
         return Response(buff.getvalue(),media_type="image/png",headers={"Cache-Control":"private, max-age=300"})
