@@ -1,9 +1,20 @@
 {
+  "/{path}": [
+    "get"
+  ],
   "/api/access-request": [
     "post"
   ],
   "/api/admin/audit": [
     "get"
+  ],
+  "/api/admin/events/{event_id}/guest-checkins": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/guests": [
+    "get",
+    "post"
   ],
   "/api/admin/events/{event_id}/participations": [
     "get",
@@ -65,10 +76,10 @@
   "/api/admin/sites/{sid}/export": [
     "get"
   ],
-  "/api/admin/sites/{sid}/imports/preview": [
+  "/api/admin/sites/{sid}/imports/{iid}/commit": [
     "post"
   ],
-  "/api/admin/sites/{sid}/imports/{iid}/commit": [
+  "/api/admin/sites/{sid}/imports/preview": [
     "post"
   ],
   "/api/admin/sites/{sid}/metrics": [
@@ -105,6 +116,12 @@
   "/api/collect": [
     "post"
   ],
+  "/api/device/events/{event_id}/guest-checkins": [
+    "post"
+  ],
+  "/api/device/events/{event_id}/guest-manifest": [
+    "get"
+  ],
   "/api/device/heartbeat": [
     "post"
   ],
@@ -116,6 +133,21 @@
   ],
   "/api/health/ready": [
     "get"
+  ],
+  "/api/public/events/{event_slug}/guest-config": [
+    "get"
+  ],
+  "/api/public/events/{event_slug}/guests/{guest_number}": [
+    "get"
+  ],
+  "/api/public/events/{event_slug}/guests/{guest_number}/qr": [
+    "get"
+  ],
+  "/api/public/events/{event_slug}/guests/register": [
+    "post"
+  ],
+  "/api/public/events/{event_slug}/guests/sync": [
+    "post"
   ],
   "/api/public/site/{slug}": [
     "get"
@@ -133,9 +165,6 @@
     "get"
   ],
   "/templates/{name}": [
-    "get"
-  ],
-  "/{path}": [
     "get"
   ]
 }
