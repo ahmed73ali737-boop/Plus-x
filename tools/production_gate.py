@@ -6,6 +6,7 @@ def enabled(name): return os.environ.get(name,'false').lower()=='true'
 
 def main():
     db=os.environ.get('DATABASE_URL',''); origin=os.environ.get('PUBLIC_ORIGIN','')
+    guest_secret=os.environ.get('GUEST_ID_SECRET','')
     workers=int(os.environ.get('WEB_WORKERS','1') or 1)
     checks={
       'postgresql_required':db.startswith('postgresql+psycopg://'),
@@ -13,6 +14,7 @@ def main():
       'demo_seed_disabled':not enabled('SEED_DEMO'),
       'multi_worker_configured':workers>=2,
       'database_password_not_placeholder':'REPLACE_' not in db and 'example' not in db.lower(),
+      'guest_identity_secret_configured':len(guest_secret)>=32 and 'REPLACE_' not in guest_secret and 'example' not in guest_secret.lower(),
       'native_postgres_accepted':enabled('PX_NATIVE_POSTGRES_ACCEPTED'),
       'load_accepted':enabled('PX_LOAD_ACCEPTED'),
       'security_accepted':enabled('PX_SECURITY_ACCEPTED'),
