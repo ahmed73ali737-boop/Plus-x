@@ -137,24 +137,31 @@ async function loadManifest(eventId,token){
     return (await get('guest_manifests',eventId))?.data||{event_id:eventId,guests:[]};
   }
 }
+let checkinSyncing=null;
 async function syncCheckins(eventId,token){
-  const pending=()=>all('checkin_outbox').then(xs=>xs.filter(x=>x.event_id===eventId&&x.status==='pending'));
-  if(!token)return{synced:0,pending:(await pending()).length,error:'DEVICE_NOT_PAIRED'};
-  if(!navigator.onLine)return{synced:0,pending:(await pending()).length,offline:true};
-  const items=(await pending()).slice(0,100);if(!items.length)return{synced:0,pending:0};
-  try{
-    const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-checkins',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({items:items.map(x=>x.payload)})});
-    if(!r.ok)throw new Error('CHECKIN_SYNC_'+r.status);
-    const out=await r.json();let synced=0,rejected=0;
-    for(const rc of out.receipts||[]){
-      const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
-      const state=rc.status==='rejected'?'rejected':'accepted';
-      if(state==='accepted')synced++;else rejected++;
-      await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
-      await put('checkin_outbox',{...item,status:state,error:rc.error||''});
-    }
-    return{synced,rejected,pending:(await pending()).length};
-  }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
+  if(checkinSyncing)return checkinSyncing;
+  checkinSyncing=(async()=>{
+    const pending=()=>all('checkin_outbox').then(xs=>xs.filter(x=>x.event_id===eventId&&x.status==='pending'));
+    if(!token)return{synced:0,pending:(await pending()).length,error:'DEVICE_NOT_PAIRED'};
+    if(!navigator.onLine)return{synced:0,pending:(await pending()).length,offline:true};
+    const items=(await pending()).slice(0,100);if(!items.length)return{synced:0,pending:0};
+    try{
+      const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-checkins',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({items:items.map(x=>x.payload)})});
+      if(!r.ok)throw new Error('CHECKIN_SYNC_'+r.status);
+      const out=await r.json();let synced=0,rejected=0;
+      for(const rc of out.receipts||[]){
+        const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
+        const latest=await get('checkin_outbox',item.id);
+        if(latest?.status==='accepted')continue;
+        const state=rc.status==='rejected'?'rejected':'accepted';
+        if(state==='accepted')synced++;else rejected++;
+        await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
+        await put('checkin_outbox',{...item,status:state,error:rc.error||''});
+      }
+      return{synced,rejected,pending:(await pending()).length};
+    }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
+  })();
+  try{return await checkinSyncing;}finally{checkinSyncing=null;}
 }
 export async function scanPage(slug){
   const page=await bundle(slug);applyTheme(page);document.title='ماسح الزوار | '+page.config.title;activate();
