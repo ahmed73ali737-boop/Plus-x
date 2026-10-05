@@ -39,6 +39,8 @@ def register(client, phone, **extra):
 def test_phone_normalization_and_public_number_is_keyed_not_raw_phone_hash():
     phone=normalize_phone('0777 123 456','+967')
     assert phone=='+967777123456'
+    assert normalize_phone('٠٧٧٧ ١٢٣ ٤٥٦','+٩٦٧')=='+967777123456'
+    assert normalize_phone('۰۷۷۷ ۱۲۳ ۴۵۶','+۹۶۷')=='+967777123456'
     raw=hashlib.sha256(phone.encode('utf-8')).hexdigest()
     number=guest_number_for_phone(phone)
     assert number==guest_number_for_phone(phone)
