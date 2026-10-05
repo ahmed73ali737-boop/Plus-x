@@ -165,3 +165,13 @@ jobs:
           name: postgres-qa
           path: qa/postgres-native-acceptance.json
           if-no-files-found: ignore
+
+  container-import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build -f ops/Dockerfile -t pulsex-ci .
+      - name: Verify runtime imports inside image
+        run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; print('container-runtime-import-ok')"
