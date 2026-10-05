@@ -183,7 +183,13 @@ def record_checkin(conn, event_id: str, guest_number: str, body: dict, *, scanne
     scan_id=text(body.get("scan_id") or new_id(),64,True)
     existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
     if existing:
-        return {"scan_id":scan_id,"status":"duplicate","guest":staff_guest_view(guest)}
+        return {
+            "scan_id":scan_id,
+            "status":"duplicate",
+            "direction":existing["direction"],
+            "checkpoint":existing["checkpoint"],
+            "guest":staff_guest_view(guest),
+        }
     direction=body.get("direction") if body.get("direction") in ("entry","exit") else "entry"
     checkpoint=text(body.get("checkpoint") or "main",80)
     conn.execute(insert(guest_checkins).values(
