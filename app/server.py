@@ -31,6 +31,7 @@ from .application.collection_service import validate_submission, build_metrics
 from .application.device_service import create_device, list_devices, update_device, heartbeat as device_heartbeat
 from .application.access_request_service import list_requests, set_request_status
 from .application.public_service import build_public_bundle, build_public_poll_results
+from .api.guest_routes import install_guest_routes
 
 ROOT=Path(__file__).resolve().parent.parent
 
@@ -43,6 +44,8 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
     dummy=password_hash(secrets.token_urlsafe(20))
 
     install_security_middleware(app, public_origin)
+
+    install_guest_routes(app, engine, public_origin, identify=lambda req,c,write=False: identify(req,c,write), site_row=site_row, log=log)
     app.include_router(create_health_router(engine))
 
     def identify(req,c,write=False):
