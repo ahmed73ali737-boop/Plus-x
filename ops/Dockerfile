@@ -11,4 +11,4 @@ RUN mkdir -p /app/data/media && chown -R pulsex:pulsex /app
 USER pulsex
 ENV HOST=0.0.0.0 PORT=4310
 EXPOSE 4310
-CMD ["sh", "-c", "python tools/production_gate.py && python run.py"]
+CMD ["sh", "-c", "python tools/production_gate.py && python tools/bootstrap_production.py && python run.py"]
