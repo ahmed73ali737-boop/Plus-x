@@ -71,7 +71,7 @@ def seed_demo_data(engine, credentials_path=None, count=10):
             site_id = f'agency-{i:02}'
             orgmap[site_id] = oid
             c.execute(insert(organizations).values(id=oid, slug=f'organization-{i:02}', name=f'المؤسسة التجريبية {i:02}', profile={'description':'ملف مؤسسة دائم يمكن ربطه بأكثر من فعالية','logo':'','primary':['#176B73','#2759A5','#8047A1','#9B6724'][i % 4]}, status='active', created_at=now()))
-            c.execute(insert(event_participations).values(id=new_id(), event_id='event-demo', organization_id=oid, agency_site_id=site_id, participation_type='exhibitor', status='active', booth=f'A-{i:02}', summary='مشاركة تجريبية مرتبطة بالمؤسسة الدائمة', services=[], valid_from=event['start'], valid_until=event['end'], created_at=now()))
+            c.execute(insert(event_participations).values(id=new_id(), event_id='event-demo', organization_id=oid, agency_site_id=site_id, participation_type='exhibitor', status='active', booth=f'A-{i:02}', summary='مشاركة تجريبية مرتبطة بالمؤسسة الدائمة', services=[], valid_from=None, valid_until=None, created_at=now()))
 
         accounts = [('platform','platform','admin@pulsex.test','مدير المنصة'), ('organizer','event-demo','organizer@pulsex.test','الجهة المنظمة')]
         accounts += [('agency', f'agency-{i:02}', f'agency{i:02}@pulsex.test', f'مسؤول الجهة {i:02}') for i in range(1, count + 1)]
