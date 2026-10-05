@@ -58,7 +58,7 @@ def install_security_middleware(app, public_origin: str) -> None:
         response = await call_next(request)
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'same-origin'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        response.headers['Permissions-Policy'] = 'camera=(self), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' https: data:; media-src 'self' https:; connect-src 'self'; "
