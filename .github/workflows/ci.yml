@@ -66,6 +66,8 @@ jobs:
         run: python tests/browser_components.py
       - name: Run Windows real HTTP browser end-to-end
         run: python tests/browser_smoke.py
+      - name: Run Windows guest QR and offline browser flow
+        run: python tests/browser_guest_flow.py
       - name: Run Windows IndexedDB offline component
         run: python tests/browser_offline_indexeddb.py
       - name: Upload Windows browser QA artifacts
@@ -77,6 +79,8 @@ jobs:
             qa/browser-components.json
             qa/browser-smoke.json
             qa/windows11-browser-offline-indexeddb.json
+            qa/windows12-guest-browser.json
+            qa/guest-browser-server.log
             qa/browser-server.log
             qa/*.png
           if-no-files-found: ignore
@@ -99,6 +103,8 @@ jobs:
         run: python tests/browser_components.py
       - name: Run real HTTP browser end-to-end flow
         run: python tests/browser_smoke.py
+      - name: Run guest QR and offline browser flow
+        run: python tests/browser_guest_flow.py
       - name: Run IndexedDB offline queue component
         if: always()
         run: python tests/browser_offline_indexeddb.py
