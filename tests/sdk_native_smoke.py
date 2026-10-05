@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='px-sdk-') as td:
         for _ in range(100):
             try: urllib.request.urlopen(base+'/api/health',timeout=.3);break
             except Exception: time.sleep(.1)
-        accounts=json.loads((temp/'accounts.json').read_text())
+        accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'))
         sdk=PulseXClient(base)
         assert sdk.health()['build']=='windows-08'
         assert sdk.public_site('agency-01')['slug']=='agency-01'
