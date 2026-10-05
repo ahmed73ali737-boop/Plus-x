@@ -12,6 +12,8 @@ from app.application.audit_service import new_id
 from app.db import event_guests, guest_checkins, guests
 from app.domain import boolean, fail, now, text
 
+PHONE_DIGIT_TRANSLATION=str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹','01234567890123456789')
+
 
 def normalize_phone(raw, country_code="+967") -> str:
     """Normalize a phone number to a stable E.164-like representation.
@@ -20,7 +22,7 @@ def normalize_phone(raw, country_code="+967") -> str:
     created twice merely because one entry used a local format and another used
     an international format.
     """
-    value=text(raw,40,True)
+    value=text(raw,40,True).translate(PHONE_DIGIT_TRANSLATION)
     compact=re.sub(r"[\s().-]+","",value)
     if compact.startswith("00"):
         compact="+"+compact[2:]
