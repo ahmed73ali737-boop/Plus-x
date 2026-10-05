@@ -37,6 +37,26 @@ jobs:
       - name: Run JavaScript SDK tests
         run: node tests/sdk_js_test.mjs
 
+  windows-core:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install runtime and QA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-qa.txt
+      - name: Compile Python
+        run: python -m compileall -q app tests tools run.py
+      - name: Run pytest suite on Windows
+        run: python -m pytest -q
+      - name: Run native Windows HTTP acceptance
+        run: python tests/native_acceptance.py
+
   browser-components:
     runs-on: ubuntu-latest
     timeout-minutes: 20
