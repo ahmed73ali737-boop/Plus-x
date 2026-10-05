@@ -2,6 +2,7 @@ from pathlib import Path
 import os, subprocess, sys, json
 from app.db import metadata
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 from tests.load_profiles import PROFILES
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -10,7 +11,7 @@ def test_v06_openapi_and_build(tmp_path):
     app=create_app(f"sqlite:///{tmp_path/'db.sqlite3'}",seed_demo=False)
     assert app.openapi()['info']['version']=='0.9.0'
     from fastapi.testclient import TestClient
-    assert TestClient(app).get('/api/health').json()['build']=='windows-08'
+    assert TestClient(app).get('/api/health').json()['build']==BUILD_LABEL
 
 def test_scaled_profiles_are_multiples():
     assert PROFILES['x10']['writes'] >= PROFILES['pilot']['writes']*10
