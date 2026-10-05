@@ -60,6 +60,26 @@ jobs:
         run: python -m pytest -q
       - name: Run native Windows HTTP acceptance
         run: python tests/native_acceptance.py
+      - name: Install Chromium for Windows output tests
+        run: python -m playwright install chromium
+      - name: Run Windows Chromium component suite
+        run: python tests/browser_components.py
+      - name: Run Windows real HTTP browser end-to-end
+        run: python tests/browser_smoke.py
+      - name: Run Windows IndexedDB offline component
+        run: python tests/browser_offline_indexeddb.py
+      - name: Upload Windows browser QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-browser-qa
+          path: |
+            qa/browser-components.json
+            qa/browser-smoke.json
+            qa/windows11-browser-offline-indexeddb.json
+            qa/browser-server.log
+            qa/*.png
+          if-no-files-found: ignore
 
   browser-components:
     runs-on: ubuntu-latest
