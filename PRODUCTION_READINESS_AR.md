@@ -14,3 +14,10 @@ Docker يشغل هذا Gate قبل التطبيق. إبقاء أي علم false 
 
 ## BLOCKED خارج البيئة
 Windows native؛ PostgreSQL native/RLS؛ HTTPS target; physical kiosks/5-day soak; remote concurrent load; DAST/Pentest; PostgreSQL PITR; field/business UAT signatures; distributed WebSocket/Redis.
+
+
+## Guest Identity / QR hardening
+- الإنتاج يتطلب `GUEST_ID_SECRET` مستقلًا بطول 32+ حرفًا عبر Release Gate.
+- رقم الزائر العام و`phone_hash` يستخدمان HMAC keyed digest؛ لا يتم اشتقاق QR العام من SHA مباشر للهاتف.
+- التسجيل من متصفح معزول تمامًا يحتفظ فقط بمعرف محلي مؤقت `P-...` حتى الوصول إلى خادم الفعالية/شبكة LAN؛ QR النهائي لا يصدر إلا من الخادم.
+- قاعدة البيانات تفرض unique على الهاتف/البصمة/رقم الزائر، واختبار PostgreSQL يتضمن تسجيل نفس الهاتف بالتوازي من عدة عملاء.
