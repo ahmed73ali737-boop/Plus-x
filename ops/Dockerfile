@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 WORKDIR /app
 COPY requirements*.txt ./
-RUN pip install --no-cache-dir -r requirements-postgres.txt && useradd --uid 10001 --create-home pulsex
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-postgres.txt && useradd --uid 10001 --create-home pulsex
 COPY app ./app
 COPY web ./web
 COPY templates ./templates
