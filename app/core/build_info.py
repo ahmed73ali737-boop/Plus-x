@@ -8,7 +8,7 @@ import os
 
 APP_NAME = "PulseX"
 APP_VERSION = os.environ.get("PULSEX_APP_VERSION", "0.9.0")
-BUILD_LABEL = os.environ.get("PULSEX_BUILD_LABEL", "windows-11")
+BUILD_LABEL = os.environ.get("PULSEX_BUILD_LABEL", "windows-12")
 API_VERSION = os.environ.get("PULSEX_API_VERSION", "1")
 
 def runtime_identity() -> dict[str, str]:
