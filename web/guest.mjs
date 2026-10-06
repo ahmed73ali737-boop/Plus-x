@@ -186,7 +186,7 @@ async function loadManifest(eventId,token){
     return {...data,cached_at,offline:false};
   }catch{
     const cached=await get('guest_manifests',eventId);
-    return cached?{...cached.data,cached_at:cached.cached_at,offline:true}:{event_id:eventId,guests:[],access_control:{checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}],anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60},cached_at:'',offline:true};
+    return cached?{...cached.data,cached_at:cached.cached_at,offline:true}:{event_id:eventId,guests:[],access_control:{checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}],anti_passback:true,allow_reentry:true,manifest_max_age_minutes:7200},cached_at:'',offline:true};
   }
 }
 let checkinSyncing=null;
@@ -276,7 +276,7 @@ export async function scanPage(slug){
   }
   async function refreshPreflight(){
     const local=await offlineStatus();let persisted=false;try{persisted=await navigator.storage?.persisted?.()||false;}catch{}
-    const maxAge=Number(access().manifest_max_age_minutes||60),age=manifest.cached_at?Math.max(0,(Date.now()-new Date(manifest.cached_at).getTime())/60000):Infinity,fresh=age<=maxAge;
+    const maxAge=Number(access().manifest_max_age_minutes||7200),age=manifest.cached_at?Math.max(0,(Date.now()-new Date(manifest.cached_at).getTime())/60000):Infinity,fresh=age<=maxAge;
     status.textContent=!token?'اربط جهاز البوابة أولًا من لوحة الإدارة.':manifest.offline?(fresh?'Offline · سجل محلي جاهز':'Offline · سجل الزوار قديم ويحتاج تحديثًا'):'الجهاز مرتبط · سجل الزوار محدث';
     status.className='muted small'+(manifest.offline&&!fresh?' warning':'');
     const checks=[
