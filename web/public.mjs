@@ -3,6 +3,7 @@ import {sectionsMeta,snippet,route,sectionLink,itemLink} from './catalog.mjs';
 import{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}from'./ui.mjs';
 import{bundle,enqueue,prepare,status,backup,sync,activate,saveDeviceToken,deviceHeartbeat}from'./offline.mjs';
 import{question,visible}from'./questions.mjs';
+import{exhibitionExperience}from'./exhibition.mjs';
 const params=new URLSearchParams(location.search);let page,preview=params.has('preview'),kiosk=params.get('kiosk')==='1',source=kiosk?'kiosk':params.get('source')==='qr'?'qr':'web';let visitor,session;const timers=[];
 function identity(){const event=page.event_id||page.id;const key='px-visitor-'+event;if(kiosk){visitor=sessionStorage.getItem('px-kiosk-visitor')||crypto.randomUUID();sessionStorage.setItem('px-kiosk-visitor',visitor);}else{visitor=localStorage.getItem(key)||crypto.randomUUID();localStorage.setItem(key,visitor);}const sk='px-session-'+page.id;session=sessionStorage.getItem(sk)||crypto.randomUUID();sessionStorage.setItem(sk,session);}
 export function pathFor(p){return p.kind==='platform'?'/':p.kind==='event'?'/e/'+p.slug:'/e/'+(p.event?.slug||'demo')+'/p/'+p.slug;}
@@ -136,7 +137,7 @@ function fullSection(key){
 function renderRoute(scroll=true){
   adObserver?.disconnect();
   const state=route(location.hash);const validKeys=page.kind==='platform'?['events','about','facts','news']:enabledSections().map(s=>s.key);
-  mainHost.replaceChildren();const hero=document.querySelector('.hero');hero.hidden=state.type!=='home';
+  mainHost.replaceChildren();document.querySelectorAll('.hero,.expo-stage,.expo-home-only,.brand-live').forEach(node=>node.hidden=state.type!=='home');
   document.querySelectorAll('[data-nav-key]').forEach(a=>a.setAttribute('aria-current',state.type==='section'&&a.dataset.navKey===state.key?'page':'false'));
   if(state.type==='home')renderHome();
   else{
@@ -191,10 +192,11 @@ export async function publicPage(slug){
   const keys=page.kind==='platform'?[{key:'events',title:'الفعاليات'},{key:'about',title:'عن المنصة'},{key:'facts',title:'الحقائق'},{key:'news',title:'المستجدات'}]:enabledSections();
   const primary=page.kind==='platform'?'events':keys.some(s=>s.key==='services')?'services':keys[0]?.key;
   const second=keys.some(s=>s.key==='questions')?'questions':page.kind==='platform'?'about':keys[1]?.key;
+  const exhibition=exhibitionExperience(page,{h,icon,itemLink,sectionLink});
   const heroText=h('div',{class:'hero-content'},h('span',{class:'hero-kicker'},icon('spark',17),page.kind==='platform'?'منصة للتجارب التي تترك أثرًا':page.kind==='event'?'الفعالية · المعرفة · التجربة':'تعرف علينا. استكشف. وشاركنا رأيك.'),c.logo?h('img',{src:c.logo,alt:'شعار '+c.title,class:'site-logo'}):null,h('h1',{},c.title),h('p',{class:'hero-subtitle'},c.subtitle),h('p',{class:'hero-description'},snippet(c.description,185)),h('div',{class:'actions'},primary?h('a',{href:sectionLink(primary),class:'btn'},page.kind==='platform'?'استكشف الفعاليات':'اكتشف ما نقدمه',icon('arrow',19)):null,second?h('a',{href:sectionLink(second),class:'btn hero-secondary'},second==='questions'?'شاركنا رأيك':'تعرّف أكثر'):null,guestEventSlug?h('a',{href:'/e/'+guestEventSlug+'/guest',class:'btn hero-secondary'},'بطاقة الزائر'):null),h('div',{class:'hero-assurances'},h('span',{},icon('check',16),'تصفح بحرية'),h('span',{},icon('shield',16),'البيانات الشخصية اختيارية')));
   const stage=h('div',{class:'hero-art'},h('div',{class:'visual-grid'}),h('div',{class:'visual-disc'}),c.cover?h('img',{src:c.cover,alt:'المحتوى التعريفي للصفحة',class:'hero-picture'}):h('div',{class:'hero-logo'},icon('spark',92)),h('div',{class:'float-card float-top'},h('span',{class:'surface-icon'},icon('layers',21)),h('div',{},h('strong',{},keys.length+' أقسام قابلة للاستكشاف'),h('small',{},'محتوى مرتبط بمدخلات الجهة'))),h('div',{class:'float-card float-bottom'},h('span',{class:'surface-icon'},icon('message',21)),h('div',{},h('strong',{},'رأيك يصنع فرقًا'),h('small',{},'أسئلة وتصويت وتقييم اختياري'))));
-  root.append(h('section',{class:'hero'},heroText,stage));
-  const liveLayer=brandLiveLayer();if(liveLayer)root.append(liveLayer);
+  if(exhibition){root.append(exhibition.hero);if(exhibition.after){exhibition.after.classList.add('expo-home-only');root.append(exhibition.after);}}else root.append(h('section',{class:'hero'},heroText,stage));
+  const liveLayer=exhibition?null:brandLiveLayer();if(liveLayer)root.append(liveLayer);
   const nav=h('nav',{class:'section-nav site-section-nav','aria-label':'أقسام الصفحة'},keys.map(s=>h('a',{href:'#'+s.key,'data-nav-key':s.key},icon(sectionsMeta[s.key]?.icon||'spark',17),s.title)));
   root.append(nav);mainHost=h('main',{class:'public-main',id:'main-content'});root.append(mainHost);renderRoute(false);window.addEventListener('hashchange',()=>{const r=route(location.hash);renderRoute(r.type!=='home');if(r.type==='home'&&r.anchor)requestAnimationFrame(()=>document.getElementById(r.anchor)?.scrollIntoView({behavior:'smooth',block:'start'}));});
   const floating=h('div',{class:'devicebar'},button('تجهيز دون إنترنت',offlinePanel,'text-btn'),h('span',{id:'connection-status',class:'connection'},'جارٍ فحص المزامنة'),kiosk?button('زائر جديد',resetKiosk,'btn small'):button('وضع التاب',()=>{const u=new URL(location.href);u.searchParams.set('kiosk','1');location.href=u.href;},'text-btn'));
