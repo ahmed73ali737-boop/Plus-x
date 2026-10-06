@@ -138,6 +138,22 @@ def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
         assert len(rows)==1
 
 
+def test_agency_cannot_access_event_wide_guest_directory_or_export(tmp_path):
+    app,c=boot(tmp_path)
+    login(c,app,'agency01@pulsex.test')
+    assert c.get('/api/admin/events/event-demo/guests').status_code==403
+    assert c.get('/api/admin/events/event-demo/guest-checkins').status_code==403
+    assert c.get('/api/admin/events/event-demo/guests/export').status_code==403
+
+
+def test_public_guest_registration_requires_consent_and_valid_phone(tmp_path):
+    app,c=boot(tmp_path)
+    no_consent=c.post('/api/public/events/demo/guests/register',json={'phone':'777123123','country_code':'+967','consent':False})
+    assert no_consent.status_code==422 and no_consent.json()['detail']=='GUEST_CONSENT_REQUIRED'
+    bad_phone=c.post('/api/public/events/demo/guests/register',json={'phone':'12','country_code':'+967','consent':True})
+    assert bad_phone.status_code==422 and bad_phone.json()['detail']=='PHONE_INVALID'
+
+
 def test_device_for_an_agency_cannot_download_event_guest_manifest(tmp_path):
     app,c=boot(tmp_path)
     login(c,app)
