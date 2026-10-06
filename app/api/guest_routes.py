@@ -238,6 +238,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             guest=result["guest"]
             return {
                 "status":result["status"],
+                "reason":result.get("reason"),
                 "presence":result["presence"],
                 "guest":{
                     "guest_number":guest["guest_number"],
