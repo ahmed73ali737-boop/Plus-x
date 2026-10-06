@@ -257,7 +257,7 @@ export async function scanPage(slug){
   const result=h('div',{class:'scan-result empty',role:'status','aria-live':'polite','aria-atomic':'true'},'بانتظار المسح');
   let currentGuest=null;
 
-  function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
+  function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:7200,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
   function checkpoints(){const xs=(access().checkpoints||[]).filter(x=>x.enabled!==false);return xs.length?xs:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}];}
   function refreshCheckpointOptions(){
     const old=checkpoint.input.value;checkpoint.input.replaceChildren(...checkpoints().map(cp=>h('option',{value:cp.key},cp.label||cp.key)));
@@ -273,6 +273,10 @@ export async function scanPage(slug){
       GUEST_TYPE_NOT_ALLOWED:'نوع هذا الزائر غير مسموح في نقطة الوصول.',
       GUEST_NOT_ACTIVE:'تسجيل الزائر غير فعال.',
       REENTRY_NOT_ALLOWED:'سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',
+      ACCESS_POLICY_CHANGED:'تغيرت سياسة الوصول منذ تجهيز الجهاز؛ راجع الحركة قبل اعتمادها.',
+      OFFLINE_SCAN_TIME_INVALID:'وقت المسح غير صالح.',
+      OFFLINE_SCAN_TIME_FUTURE:'ساعة الجهاز متقدمة أكثر من الحد المسموح.',
+      SCAN_ID_CONFLICT:'معرّف المسح استُخدم سابقًا لحركة مختلفة.',
       GUEST_NOT_REGISTERED:'الزائر غير مسجل في هذه الفعالية.'
     })[reason]||reason||'غير مسموح.';
   }
@@ -304,6 +308,7 @@ export async function scanPage(slug){
       ['الربط',token?'جاهز':'غير مربوط',!!token],
       ['سجل الزوار',(manifest.guest_count??(manifest.guests||[]).length)+' زائر',(manifest.guests||[]).length>0],
       ['نسخة السجل',manifest.manifest_version?manifest.manifest_version.slice(0,8):'—',!!manifest.manifest_version],
+      ['نسخة السياسة',manifest.access_policy_version?manifest.access_policy_version.slice(0,8):'—',!!manifest.access_policy_version],
       ['حداثة السجل',Number.isFinite(age)?Math.round(age)+' د':'غير مجهز',fresh],
       ['نقاط الوصول',String(checkpoints().length),checkpoints().length>0],
       ['الطابور',local.pending?local.pending+' معلّق':'0 معلّق',local.pending===0],
@@ -359,7 +364,8 @@ export async function scanPage(slug){
       if(selectedMode==='entry'&&policy.allow_reentry===false&&latest.last_direction==='exit'){toast('سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',true);feedback(false);return;}
       const scan_id=crypto.randomUUID(),point=checkpoint.input.value;
       const previous={state:latest.state||'outside',last_direction:latest.last_direction||'',last_checkpoint:latest.last_checkpoint||''};
-      await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',previous_presence:previous,payload:{scan_id,guest_number:g.guest_number,mode:selectedMode,direction:selectedMode,checkpoint:point,client_time:new Date().toISOString()}});
+      const scannedOffline=!navigator.onLine;
+      await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',previous_presence:previous,payload:{scan_id,guest_number:g.guest_number,mode:selectedMode,direction:selectedMode,checkpoint:point,client_time:new Date().toISOString(),offline_scan:scannedOffline,access_policy_version:manifest.access_policy_version||''}});
       await put('gate_presence',{id:gatePresenceKey(page.id,g.guest_number),event_id:page.id,guest_number:g.guest_number,state:selectedMode==='entry'?'inside':'outside',last_direction:selectedMode,last_checkpoint:point,updated_at:new Date().toISOString(),source:'local-pending'});
       const out=await refreshSync(false),receipt=await get('checkin_receipts',scan_id),label=selectedMode==='exit'?'الخروج':'الدخول';
       if(receipt?.status==='already_inside'||receipt?.status==='already_outside'){toast(receipt.status==='already_inside'?'لم تُسجل حركة جديدة: الزائر داخل الفعالية بالفعل.':'لم تُسجل حركة جديدة: الزائر خارج الفعالية بالفعل.',true);feedback(false);return;}
