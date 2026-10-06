@@ -1,0 +1,87 @@
+name: Publish Final Release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - VERSION
+      - FINAL_RELEASE.json
+      - FINAL_RELEASE_AR.md
+      - EXHIBITION_CI_EVIDENCE_20261006.md
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pulsex-final-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n ' < VERSION)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate final manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          version = pathlib.Path('VERSION').read_text(encoding='utf-8').strip()
+          data = json.loads(pathlib.Path('FINAL_RELEASE.json').read_text(encoding='utf-8'))
+          assert data['release'] == f'v{version}', (data['release'], version)
+          assert data['release_type'] == 'final_software_release'
+          assert pathlib.Path('FINAL_RELEASE_AR.md').is_file()
+          assert pathlib.Path('EXHIBITION_CI_EVIDENCE_20261006.md').is_file()
+          print('final-release-manifest-ok', version)
+          PY
+
+      - name: Build immutable release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p dist
+          git archive --format=zip --output="dist/PulseX-Exhibition-v${VERSION}.zip" HEAD
+          git archive --format=tar.gz --output="dist/PulseX-Exhibition-v${VERSION}.tar.gz" HEAD
+          (
+            cd dist
+            sha256sum "PulseX-Exhibition-v${VERSION}.zip" "PulseX-Exhibition-v${VERSION}.tar.gz" > SHA256SUMS.txt
+          )
+
+      - name: Publish or refresh GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          TITLE="PulseX Exhibition Final Release v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file FINAL_RELEASE_AR.md --latest
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file FINAL_RELEASE_AR.md \
+              --latest
+          fi
