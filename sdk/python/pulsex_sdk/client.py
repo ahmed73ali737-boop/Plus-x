@@ -136,5 +136,8 @@ class PulseXClient:
     def device_guest_manifest(self, event_id: str, device_token: str):
         return self._request('GET', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-manifest', headers={'X-PulseX-Device-Token': device_token})
 
+    def device_validate_guest(self, event_id: str, guest_number: str, device_token: str):
+        return self._request('GET', f'/api/device/events/{urllib.parse.quote(event_id)}/guests/{urllib.parse.quote(guest_number)}/validate', headers={'X-PulseX-Device-Token': device_token})
+
     def device_guest_checkins(self, event_id: str, device_token: str, items: list[dict]):
         return self._request('POST', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-checkins', {'items': items}, headers={'X-PulseX-Device-Token': device_token})
