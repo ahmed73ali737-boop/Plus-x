@@ -1,5 +1,5 @@
 import {h,root,api,field,check,button,toast,brand} from './ui.mjs';
-import {bundle,get,put,all,activate} from './offline.mjs';
+import {bundle,get,put,del,all,activate} from './offline.mjs';
 
 function cleanLocalPhone(raw,countryCode='+967'){
   const digitMap={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
@@ -60,12 +60,13 @@ async function syncGuestRegistrations(slug){
       const item=pending.find(x=>x.body.client_id===receipt.client_id);if(!item)continue;
       if(receipt.status==='accepted'){
         await put('guest_receipts',{id:item.id,...receipt,at:new Date().toISOString()});
-        await put('guest_outbox',{...item,status:'accepted'});
+        await del('guest_outbox',item.id);
         const local=item.local_id?await get('guests',item.local_id):null;
         const canonicalId=guestKey(slug,receipt.guest_number);
         const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,synced:true,provisional:false,created:receipt.created,updated_at:new Date().toISOString()};
+        delete canonical.phone;
         await put('guests',canonical);await cacheQr(slug,canonical);
-        if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,status:'reconciled',redirect_to:canonicalId,synced:true,updated_at:new Date().toISOString()});
+        if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,phone:'',status:'reconciled',redirect_to:canonicalId,synced:true,updated_at:new Date().toISOString()});
         if(item.phone_key)await put('guests',{id:item.phone_key,kind:'phone_map',provisional_id:item.local_id,redirect_to:canonicalId,updated_at:new Date().toISOString()});
         synced++;
       }else await put('guest_outbox',{...item,status:'rejected',error:receipt.error});
@@ -197,12 +198,13 @@ async function syncCheckins(eventId,token){
       const out=await r.json();let synced=0,rejected=0;
       for(const rc of out.receipts||[]){
         const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
-        const latest=await get('checkin_outbox',item.id);
-        if(latest?.status==='accepted')continue;
+        const priorReceipt=await get('checkin_receipts',item.id);
+        if(priorReceipt?.status&&priorReceipt.status!=='rejected'){await del('checkin_outbox',item.id);continue;}
         const state=rc.status==='rejected'?'rejected':'accepted';
         if(state==='accepted')synced++;else rejected++;
         await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
-        await put('checkin_outbox',{...item,status:state,error:rc.error||''});
+        if(state==='accepted')await del('checkin_outbox',item.id);
+        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||''});
       }
       return{synced,rejected,pending:(await pending()).length};
     }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
