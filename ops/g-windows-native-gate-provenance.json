@@ -19,6 +19,11 @@
       "reason": "Second executable Windows run reached application acceptance and exposed a stale test assumption: agency-01 participation expired on 2026-10-03, so direct agency management correctly returned FORBIDDEN_SCOPE on 2026-10-06.",
       "run_id": 37394384831,
       "fix": "Use the event organizer for event-wide admin acceptance, verify organizer access to another participant site, and verify organizer denial against platform scope. Authorization lifecycle behavior remains unchanged."
+    },
+    {
+      "reason": "Third executable Windows run passed every functional native-acceptance check but the test process failed during temporary-directory cleanup because Windows still held db.sqlite briefly after the server process exited.",
+      "run_id": 37394778758,
+      "fix": "Keep the functional behavior unchanged; after server termination, explicitly verify SQLite file-handle release with bounded rename retries before TemporaryDirectory cleanup."
     }
   ],
   "current_evidence_boundary": "Windows-hosted app+QA dependency install, isolated native acceptance, and Python pytest suite only. PostgreSQL/RLS, browser offline/device soak, remote load/security and field UAT remain separate."
