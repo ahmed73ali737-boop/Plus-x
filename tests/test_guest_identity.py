@@ -91,7 +91,7 @@ def test_frontend_guest_offline_and_brand_contracts_present():
     for token in ["'guests'","'guest_outbox'","'guest_manifests'","'checkin_outbox'"]:
         assert token in offline
     assert "guestPage(parts[1]" in appjs and "scanPage(parts[1])" in appjs
-    for token in ['provisionalNumberForPhone','syncGuestRegistrations','BarcodeDetector','loadManifest','syncCheckins']:
+    for token in ['localPhoneFingerprint','newProvisionalNumber','syncGuestRegistrations','BarcodeDetector','loadManifest','syncCheckins']:
         assert token in guest
     for token in ['data-template=rts_tech','data-template=easy_finance','data-template=tharawat_finance']:
         assert token in design
