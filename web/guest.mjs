@@ -97,7 +97,8 @@ async function registerGuestOfflineFirst(slug,values){
   return local;
 }
 function guestHeader(page,slug){
-  return h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(),h('nav',{class:'toplinks'},h('a',{href:'/e/'+slug},'الفعالية'),h('a',{href:'/e/'+slug+'/guest'},'بطاقة الزائر'),h('a',{href:'/e/'+slug+'/scan'},'المسح')),h('span',{class:'tag'},navigator.onLine?'متصل':'دون اتصال')));
+  const title=page.config?.title||'PulseX';const mark=title.trim().slice(0,1).toUpperCase()||'P';
+  return h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(title,mark,'/e/'+slug),h('nav',{class:'toplinks'},h('a',{href:'/e/'+slug},'الفعالية'),h('a',{href:'/e/'+slug+'/guest'},'بطاقة الزائر'),h('a',{href:'/e/'+slug+'/scan'},'المسح')),h('span',{class:'tag'},navigator.onLine?'متصل':'دون اتصال')));
 }
 async function reconcileGuestPass(slug,g){
   await syncGuestRegistrations(slug);
