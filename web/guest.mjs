@@ -175,11 +175,12 @@ function parseGuestNumber(value){
   try{const u=new URL(value,location.origin);const m=u.pathname.toUpperCase().match(/\/GUEST\/(G-[A-F0-9-]+)/);if(m)return m[1];}catch{}
   return '';
 }
+function gatePresenceKey(eventId,guestNumber){return eventId+':'+guestNumber;}
 async function loadManifest(eventId,token){
   try{
     const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-manifest',{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});
     if(!r.ok)throw new Error('MANIFEST_FETCH_FAILED');
-    const data=await r.json();await put('guest_manifests',{id:eventId,data,cached_at:new Date().toISOString()});return data;
+    const data=await r.json();await put('guest_manifests',{id:eventId,data,cached_at:new Date().toISOString()});for(const guest of data.guests||[])await put('gate_presence',{id:gatePresenceKey(eventId,guest.guest_number),event_id:eventId,guest_number:guest.guest_number,state:guest.presence||'outside',updated_at:new Date().toISOString(),source:'manifest'});return data;
   }catch{
     return (await get('guest_manifests',eventId))?.data||{event_id:eventId,guests:[]};
   }
@@ -199,12 +200,13 @@ async function syncCheckins(eventId,token){
       for(const rc of out.receipts||[]){
         const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
         const priorReceipt=await get('checkin_receipts',item.id);
-        if(priorReceipt?.status&&priorReceipt.status!=='rejected'){await del('checkin_outbox',item.id);continue;}
-        const state=rc.status==='rejected'?'rejected':'accepted';
-        if(state==='accepted')synced++;else rejected++;
+        if(priorReceipt?.status&&['accepted','duplicate'].includes(priorReceipt.status)){await del('checkin_outbox',item.id);continue;}
+        const accepted=['accepted','duplicate'].includes(rc.status);
+        if(accepted)synced++;else rejected++;
         await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
-        if(state==='accepted')await del('checkin_outbox',item.id);
-        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||''});
+        if(rc.presence)await put('gate_presence',{id:gatePresenceKey(eventId,item.payload.guest_number),event_id:eventId,guest_number:item.payload.guest_number,state:rc.presence,updated_at:new Date().toISOString(),source:'server'});
+        if(accepted)await del('checkin_outbox',item.id);
+        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||rc.status});
       }
       return{synced,rejected,pending:(await pending()).length};
     }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
@@ -219,7 +221,7 @@ export async function scanPage(slug){
   const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
   const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
-  const direction=selectField('نوع الحركة',[['entry','دخول'],['exit','خروج']],'entry');
+  const direction=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
   const checkpoint=field('نقطة المسح','text','main',{maxlength:80,placeholder:'main / Gate A / VIP'});
   const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
   async function refreshSync(notify=false){
@@ -233,8 +235,25 @@ export async function scanPage(slug){
     let g=(manifest.guests||[]).find(x=>x.guest_number===number);
     if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
     if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
-    const check=button(direction.input.value==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{const scan_id=crypto.randomUUID();const movement=direction.input.value==='exit'?'exit':'entry';const point=checkpoint.input.value.trim()||'main';await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:movement,checkpoint:point,client_time:new Date().toISOString()}});const out=await refreshSync(false);const label=movement==='exit'?'الخروج':'الدخول';toast(out.pending?'تم حفظ '+label+' محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل '+label+' ومزامنته.');},'btn');
-    result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title].filter(Boolean).join(' · ')),check);
+    const mode=direction.input.value;
+    if(mode==='validate'){
+      result.replaceChildren(h('span',{class:'tag status-current'},'صالح للفعالية'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+((await get('gate_presence',gatePresenceKey(page.id,g.guest_number)))?.state||g.presence||'outside')));
+      return;
+    }
+    const check=button(mode==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{
+      const localKey=gatePresenceKey(page.id,g.guest_number);
+      const local=await get('gate_presence',localKey)||{state:g.presence||'outside'};
+      if(mode==='entry'&&local.state==='inside'){toast('الزائر مسجل داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);return;}
+      if(mode==='exit'&&local.state!=='inside'){toast('الزائر غير مسجل داخل الفعالية حاليًا.',true);return;}
+      const scan_id=crypto.randomUUID();const point=checkpoint.input.value.trim()||'main';
+      await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:mode,checkpoint:point,client_time:new Date().toISOString()}});
+      await put('gate_presence',{id:localKey,event_id:page.id,guest_number:g.guest_number,state:mode==='entry'?'inside':'outside',updated_at:new Date().toISOString(),source:'local-pending'});
+      const out=await refreshSync(false);const label=mode==='exit'?'الخروج':'الدخول';const receipt=await get('checkin_receipts',scan_id);
+      if(receipt?.status==='already_inside'){toast('لم تُسجل حركة جديدة: الزائر داخل الفعالية بالفعل.',true);return;}
+      if(receipt?.status==='already_outside'){toast('لم تُسجل حركة جديدة: الزائر خارج الفعالية بالفعل.',true);return;}
+      toast(out.pending?'تم حفظ '+label+' محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل '+label+' ومزامنته.');
+    },'btn');
+    result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),check);
   }
   const tools=h('div',{class:'scanner-tools'},input.node,direction.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
