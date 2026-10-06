@@ -17,7 +17,7 @@ from app.application.guest_service import (
     public_guest_view,
     register_guest,
 )
-from app.application.guest_gate_service import build_guest_manifest, record_checkin, validate_guest
+from app.application.guest_gate_service import build_guest_manifest, event_presence_map, record_checkin, validate_guest
 from app.application.access import require_scope
 from app.db import guest_checkins, sites
 from app.domain import fail, now, text
@@ -185,7 +185,15 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                 .order_by(guest_checkins.c.scanned_at.desc())
                 .limit(500)
             ).mappings()
-            return {"checkins":[dict(x) for x in rows]}
+            presence=event_presence_map(c,event_id)
+            return {
+                "checkins":[dict(x) for x in rows],
+                "presence":[
+                    {"guest_id":guest_id,"state":item.get("state","outside"),"last_direction":item.get("last_direction"),"last_checkpoint":item.get("last_checkpoint"),"updated_at":item.get("updated_at")}
+                    for guest_id,item in presence.items()
+                ],
+                "inside_count":sum(1 for item in presence.values() if item.get("state")=="inside"),
+            }
 
     @app.post("/api/admin/events/{event_id}/guest-checkins")
     def admin_guest_checkin(event_id: str, body: dict, request: Request):
