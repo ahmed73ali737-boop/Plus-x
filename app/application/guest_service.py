@@ -9,7 +9,7 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.application.audit_service import new_id
-from app.db import event_guests, guest_checkins, guests
+from app.db import event_guests, guests
 from app.domain import boolean, fail, now, text
 
 PHONE_DIGIT_TRANSLATION=str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹','01234567890123456789')
@@ -235,34 +235,3 @@ def list_event_guests(conn, event_id: str) -> list[dict]:
         .order_by(event_guests.c.registered_at.desc())
     ).mappings()
     return [staff_guest_view(dict(x)) for x in rows]
-
-
-def record_checkin(conn, event_id: str, guest_number: str, body: dict, *, scanner_id: str | None, source: str) -> dict:
-    guest=event_guest_by_number(conn,event_id,guest_number)
-    if not guest:
-        fail("GUEST_NOT_REGISTERED",404)
-    scan_id=text(body.get("scan_id") or new_id(),64,True)
-    existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
-    if existing:
-        return {
-            "scan_id":scan_id,
-            "status":"duplicate",
-            "direction":existing["direction"],
-            "checkpoint":existing["checkpoint"],
-            "guest":staff_guest_view(guest),
-        }
-    direction=body.get("direction") if body.get("direction") in ("entry","exit") else "entry"
-    checkpoint=text(body.get("checkpoint") or "main",80)
-    conn.execute(insert(guest_checkins).values(
-        id=scan_id,
-        event_id=event_id,
-        guest_id=guest["id"],
-        guest_number=guest["guest_number"],
-        scanner_id=scanner_id,
-        source=source,
-        direction=direction,
-        checkpoint=checkpoint,
-        client_time=text(body.get("client_time"),64),
-        scanned_at=now(),
-    ))
-    return {"scan_id":scan_id,"status":"accepted","direction":direction,"checkpoint":checkpoint,"guest":staff_guest_view(guest)}
