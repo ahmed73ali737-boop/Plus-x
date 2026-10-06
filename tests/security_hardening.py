@@ -48,6 +48,6 @@ def main():
             report={'status':'passed','passed':len(checks),'checks':checks,'backend':'SQLite','scope':'bounded hardening checks; not DAST or pentest'}
         finally:
             proc.terminate(); proc.wait(timeout=10); log.close()
-    out=ROOT/'qa/hardening/security-smoke.json';out.write_text(json.dumps(report,indent=2),encoding='utf-8');print(json.dumps(report),encoding='utf-8')
+    out=ROOT/'qa/hardening/security-smoke.json';out.write_text(json.dumps(report,indent=2),encoding='utf-8');print(json.dumps(report))
 
 if __name__=='__main__': main()
