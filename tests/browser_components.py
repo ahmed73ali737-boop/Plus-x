@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 app=create_app('sqlite:///:memory:',origin='http://testserver',seed_demo=True);client=TestClient(app)
 account=app.state.seed_credentials[2];auth=client.post('/api/auth/login',json={'email':account['email'],'password':account['password']}).json()
 routes={'/api/auth/me':auth,'/api/admin/sites':client.get('/api/admin/sites').json(),'/api/admin/sites/agency-01':client.get('/api/admin/sites/agency-01').json(),'/api/admin/sites/agency-01/metrics':client.get('/api/admin/sites/agency-01/metrics').json(),'/api/admin/sites/agency-01/preview':client.get('/api/admin/sites/agency-01/preview').json()}
-for slug in ('platform','demo','agency-01'):
+for slug in ('platform','demo','agency-01','agency-08','agency-09','agency-10'):
     routes['/api/public/site/'+slug]=client.get('/api/public/site/'+slug).json()
     routes['/api/public/site/'+slug+'/results']=client.get('/api/public/site/'+slug+'/results').json()
 def replace_media(x):
@@ -32,8 +32,9 @@ icons='const Icons=(()=>{'+code('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+code('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
 common="const UI=(()=>{"+ui+";return {h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels,types,setCSRF,download};})();"
 questions="const Questions=(()=>{const {h,field,selectField}=UI;"+code('questions.mjs')+";return{question,visible};})();"
+exhibition="const Exhibition=(()=>{"+code('exhibition.mjs')+";return{exhibitionExperience};})();"
 public=code('public.mjs').replace("if(!preview&&page.kind!=='platform')", "if(false&&page.kind!=='platform')").replace('identity();',"visitor='fixture';session='fixture';")
-public="const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const bundle=async slug=>structuredClone(window._routes['/api/public/site/'+slug]);const enqueue=async()=>{throw Error('Read-only component harness forbids writes')};const prepare=enqueue,backup=enqueue,sync=async()=>{},activate=()=>{},status=async()=>({pending:0,rejected:0,items:[]});"+public+";return {publicPage,welcome};})();window.PXPublic=Public;"
+public="const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const{exhibitionExperience}=Exhibition;const bundle=async slug=>structuredClone(window._routes['/api/public/site/'+slug]);const enqueue=async()=>{throw Error('Read-only component harness forbids writes')};const prepare=enqueue,backup=enqueue,sync=async()=>{},activate=()=>{},status=async()=>({pending:0,rejected:0,items:[]});"+public+";return {publicPage,welcome};})();window.PXPublic=Public;"
 admin="const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error('Read-only')};"+code('admin.mjs')+";return{adminPage};})();window.PXAdmin=Admin;"
 checks=[];errors=[]
 with sync_playwright() as p:
@@ -42,16 +43,30 @@ with sync_playwright() as p:
     def setup(modules):
         page.goto('about:blank')
         page.set_content('<html lang="ar" dir="rtl"><body><div id="app"></div><div id="toasts"></div></body></html>')
-        page.add_style_tag(content=(ROOT/'web/style.css').read_text(encoding='utf-8'))
-        page.add_style_tag(content=(ROOT/'web/design.css').read_text(encoding='utf-8'))
+        for stylesheet in ['style.css','design.css','exhibition.css','exhibition-rts.css','exhibition-easy.css','exhibition-tharawat.css']:
+            page.add_style_tag(content=(ROOT/'web'/stylesheet).read_text(encoding='utf-8'))
         page.evaluate('''arg=>{window._routes=arg.routes;window._qr=arg.qr;window.crypto.randomUUID=()=>"component-"+Math.random().toString(36).slice(2);for(const name of ['localStorage','sessionStorage']){const values={};Object.defineProperty(window,name,{configurable:true,value:{getItem:k=>values[k]||null,setItem:(k,v)=>{values[k]=v},removeItem:k=>delete values[k]}});}window.fetch=async(url,options)=>{if(options?.method&&options.method!=='GET')throw Error('Read-only component harness forbids writes');if(!(url in window._routes))throw Error('Missing read fixture: '+url);return{ok:true,json:async()=>structuredClone(window._routes[url])}};}''',{'routes':routes,'qr':'data:image/png;base64,'+qr})
         page.add_script_tag(content='(async()=>{'+common+icons+catalog+questions+modules+'})()')
-    setup(public)
+    setup(exhibition+public)
     page.evaluate("PXPublic.publicPage('platform')");page.get_by_role('heading',name='الفعاليات الجارية والقادمة').wait_for();checks.append('platform_directory_component');page.screenshot(path=str(ROOT/'qa/platform-desktop.png'),full_page=True)
     page.evaluate("PXPublic.publicPage('agency-01')");page.get_by_role('heading',name='الجهة التجريبية 01',exact=True,level=1).wait_for();assert page.locator('[data-section]').count()==10;checks.append('agency_ten_sections_component');page.screenshot(path=str(ROOT/'qa/agency-desktop.png'),full_page=True)
+    for slug,template,selector,title,check_name in [
+        ('agency-08','tharawat_finance','.expo-tharawat-stage','ثروات','tharawat_exhibition_component'),
+        ('agency-09','easy_finance','.expo-easy-stage','Easy','easy_exhibition_component'),
+        ('agency-10','rts_tech','.expo-rts-stage','RTS','rts_exhibition_component'),
+    ]:
+        setup(exhibition+public)
+        page.evaluate(f"PXPublic.publicPage('{slug}')")
+        page.locator(selector).wait_for()
+        assert page.locator(selector).get_by_role('heading',name=title,exact=True,level=1).count()==1
+        assert page.evaluate("document.body.dataset.template")==template
+        assert page.locator(selector+' a.expo-btn').count()>=2
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+        page.screenshot(path=str(ROOT/f'qa/exhibition-{slug}.png'),full_page=True)
+        checks.append(check_name)
     page.locator('#questions').get_by_role('link',name='ابدأ الاستبيان',exact=True).click();page.locator('fieldset[data-code="q-interest"] input').first.check();assert page.locator('fieldset[data-code="q-interest"] input:checked').count()==1;checks.append('choice_control_interaction_component')
     page.evaluate('PXPublic.welcome()');page.get_by_role('button',name='تخطي هذه الخطوة',exact=True).click();assert page.get_by_label('الاسم',exact=True).count()==1;page.get_by_role('button',name='الدخول دون بيانات',exact=True).click();assert page.locator('dialog[open]').count()==0;checks.append('progressive_welcome_skip_component')
-    page.set_viewport_size({'width':390,'height':844});setup(public);page.evaluate("PXPublic.publicPage('agency-01')");page.get_by_role('heading',name='الجهة التجريبية 01',exact=True,level=1).wait_for();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1');page.evaluate("document.activeElement.blur();scrollTo({top:0,left:0,behavior:'instant'})");page.wait_for_timeout(200);page.screenshot(path=str(ROOT/'qa/agency-mobile.png'),full_page=False);checks.append('mobile_component_no_horizontal_overflow')
+    page.set_viewport_size({'width':390,'height':844});setup(exhibition+public);page.evaluate("PXPublic.publicPage('agency-01')");page.get_by_role('heading',name='الجهة التجريبية 01',exact=True,level=1).wait_for();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1');page.evaluate("document.activeElement.blur();scrollTo({top:0,left:0,behavior:'instant'})");page.wait_for_timeout(200);page.screenshot(path=str(ROOT/'qa/agency-mobile.png'),full_page=False);checks.append('mobile_component_no_horizontal_overflow')
     page.set_viewport_size({'width':1440,'height':1000});setup(admin);page.evaluate('PXAdmin.adminPage()');page.get_by_role('heading',name='نظرة عامة',exact=True).wait_for();page.screenshot(path=str(ROOT/'qa/admin-overview.png'),full_page=True);checks.append('agency_admin_scoped_fixture_component')
     page.get_by_role('button',name='إدخال الأسئلة',exact=True).click();page.get_by_role('button',name='+ سؤال واحد',exact=True).first.click();page.locator('dialog').get_by_label('نوع الإجابة',exact=True).select_option('matrix');page.locator('dialog').get_by_label('بنود المصفوفة',exact=False).fill('الوضوح\nالسرعة');page.screenshot(path=str(ROOT/'qa/manual-question-editor.png'),full_page=True);checks.append('manual_question_editor_component');page.locator('dialog').get_by_role('button',name='×',exact=True).click()
     page.get_by_role('button',name='Excel / CSV',exact=True).click();page.get_by_role('button',name='فحص ومعاينة الاستيراد',exact=True).wait_for();page.screenshot(path=str(ROOT/'qa/import-component.png'),full_page=True);checks.append('import_controls_component')
