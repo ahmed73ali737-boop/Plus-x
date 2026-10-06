@@ -79,6 +79,11 @@ try:
         dismiss_welcome(page)
         page.get_by_text("THARAWAT · EXHIBITION EDITION", exact=True).wait_for()
         page.locator(".expo-tharawat-salon").wait_for()
+        page.get_by_role("link", name="بطاقة الزائر", exact=True).first.wait_for()
+        assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
+        assert page.get_by_text("طلب حساب", exact=True).count() == 0
+        assert page.locator(".devicebar").count() == 0
+        assert page.locator(".pilot-note").count() == 0
         assert page.locator(".expo-easy-stage,.expo-rts-stage").count() == 0
         assert_no_overflow(page)
         page.screenshot(path=str(ROOT / "qa/tharawat-exhibition.png"), full_page=True)
@@ -91,8 +96,13 @@ try:
         page.locator(".expo-easy-phone").wait_for()
         page.get_by_text("بطاقات Wi‑Fi", exact=True).first.wait_for()
         page.get_by_text("حسابات الأطفال", exact=True).first.wait_for()
+        page.get_by_role("link", name="بطاقة الزائر", exact=True).first.wait_for()
+        assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
         assert page.locator(".expo-tharawat-stage,.expo-rts-stage").count() == 0
         assert_no_overflow(page)
+        page.goto(URL + "/e/demo/p/agency-09#services")
+        page.get_by_text("تقاريرك وسجلّك", exact=True).wait_for()
+        mark("easy_full_exhibition_service_content")
         page.screenshot(path=str(ROOT / "qa/easy-exhibition.png"), full_page=True)
         mark("easy_distinct_living_wallet_surface")
 
@@ -104,8 +114,16 @@ try:
         page.get_by_text("RTS / LIVE DIGITAL SYSTEMS", exact=True).wait_for()
         page.get_by_text("Payment & Collection", exact=True).first.wait_for()
         page.get_by_text("Integration & Platforms", exact=True).first.wait_for()
+        page.get_by_role("link", name="بطاقة الزائر", exact=True).first.wait_for()
+        assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
         assert page.locator(".expo-tharawat-stage,.expo-easy-stage").count() == 0
         assert_no_overflow(page)
+        page.goto(URL + "/e/demo/p/agency-10#services")
+        page.get_by_text("Accounting & Sales Systems", exact=True).wait_for()
+        page.get_by_text("Lending, Requests & Billing", exact=True).wait_for()
+        page.get_by_text("Humanitarian & Donations Platforms", exact=True).wait_for()
+        page.get_by_text("Exchange & Financial Products", exact=True).wait_for()
+        mark("rts_full_capability_content")
         page.screenshot(path=str(ROOT / "qa/rts-exhibition-360.png"), full_page=True)
         mark("rts_distinct_command_center_surface")
 
