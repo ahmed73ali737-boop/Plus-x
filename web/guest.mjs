@@ -226,88 +226,152 @@ export async function scanPage(slug){
   const auth=(await get('bundles','device-auth'))?.data||{};const token=auth.token||'';
   let manifest=await loadManifest(page.id,token);
   root.replaceChildren(guestHeader(page,slug));const host=h('main',{class:'scanner-shell'});root.append(host);
-  const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
+
+  const status=h('p',{class:'muted small'});
   const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
   const preflight=h('div',{class:'scanner-preflight'});
+  const input=field('امسح QR أو ابحث بالاسم / الجهة / رقم الزائر','text','',{placeholder:'QR أو G-... أو اسم الزائر',autocomplete:'off'});
+  const mode=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
+  const checkpoint=selectField('نقطة الوصول',[], '');
+  const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
+  let currentGuest=null;
+
+  function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
+  function checkpoints(){const xs=(access().checkpoints||[]).filter(x=>x.enabled!==false);return xs.length?xs:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}];}
+  function refreshCheckpointOptions(){
+    const old=checkpoint.input.value;checkpoint.input.replaceChildren(...checkpoints().map(cp=>h('option',{value:cp.key},cp.label||cp.key)));
+    checkpoint.input.value=checkpoints().some(cp=>cp.key===old)?old:checkpoints()[0].key;
+  }
+  refreshCheckpointOptions();
+
+  function reasonText(reason){
+    return ({
+      CHECKPOINT_NOT_FOUND:'نقطة الوصول غير معرفة.',
+      CHECKPOINT_DISABLED:'نقطة الوصول موقوفة.',
+      CHECKPOINT_WINDOW_CLOSED:'نقطة الوصول خارج وقت السماح.',
+      GUEST_TYPE_NOT_ALLOWED:'نوع هذا الزائر غير مسموح في نقطة الوصول.',
+      GUEST_NOT_ACTIVE:'تسجيل الزائر غير فعال.',
+      REENTRY_NOT_ALLOWED:'سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',
+      GUEST_NOT_REGISTERED:'الزائر غير مسجل في هذه الفعالية.'
+    })[reason]||reason||'غير مسموح.';
+  }
+  function feedback(ok){try{navigator.vibrate?.(ok?60:[80,45,80]);}catch{}}
+  function localAccess(g){
+    const cp=(access().checkpoints||[]).find(x=>x.key===checkpoint.input.value);
+    if(!cp)return{status:'invalid',reason:'CHECKPOINT_NOT_FOUND'};
+    if(cp.enabled===false)return{status:'invalid',reason:'CHECKPOINT_DISABLED'};
+    const nowMs=Date.now(),start=cp.start?Date.parse(cp.start):NaN,end=cp.end?Date.parse(cp.end):NaN;
+    if((Number.isFinite(start)&&nowMs<start)||(Number.isFinite(end)&&nowMs>=end))return{status:'invalid',reason:'CHECKPOINT_WINDOW_CLOSED'};
+    const allowed=cp.allowed_guest_types||[];if(allowed.length&&!allowed.includes(g.guest_type||'visitor'))return{status:'invalid',reason:'GUEST_TYPE_NOT_ALLOWED'};
+    if(!['registered','active'].includes(g.status||'registered'))return{status:'invalid',reason:'GUEST_NOT_ACTIVE'};
+    return{status:'valid'};
+  }
+  async function authoritativeValidate(g){
+    const local=localAccess(g);if(local.status!=='valid'||!navigator.onLine||!token)return local;
+    try{
+      const r=await fetch('/api/device/events/'+encodeURIComponent(page.id)+'/guests/'+encodeURIComponent(g.guest_number)+'/validate?checkpoint='+encodeURIComponent(checkpoint.input.value),{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});
+      if(!r.ok){const e=await r.json().catch(()=>({}));return{status:'invalid',reason:e.detail||('HTTP_'+r.status)};}
+      return await r.json();
+    }catch{return local;}
+  }
   async function refreshPreflight(){
-    const local=await offlineStatus();const cached=await get('guest_manifests',page.id);let persisted=false;try{persisted=await navigator.storage?.persisted?.()||false;}catch{}
+    const local=await offlineStatus();let persisted=false;try{persisted=await navigator.storage?.persisted?.()||false;}catch{}
+    const maxAge=Number(access().manifest_max_age_minutes||60),age=manifest.cached_at?Math.max(0,(Date.now()-new Date(manifest.cached_at).getTime())/60000):Infinity,fresh=age<=maxAge;
+    status.textContent=!token?'اربط جهاز البوابة أولًا من لوحة الإدارة.':manifest.offline?(fresh?'Offline · سجل محلي جاهز':'Offline · سجل الزوار قديم ويحتاج تحديثًا'):'الجهاز مرتبط · سجل الزوار محدث';
+    status.className='muted small'+(manifest.offline&&!fresh?' warning':'');
     const checks=[
       ['الربط',token?'جاهز':'غير مربوط',!!token],
-      ['سجل الزوار',(manifest.guests||[]).length+' زائر',(manifest.guests||[]).length>0],
+      ['سجل الزوار',(manifest.guest_count??(manifest.guests||[]).length)+' زائر',(manifest.guests||[]).length>0],
+      ['نسخة السجل',manifest.manifest_version?manifest.manifest_version.slice(0,8):'—',!!manifest.manifest_version],
+      ['حداثة السجل',Number.isFinite(age)?Math.round(age)+' د':'غير مجهز',fresh],
+      ['نقاط الوصول',String(checkpoints().length),checkpoints().length>0],
       ['الطابور',local.pending?local.pending+' معلّق':'0 معلّق',local.pending===0],
       ['المرفوض',local.rejected?local.rejected+' يحتاج مراجعة':'0',local.rejected===0],
       ['التخزين',persisted?'مستمر':'قد يفرغه المتصفح',persisted],
-      ['الكاميرا','BarcodeDetector'in window?'مدعومة':'ماسح/إدخال يدوي',true],
+      ['الكاميرا','BarcodeDetector'in window?'مدعومة':'ماسح/بحث يدوي',true],
       ['الشبكة',navigator.onLine?'متصل':'Offline',true],
     ];
-    preflight.replaceChildren(...checks.map(([label,value,ok])=>h('div',{class:'preflight-chip'+(ok?' ready':' warning')},h('small',{},label),h('strong',{},value))),cached?.cached_at?h('small',{class:'muted preflight-time'},'آخر تجهيز: '+new Date(cached.cached_at).toLocaleString('ar-YE')):null);
+    preflight.replaceChildren(...checks.map(([label,value,ok])=>h('div',{class:'preflight-chip'+(ok?' ready':' warning')},h('small',{},label),h('strong',{},value))),manifest.cached_at?h('small',{class:'muted preflight-time'},'آخر تجهيز: '+new Date(manifest.cached_at).toLocaleString('ar-YE')):null);
   }
-  const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
-  const direction=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
-  const access=manifest.access_control||{anti_passback:true,allow_reentry:true,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};
-  const checkpoint=selectField('نقطة الوصول',(access.checkpoints||[]).filter(x=>x.enabled!==false).map(x=>[x.key,x.label||x.key]),(access.checkpoints||[]).find(x=>x.enabled!==false)?.key||'main');
-  const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
   async function refreshSync(notify=false){
     const out=await syncCheckins(page.id,token);
     syncState.textContent=out.pending?'معلّق: '+out.pending:out.error?'المزامنة تحتاج اتصال':'تمت المزامنة';
-    if(notify)toast(out.pending?'ما زالت '+out.pending+' حركة محفوظة محليًا.':'تمت مزامنة حركات الدخول.');
-    return out;
+    if(notify)toast(out.pending?'ما زالت '+out.pending+' حركة محفوظة محليًا.':'تمت مزامنة حركات البوابة.');
+    await refreshPreflight();return out;
   }
-  async function localAccessDecision(g,checkpointKey){
-    const policy=manifest.access_control||access;const rule=(policy.checkpoints||[]).find(x=>x.key===checkpointKey);
-    if(!rule)return{ok:false,reason:'نقطة الوصول غير موجودة في سياسة الفعالية.'};
-    if(rule.enabled===false)return{ok:false,reason:'نقطة الوصول موقوفة.'};
-    const now=Date.now(),start=rule.start?Date.parse(rule.start):null,end=rule.end?Date.parse(rule.end):null;
-    if((start&&now<start)||(end&&now>=end))return{ok:false,reason:'نقطة الوصول خارج نافذة الوقت المسموح.'};
-    const allowed=rule.allowed_guest_types||[];
-    if(allowed.length&&!allowed.includes(g.guest_type||'visitor'))return{ok:false,reason:'نوع الزائر غير مسموح في نقطة الوصول هذه.'};
-    return{ok:true,policy,rule};
+  function matchesFor(raw){
+    const exact=parseGuestNumber(raw);if(exact)return(manifest.guests||[]).filter(x=>x.guest_number===exact);
+    const q=String(raw||'').trim().toLowerCase();if(q.length<2)return[];
+    return(manifest.guests||[]).filter(g=>[g.guest_number,g.name,g.organization,g.job_title].some(v=>String(v||'').toLowerCase().includes(q)));
   }
-  async function show(number){
-    number=parseGuestNumber(number);if(!number){result.replaceChildren(h('p',{},'رمز غير معروف'));return;}
-    let g=(manifest.guests||[]).find(x=>x.guest_number===number);
-    if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
-    if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
-    const point=checkpoint.input.value||'main';const decision=await localAccessDecision(g,point);
-    if(!decision.ok){result.replaceChildren(h('h3',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},decision.reason));return;}
-    const mode=direction.input.value;
-    if(mode==='validate'){
-      let presence=((await get('gate_presence',gatePresenceKey(page.id,g.guest_number)))?.state||g.presence||'outside'),valid=true,reason='';
-      if(navigator.onLine&&token){try{const vr=await fetch('/api/device/events/'+encodeURIComponent(page.id)+'/guests/'+encodeURIComponent(g.guest_number)+'/validate?checkpoint='+encodeURIComponent(point),{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});const vd=await vr.json();valid=vr.ok&&vd.status==='valid';presence=vd.presence||presence;reason=vd.reason||vd.error||'';}catch{}}
-      result.replaceChildren(h('span',{class:'tag '+(valid?'status-current':'warning')},valid?'صالح لنقطة الوصول':'غير مسموح'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+presence+(reason?' · '+reason:'')));
-      return;
+  function chooseMatches(matches){
+    result.className='scan-result';
+    result.replaceChildren(h('h3',{},'وجدت أكثر من زائر'),h('p',{class:'muted'},'اختر السجل الصحيح قبل تنفيذ أي حركة.'),h('div',{class:'scan-match-list'},matches.slice(0,8).map(g=>button((g.name||'زائر')+' · '+g.guest_number,()=>{input.input.value=g.guest_number;show(g.guest_number);},'btn secondary'))));
+  }
+  async function findGuest(raw,refresh=true){
+    let matches=matchesFor(raw);
+    if(!matches.length&&navigator.onLine&&token&&refresh){manifest=await loadManifest(page.id,token);refreshCheckpointOptions();await refreshPreflight();matches=matchesFor(raw);}
+    return matches;
+  }
+  async function show(raw){
+    const matches=await findGuest(raw);
+    if(matches.length>1){currentGuest=null;chooseMatches(matches);feedback(false);return;}
+    const g=matches[0];currentGuest=g||null;
+    if(!g){result.className='scan-result denied';result.replaceChildren(h('p',{class:'warning'},'لم أجد زائرًا مطابقًا في سجل البوابة. استخدم الاسم أو رقم الزائر، أو حدّث السجل عند توفر الاتصال.'));feedback(false);return;}
+
+    const validation=await authoritativeValidate(g);
+    if(validation.status!=='valid'){
+      result.className='scan-result denied';result.replaceChildren(h('span',{class:'tag'},'غير مسموح'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},reasonText(validation.reason)));feedback(false);return;
     }
-    const check=button(mode==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{
-      const localKey=gatePresenceKey(page.id,g.guest_number);
-      const local=await get('gate_presence',localKey)||{state:g.presence||'outside'};
-      if(decision.policy.anti_passback!==false&&mode==='entry'&&local.state==='inside'){toast('الزائر مسجل داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);return;}
-      if(decision.policy.anti_passback!==false&&mode==='exit'&&local.state!=='inside'){toast('الزائر غير مسجل داخل الفعالية حاليًا.',true);return;}
-      if(mode==='entry'&&decision.policy.allow_reentry===false&&local.last_direction==='exit'){toast('سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',true);return;}
-      const scan_id=crypto.randomUUID();const point=checkpoint.input.value||'main';
-      await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:mode,checkpoint:point,client_time:new Date().toISOString()}});
-      await put('gate_presence',{id:localKey,event_id:page.id,guest_number:g.guest_number,state:mode==='entry'?'inside':'outside',last_direction:mode,last_checkpoint:point,updated_at:new Date().toISOString(),source:'local-pending'});
-      const out=await refreshSync(false);const label=mode==='exit'?'الخروج':'الدخول';const receipt=await get('checkin_receipts',scan_id);
-      if(receipt?.status==='already_inside'){toast('لم تُسجل حركة جديدة: الزائر داخل الفعالية بالفعل.',true);return;}
-      if(receipt?.status==='already_outside'){toast('لم تُسجل حركة جديدة: الزائر خارج الفعالية بالفعل.',true);return;}
-      toast(out.pending?'تم حفظ '+label+' محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل '+label+' ومزامنته.');
+
+    const selectedMode=mode.input.value;
+    const presence=await get('gate_presence',gatePresenceKey(page.id,g.guest_number))||{state:g.presence||'outside',last_direction:g.last_direction||'',last_checkpoint:g.last_checkpoint||''};
+    if(selectedMode==='validate'){
+      result.className='scan-result success';result.replaceChildren(h('span',{class:'tag status-current'},'صالح للدخول'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+(validation.presence||presence.state||'outside')+' · نقطة الوصول: '+checkpoint.input.value));feedback(true);return;
+    }
+
+    const policy=access();
+    const check=button(selectedMode==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{
+      const latest=await get('gate_presence',gatePresenceKey(page.id,g.guest_number))||presence;
+      if(policy.anti_passback!==false&&selectedMode==='entry'&&latest.state==='inside'){toast('الزائر داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);feedback(false);return;}
+      if(policy.anti_passback!==false&&selectedMode==='exit'&&latest.state!=='inside'){toast('الزائر خارج الفعالية بالفعل.',true);feedback(false);return;}
+      if(selectedMode==='entry'&&policy.allow_reentry===false&&latest.last_direction==='exit'){toast('سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',true);feedback(false);return;}
+      const scan_id=crypto.randomUUID(),point=checkpoint.input.value;
+      const previous={state:latest.state||'outside',last_direction:latest.last_direction||'',last_checkpoint:latest.last_checkpoint||''};
+      await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',previous_presence:previous,payload:{scan_id,guest_number:g.guest_number,mode:selectedMode,direction:selectedMode,checkpoint:point,client_time:new Date().toISOString()}});
+      await put('gate_presence',{id:gatePresenceKey(page.id,g.guest_number),event_id:page.id,guest_number:g.guest_number,state:selectedMode==='entry'?'inside':'outside',last_direction:selectedMode,last_checkpoint:point,updated_at:new Date().toISOString(),source:'local-pending'});
+      const out=await refreshSync(false),receipt=await get('checkin_receipts',scan_id),label=selectedMode==='exit'?'الخروج':'الدخول';
+      if(receipt?.status==='already_inside'||receipt?.status==='already_outside'){toast(receipt.status==='already_inside'?'لم تُسجل حركة جديدة: الزائر داخل الفعالية بالفعل.':'لم تُسجل حركة جديدة: الزائر خارج الفعالية بالفعل.',true);feedback(false);return;}
+      const rejected=await get('checkin_outbox',scan_id);
+      if(rejected?.status==='rejected'){toast('رفض الخادم الحركة: '+reasonText(rejected.error),true);feedback(false);return;}
+      toast(out.pending?'تم حفظ '+label+' محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل '+label+' ومزامنته.');feedback(true);
+      g.presence=selectedMode==='entry'?'inside':'outside';g.last_direction=selectedMode;g.last_checkpoint=point;
     },'btn');
-    result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),check);
+    result.className='scan-result ready';result.replaceChildren(h('span',{class:'tag'},g.guest_type||'visitor'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+presence.state+' · '+(checkpoint.input.selectedOptions[0]?.textContent||checkpoint.input.value)),check);
   }
-  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
+
+  const tools=h('div',{class:'scanner-tools'},input.node,mode.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);refreshCheckpointOptions();await refreshPreflight();toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر · '+(manifest.manifest_version||'').slice(0,8));},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
+  input.input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();show(input.input.value);}});
+  mode.input.addEventListener('change',()=>currentGuest&&show(currentGuest.guest_number));
+  checkpoint.input.addEventListener('change',()=>currentGuest&&show(currentGuest.guest_number));
+
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
-  host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,h('div',{class:'between preflight-head'},h('h3',{},'جاهزية البوابة'),button('إعادة الفحص',refreshPreflight,'text-btn')),preflight,tools,cameraBox,result));
+  host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE ACCESS CONTROL'),h('h1',{},'بوابة الدخول والتحقق'),status,h('div',{class:'between preflight-head'},h('h3',{},'جاهزية البوابة'),button('إعادة الفحص',refreshPreflight,'text-btn')),preflight,tools,cameraBox,result));
   await refreshPreflight();
-  const retry=async()=>{const out=await refreshSync(false);await refreshPreflight();return out;};
-  const reconnect=()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);await retry();status.textContent=token?'الجهاز مرتبط · تمت مزامنة السجل والطابور':'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.';},350);
+
+  const retry=async()=>{const out=await refreshSync(false);return out;};
+  const reconnect=()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);refreshCheckpointOptions();await retry();},350);
   const retryTimer=setInterval(()=>{if(navigator.onLine)retry();},3000);
   window.addEventListener('online',reconnect);
   window.addEventListener('beforeunload',()=>{clearInterval(retryTimer);window.removeEventListener('online',reconnect);},{once:true});
   await refreshSync(false);
+
   if('BarcodeDetector'in window&&navigator.mediaDevices?.getUserMedia){
     try{
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;const detector=new BarcodeDetector({formats:['qr_code']});
-      let busy=false;const tick=async()=>{if(busy)return;busy=true;try{for(const code of await detector.detect(video)){if(code.rawValue){input.input.value=code.rawValue;await show(code.rawValue);break;}}}catch{}finally{busy=false;}};setInterval(tick,700);
-    }catch{cameraBox.append(h('p',{class:'notice'},'تعذر فتح الكاميرا. استخدم الإدخال اليدوي أو ماسح QR متصل بالجهاز.'));}
-  }else cameraBox.append(h('p',{class:'notice'},'المتصفح لا يدعم مسح QR بالكاميرا مباشرة. استخدم الإدخال اليدوي أو متصفحًا يدعم BarcodeDetector.'));
+      let busy=false,lastRaw='',lastAt=0;
+      const tick=async()=>{if(busy)return;busy=true;try{for(const code of await detector.detect(video)){if(code.rawValue){const now=Date.now();if(code.rawValue!==lastRaw||now-lastAt>1500){lastRaw=code.rawValue;lastAt=now;input.input.value=code.rawValue;await show(code.rawValue);}break;}}}catch{}finally{busy=false;}};setInterval(tick,650);
+    }catch{cameraBox.append(h('p',{class:'notice'},'تعذر فتح الكاميرا. استخدم البحث اليدوي أو ماسح QR متصل بالجهاز.'));}
+  }else cameraBox.append(h('p',{class:'notice'},'المتصفح لا يدعم مسح QR بالكاميرا مباشرة. استخدم البحث اليدوي أو قارئ QR متصلًا بالجهاز.'));
 }
