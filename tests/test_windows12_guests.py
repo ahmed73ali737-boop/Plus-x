@@ -171,6 +171,31 @@ def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
         assert len(rows)==1
 
 
+def test_scan_id_cannot_be_reused_for_different_movement(tmp_path):
+    app,c=boot(tmp_path)
+    guest=register(c,'777434343')
+    login(c,app)
+    device=c.post('/api/admin/sites/event-demo/devices',json={'name':'Idempotency Gate','device_type':'operator'})
+    token=device.json()['device_token']
+    c.headers.pop('X-CSRF',None);c.headers.pop('Origin',None)
+    headers={'X-PulseX-Device-Token':token}
+    scan_id=str(uuid.uuid4())
+
+    first=c.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':scan_id,'guest_number':guest['guest_number'],'direction':'entry','checkpoint':'main'
+    }]}).json()['receipts'][0]
+    assert first['status']=='accepted'
+
+    conflict=c.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':scan_id,'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'main'
+    }]}).json()['receipts'][0]
+    assert conflict['status']=='rejected' and conflict['error']=='SCAN_ID_CONFLICT'
+
+    with app.state.engine.connect() as db:
+        rows=db.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().all()
+        assert len(rows)==1 and rows[0]['direction']=='entry'
+
+
 def test_guest_type_is_admin_controlled(tmp_path):
     app,c=boot(tmp_path)
     public=c.post('/api/public/events/demo/guests/register',json={
