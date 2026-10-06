@@ -78,6 +78,18 @@ def main():
         finally:
             if proc.poll() is None:proc.terminate();proc.wait(timeout=8)
             log.close()
+            # Windows can hold the SQLite handle briefly after the server process exits.
+            # Prove the file is releasable before TemporaryDirectory removes it instead of
+            # hiding a persistent lock with ignore_cleanup_errors.
+            if os.name == 'nt':
+                db_path=temp/'db.sqlite';probe=temp/'db-release-probe.sqlite'
+                for _ in range(40):
+                    try:
+                        if db_path.exists():
+                            os.replace(db_path,probe);os.replace(probe,db_path)
+                        break
+                    except PermissionError:
+                        time.sleep(.1)
     dest=ROOT/'qa'/('windows-native-acceptance.json' if os.name=='nt' else 'linux-local-acceptance.json')
     dest.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print('Report:',dest);print(json.dumps(report,ensure_ascii=True,indent=2));return 0 if report['status']=='passed' else 1
