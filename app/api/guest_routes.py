@@ -119,7 +119,12 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=require_scope(c,u,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            return {"guests":list_event_guests(c,event_id)}
+            presence=event_presence_map(c,event_id)
+            rows=[]
+            for guest in list_event_guests(c,event_id):
+                guest["presence"]=presence.get(guest["id"],{}).get("state","outside")
+                rows.append(guest)
+            return {"guests":rows}
 
     @app.get("/api/admin/events/{event_id}/guests/export")
     def admin_export_guests(event_id: str, request: Request):
