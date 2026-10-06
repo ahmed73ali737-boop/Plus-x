@@ -132,6 +132,15 @@ try:
         page.get_by_text(guest_number,exact=True).wait_for()
         mark("qr_payload_resolves_guest_in_scanner")
 
+        # Validate-only mode checks eligibility/presence without writing a movement.
+        page.get_by_label("وضع المسح",exact=True).select_option("validate")
+        page.get_by_role("button",name="بحث / فتح",exact=True).click()
+        page.get_by_text("صالح للفعالية",exact=True).wait_for()
+        mark("validate_only_does_not_check_in")
+
+        page.get_by_label("وضع المسح",exact=True).select_option("entry")
+        page.get_by_role("button",name="بحث / فتح",exact=True).click()
+
         # Offline scan/check-in from the already prepared local manifest.
         context.set_offline(True)
         page.get_by_role("button",name="تسجيل دخول",exact=True).click()
@@ -152,8 +161,14 @@ try:
         page.get_by_text("تمت المزامنة",exact=False).first.wait_for()
         mark("offline_checkin_synced_after_reconnect")
 
+        page.get_by_label("وضع المسح",exact=True).select_option("entry")
+        page.get_by_role("button",name="بحث / فتح",exact=True).click()
+        page.get_by_role("button",name="تسجيل دخول",exact=True).click()
+        page.get_by_text("داخل الفعالية بالفعل",exact=False).wait_for()
+        mark("local_antipassback_blocks_second_entry")
+
         # The same operator flow supports exit and named checkpoints.
-        page.get_by_label("نوع الحركة",exact=True).select_option("exit")
+        page.get_by_label("وضع المسح",exact=True).select_option("exit")
         page.get_by_label("نقطة المسح",exact=True).fill("Gate A")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
         page.get_by_role("button",name="تسجيل خروج",exact=True).click()
