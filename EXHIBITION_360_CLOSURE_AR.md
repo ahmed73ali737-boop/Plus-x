@@ -40,6 +40,8 @@
 | PostgreSQL | native application-path acceptance | PostgreSQL 18 CI gate | Verified on prior head; re-run required |
 | Container | production image builds/imports/migrations assets | container-import gate | Verified on prior head; re-run required |
 | Capacity — interaction | 1000 reads + 1000 submissions synthetic local smoke | `capacity_smoke.py` | Added to CI; not production certificate |
+| Capacity — PostgreSQL | 1000 reads + 1000 submissions through FastAPI/SQLAlchemy/PostgreSQL | `postgres_capacity_smoke.py` | Added to CI; not production certificate |
+| Capacity — exhibition topology | 70 participating entities + 700 repeated agency bundle reads | `exhibition_scale_smoke.py` | Added to CI; not production certificate |
 | Capacity — guests | 1000 guest registrations smoke | `guest_capacity_smoke.py` | Verified on prior head; re-run required |
 | Observability | health/live/ready + QA artifacts/logs | native/CI artifacts | Implemented |
 | Deployment | real target environment + persistent PostgreSQL + secrets | deployment evidence | OPEN |
@@ -53,19 +55,19 @@
 - هندسة بصرية داكنة/تقنية مستقلة.
 - System Map ديناميكي، telemetry، capability nodes وrail.
 - محتوى المعرض: Digital Transformation، FinTech & Payment Platforms، Payment & Collection، Integration & Platforms، Business Systems، Data/Automation/Insights، Accounting & Sales، Lending/Requests/Billing، Humanitarian & Donations، Exchange & Financial Products.
-- CTA مباشر للاستكشاف والتصويت وGuest Pass.
+- CTA مباشر للاستكشاف والتصويت وGuest Pass، مع E2E للتصويت والنتيجة.
 
 ### Easy
 - تجربة محفظة حية بدل Hero تقليدي.
 - Phone surface وquick actions وone-tap journey.
 - الخصوصية والرقم البديل، الحصالة والكسر المباشر، بطاقات Wi‑Fi، حسابات الأطفال، الدفع والتحويل، التقارير والسجل.
-- CTA للتجربة والتصويت وGuest Pass.
+- CTA للتجربة والتصويت وGuest Pass، مع E2E للاستبيان والحفظ.
 
 ### ثروات
 - Financial Perspective/Editorial language مستقلة عن Easy وRTS.
 - Insight Horizon + Discovery Salon + live insights.
 - منظومة رقمية، حلول مالية للأفراد والأعمال، ابتكار مالي، شراكات وتكاملات، بيانات ورؤى قابلة للتنفيذ.
-- CTA للاستكشاف والتصويت وGuest Pass.
+- CTA للاستكشاف والتصويت وGuest Pass، مع E2E لطلب التواصل والموافقة.
 
 ## 4. القدرة — تفسير صحيح
 
