@@ -14,6 +14,11 @@
       "reason": "First executable Windows run reached pytest but failed before test collection because pytest was not installed from requirements.txt.",
       "run_id": 37394152792,
       "fix": "Install requirements-qa.txt, run repository-native tests/native_acceptance.py first, then run full pytest."
+    },
+    {
+      "reason": "Second executable Windows run reached application acceptance and exposed a stale test assumption: agency-01 participation expired on 2026-10-03, so direct agency management correctly returned FORBIDDEN_SCOPE on 2026-10-06.",
+      "run_id": 37394384831,
+      "fix": "Use the event organizer for event-wide admin acceptance, verify organizer access to another participant site, and verify organizer denial against platform scope. Authorization lifecycle behavior remains unchanged."
     }
   ],
   "current_evidence_boundary": "Windows-hosted app+QA dependency install, isolated native acceptance, and Python pytest suite only. PostgreSQL/RLS, browser offline/device soak, remote load/security and field UAT remain separate."
