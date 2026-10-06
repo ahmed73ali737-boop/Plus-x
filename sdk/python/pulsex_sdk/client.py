@@ -80,8 +80,10 @@ class PulseXClient:
     def guest_config(self, event_slug: str):
         return self._request('GET', f'/api/public/events/{urllib.parse.quote(event_slug)}/guest-config')
 
-    def register_guest(self, event_slug: str, phone: str, country_code: str = '+967', **profile):
+    def register_guest(self, event_slug: str, phone: str, country_code: str = '+967', pass_token: str | None = None, **profile):
         payload={'phone': phone, 'country_code': country_code, 'consent': True, **profile}
+        if pass_token:
+            payload['pass_token']=pass_token
         return self._request('POST', f'/api/public/events/{urllib.parse.quote(event_slug)}/guests/register', payload)
 
     def sync_guests(self, event_slug: str, items: list[dict]):
@@ -136,8 +138,9 @@ class PulseXClient:
     def device_guest_manifest(self, event_id: str, device_token: str):
         return self._request('GET', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-manifest', headers={'X-PulseX-Device-Token': device_token})
 
-    def device_validate_guest(self, event_id: str, guest_number: str, device_token: str):
-        return self._request('GET', f'/api/device/events/{urllib.parse.quote(event_id)}/guests/{urllib.parse.quote(guest_number)}/validate', headers={'X-PulseX-Device-Token': device_token})
+    def device_validate_guest(self, event_id: str, guest_number: str, device_token: str, checkpoint: str = 'main'):
+        path=f'/api/device/events/{urllib.parse.quote(event_id)}/guests/{urllib.parse.quote(guest_number)}/validate?checkpoint={urllib.parse.quote(checkpoint)}'
+        return self._request('GET', path, headers={'X-PulseX-Device-Token': device_token})
 
     def device_guest_checkins(self, event_id: str, device_token: str, items: list[dict]):
         return self._request('POST', f'/api/device/events/{urllib.parse.quote(event_id)}/guest-checkins', {'items': items}, headers={'X-PulseX-Device-Token': device_token})
