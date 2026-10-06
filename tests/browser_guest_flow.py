@@ -152,6 +152,14 @@ try:
         page.get_by_text("تمت المزامنة",exact=False).first.wait_for()
         mark("offline_checkin_synced_after_reconnect")
 
+        # The same operator flow supports exit and named checkpoints.
+        page.get_by_label("نوع الحركة",exact=True).select_option("exit")
+        page.get_by_label("نقطة المسح",exact=True).fill("Gate A")
+        page.get_by_role("button",name="بحث / فتح",exact=True).click()
+        page.get_by_role("button",name="تسجيل خروج",exact=True).click()
+        page.get_by_text("تم تسجيل الخروج ومزامنته.",exact=False).wait_for()
+        mark("online_exit_checkpoint_recorded")
+
         # Guest can register while the already-loaded page is offline. The local
         # provisional number must reconcile automatically to a server-issued
         # opaque guest number and QR when connectivity returns.
