@@ -29,8 +29,10 @@ with engine.begin() as con:
     execute_script(con,(ROOT/'ops/001_full_schema_postgres.sql').read_text(encoding='utf-8'))
 migration_result=apply_migrations(engine)
 assert '004_windows12_guest_identity.sql' in migration_result['applied']
+assert '005_guest_presence.sql' in migration_result['applied']
+assert '006_guest_pass_token.sql' in migration_result['applied']
 migration_repeat=apply_migrations(engine)
-assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==4
+assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==5
 app=create_app(url,origin='http://testserver',seed_demo=True)
 c=TestClient(app)
 checks=[]
@@ -39,7 +41,7 @@ def ok(name,cond=True):
 
 ok('postgres_dialect',app.state.engine.dialect.name=='postgresql')
 ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
-ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==4)
+ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==5)
 with engine.connect() as con:
     ok('database_roundtrip',con.execute(text('select 1')).scalar_one()==1)
     tables=set(con.execute(text("select tablename from pg_tables where schemaname='public' and tablename like 'px_%'")).scalars())
@@ -53,6 +55,8 @@ rec=c.post('/api/collect',json={'items':[env]}).json()['receipts'][0];ok('submis
 rec2=c.post('/api/collect',json={'items':[env]}).json()['receipts'][0];ok('idempotent_replay',rec2['status']=='duplicate')
 with engine.connect() as con:
     ok('foreign_keys_present',con.execute(text("select count(*) from information_schema.table_constraints where constraint_type='FOREIGN KEY' and table_schema='public'")).scalar_one()>0)
+    cols={row['column_name'] for row in con.execute(text("select column_name from information_schema.columns where table_schema='public' and table_name='px_event_guests'")).mappings()}
+    ok('pass_token_hash_column_present','pass_token_hash' in cols)
 
 def concurrent_guest_register(i):
     phone='0777 909 090' if i%2==0 else '+967 777 909 090'
