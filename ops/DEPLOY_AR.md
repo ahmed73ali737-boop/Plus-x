@@ -80,3 +80,13 @@ python tests/browser_smoke.py
 ```
 
 اختبارات Python الحالية تستخدم SQLite؛ تشغيلها ناجحًا ليس إثبات PostgreSQL. testclient/fixtures ليست بديلًا للمتصفح المتصل أو الأجهزة الفعلية. لا تغيّر سياسة المتصفح أو الشبكة للتحايل على حظر إداري؛ شغّل الاختبارات في بيئة اختبار مصرح بها.
+
+
+## Windows 12 startup migration/bootstrap
+Production container لا يعتمد على `create_all` وحده. قبل التطبيق:
+1. `tools/production_gate.py`
+2. `tools/migrate_postgres.py` — migrations checksum-tracked.
+3. `tools/bootstrap_production.py` — فقط لقاعدة فارغة.
+4. `run.py`
+
+احتفظ بنسخة PostgreSQL قبل الترقية. إذا تغير checksum migration سبق تطبيقها، يتوقف startup بدل تنفيذ SQL مختلف بنفس الاسم.
