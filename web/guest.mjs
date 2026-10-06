@@ -211,7 +211,10 @@ async function syncCheckins(eventId,token){
         await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
         if(rc.presence)await put('gate_presence',{id:gatePresenceKey(eventId,item.payload.guest_number),event_id:eventId,guest_number:item.payload.guest_number,state:rc.presence,last_direction:rc.direction||item.payload.direction||'',last_checkpoint:rc.checkpoint||item.payload.checkpoint||'',updated_at:new Date().toISOString(),source:'server'});
         if(accepted)await del('checkin_outbox',item.id);
-        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||rc.reason||rc.status});
+        else{
+          if(item.previous_presence)await put('gate_presence',{...item.previous_presence,id:gatePresenceKey(eventId,item.payload.guest_number),event_id:eventId,guest_number:item.payload.guest_number,updated_at:new Date().toISOString(),source:'server-rejected'});
+          await put('checkin_outbox',{...item,status:'rejected',error:rc.error||rc.reason||rc.status});
+        }
       }
       return{synced,rejected,pending:(await pending()).length,receipts:out.receipts||[]};
     }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
