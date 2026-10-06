@@ -72,7 +72,7 @@ def guest_qr_payload(event_slug: str, guest_number: str, public_origin: str) -> 
     return f"{public_origin.rstrip('/')}/e/{event_slug}/guest/{guest_number}"
 
 
-def register_guest(conn, event: dict, body: dict) -> dict:
+def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool = False) -> dict:
     if event["kind"]!="event":
         fail("EVENT_REQUIRED",404)
     if body.get("consent") is not True and not boolean(body.get("consent",False)):
@@ -95,10 +95,17 @@ def register_guest(conn, event: dict, body: dict) -> dict:
         "updated_at":now(),
     }
     if guest:
-        updates={k:v for k,v in values.items() if v or k=="updated_at"}
-        if updates:
-            conn.execute(update(guests).where(guests.c.id==guest["id"]).values(**updates))
-            guest={**dict(guest),**updates}
+        # A phone number is an identity/deduplication key, not proof of possession.
+        # Public re-registration must not let somebody who knows a phone number
+        # overwrite an established guest profile. Admin flows opt in explicitly.
+        current=dict(guest)
+        updates={"updated_at":values["updated_at"]}
+        for key in ("name","job_title","organization"):
+            incoming=values.get(key)
+            if incoming and (allow_profile_update or not current.get(key)):
+                updates[key]=incoming
+        conn.execute(update(guests).where(guests.c.id==guest["id"]).values(**updates))
+        guest={**current,**updates}
     else:
         candidate={
             "id":new_id(),
