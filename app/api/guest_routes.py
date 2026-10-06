@@ -49,8 +49,13 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
         with engine.begin() as c:
             event=event_by_slug(c,event_slug)
             guest=register_guest(c,event,body)
-            guest["qr_url"]=guest_qr_payload(event["slug"],guest["guest_number"],public_origin)
-            return guest
+            return {
+                "guest_number":guest["guest_number"],
+                "status":guest["status"],
+                "created":guest["created"],
+                "event_registration_created":guest["event_registration_created"],
+                "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
+            }
 
     @app.post("/api/public/events/{event_slug}/guests/sync")
     def guest_sync(event_slug: str, body: dict):
@@ -162,7 +167,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=require_scope(c,u,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            guest=register_guest(c,event,{**body,"consent":body.get("consent") is True})
+            guest=register_guest(c,event,{**body,"consent":body.get("consent") is True},allow_profile_update=True)
             log(c,u,event_id,"guest_registered",{"guest_number":guest["guest_number"],"created":guest["created"]})
             return {**guest,"qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin)}
 
