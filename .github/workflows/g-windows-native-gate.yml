@@ -3,8 +3,30 @@ name: PulseX - G Windows Native Gate
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "tools/**"
+      - "web/**"
+      - "templates/**"
+      - "sdk/**"
+      - "requirements.txt"
+      - "requirements-qa.txt"
+      - "run.py"
+      - ".github/workflows/g-windows-native-gate.yml"
   push:
     branches: [ main ]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "tools/**"
+      - "web/**"
+      - "templates/**"
+      - "sdk/**"
+      - "requirements.txt"
+      - "requirements-qa.txt"
+      - "run.py"
+      - ".github/workflows/g-windows-native-gate.yml"
 
 permissions:
   contents: read
