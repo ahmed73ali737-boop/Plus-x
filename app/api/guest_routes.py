@@ -192,7 +192,8 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                 fail("EVENT_REQUIRED",404)
             guest=register_guest(c,event,{**body,"consent":body.get("consent") is True},allow_profile_update=True,allow_guest_type=True)
             log(c,u,event_id,"guest_registered",{"guest_number":guest["guest_number"],"created":guest["created"]})
-            return {**guest,"qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin)}
+            safe_guest={k:v for k,v in guest.items() if k!="pass_token"}
+            return {**safe_guest,"qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin)}
 
     @app.get("/api/admin/events/{event_id}/guest-checkins")
     def admin_guest_checkins(event_id: str, request: Request):
