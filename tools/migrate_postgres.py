@@ -20,28 +20,48 @@ MIGRATIONS=[
 
 
 def split_sql(script: str) -> list[str]:
+    """Split simple migration SQL without treating semicolons in strings/comments as terminators."""
     statements=[]
     buf=[]
     single=False
     double=False
+    line_comment=False
     i=0
     while i<len(script):
         ch=script[i]
+        nxt=script[i+1] if i+1<len(script) else ""
+
+        if line_comment:
+            if ch=="\n":
+                line_comment=False
+                buf.append(ch)
+            i+=1
+            continue
+
+        if not single and not double and ch=="-" and nxt=="-":
+            line_comment=True
+            i+=2
+            continue
+
         if ch=="'" and not double:
-            if single and i+1<len(script) and script[i+1]=="'":
-                buf.extend([ch,script[i+1]]);i+=2;continue
+            if single and nxt=="'":
+                buf.extend([ch,nxt]);i+=2;continue
             single=not single
         elif ch=='"' and not single:
             double=not double
+
         if ch==";" and not single and not double:
             statement="".join(buf).strip()
-            if statement:statements.append(statement)
+            if statement:
+                statements.append(statement)
             buf=[]
         else:
             buf.append(ch)
         i+=1
+
     tail="".join(buf).strip()
-    if tail:statements.append(tail)
+    if tail:
+        statements.append(tail)
     return statements
 
 
