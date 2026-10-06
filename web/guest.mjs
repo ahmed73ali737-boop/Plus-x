@@ -25,6 +25,8 @@ function newProvisionalNumber(){
   const hex=crypto.randomUUID().replace(/-/g,'').toUpperCase();
   return 'P-'+hex.slice(0,4)+'-'+hex.slice(4,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16);
 }
+
+function newPassToken(){return crypto.randomUUID()+'.'+crypto.randomUUID();}
 function localPhoneKey(slug,fingerprint){return 'phone-map:'+slug+':'+fingerprint;}
 function applyTheme(page){
   const c=page.config||{};
@@ -63,11 +65,17 @@ async function syncGuestRegistrations(slug){
         await del('guest_outbox',item.id);
         const local=item.local_id?await get('guests',item.local_id):null;
         const canonicalId=guestKey(slug,receipt.guest_number);
-        const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,synced:true,provisional:false,created:receipt.created,updated_at:new Date().toISOString()};
+        const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,pass_token:receipt.pass_token||local?.pass_token||item.body.pass_token||'',status:'registered',synced:true,provisional:false,verification_required:false,created:receipt.created,updated_at:new Date().toISOString()};
         delete canonical.phone;
         await put('guests',canonical);await cacheQr(slug,canonical);
-        if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,phone:'',status:'reconciled',redirect_to:canonicalId,synced:true,updated_at:new Date().toISOString()});
+        if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,phone:'',pass_token:'',status:'reconciled',redirect_to:canonicalId,synced:true,provisional:false,updated_at:new Date().toISOString()});
         if(item.phone_key)await put('guests',{id:item.phone_key,kind:'phone_map',provisional_id:item.local_id,redirect_to:canonicalId,updated_at:new Date().toISOString()});
+        synced++;
+      }else if(receipt.status==='verification_required'){
+        await put('guest_receipts',{id:item.id,...receipt,at:new Date().toISOString()});
+        await del('guest_outbox',item.id);
+        const local=item.local_id?await get('guests',item.local_id):null;
+        if(local)await put('guests',{...local,phone:'',pass_token:'',status:'verification_required',verification_required:true,synced:true,provisional:false,qr_data_url:'',updated_at:new Date().toISOString()});
         synced++;
       }else await put('guest_outbox',{...item,status:'rejected',error:receipt.error});
     }
@@ -84,18 +92,19 @@ async function registerGuestOfflineFirst(slug,values){
   if(existing?.redirect_to){const canonical=await get('guests',existing.redirect_to);if(canonical)return canonical;}
   const provisionalNumber=existing?.guest_number||newProvisionalNumber();
   const id=existing?.id||guestKey(slug,provisionalNumber);
-  const local={id,slug,guest_number:provisionalNumber,phone,name:values.name||existing?.name||'',job_title:values.job_title||existing?.job_title||'',organization:values.organization||existing?.organization||'',status:'pending_sync',synced:false,provisional:true,qr_data_url:'',updated_at:new Date().toISOString()};
+  const pass_token=existing?.pass_token||newPassToken();
+  const local={id,slug,guest_number:provisionalNumber,phone,pass_token,name:values.name||existing?.name||'',job_title:values.job_title||existing?.job_title||'',organization:values.organization||existing?.organization||'',status:'pending_sync',verification_required:false,synced:false,provisional:true,qr_data_url:'',updated_at:new Date().toISOString()};
   await put('guests',local);
   await put('guests',{id:phoneKey,kind:'phone_map',provisional_id:id,redirect_to:null,updated_at:new Date().toISOString()});
   const pending=(await all('guest_outbox')).find(x=>x.slug===slug&&x.local_id===id&&x.status==='pending');
   if(!pending){
     const client_id=crypto.randomUUID();
-    await put('guest_outbox',{id:client_id,slug,local_id:id,phone_key:phoneKey,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,consent:true}});
+    await put('guest_outbox',{id:client_id,slug,local_id:id,phone_key:phoneKey,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,pass_token:local.pass_token,consent:true}});
   }
   await syncGuestRegistrations(slug);
   const reconciled=await get('guests',id);
   if(reconciled?.redirect_to){const canonical=await get('guests',reconciled.redirect_to);if(canonical)return canonical;}
-  return local;
+  return reconciled||local;
 }
 function guestHeader(page,slug){
   const title=page.config?.title||'PulseX';const mark=title.trim().slice(0,1).toUpperCase()||'P';
