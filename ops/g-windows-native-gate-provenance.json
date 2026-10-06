@@ -8,5 +8,13 @@
   "evidence_boundary": "Windows-hosted Python pytest only; no PostgreSQL/offline/load/security/UAT promotion.",
   "action_versions_verified_on": "2026-10-06",
   "checkout": "v7",
-  "setup_python": "v7"
+  "setup_python": "v7",
+  "adaptations": [
+    {
+      "reason": "First executable Windows run reached pytest but failed before test collection because pytest was not installed from requirements.txt.",
+      "run_id": 37394152792,
+      "fix": "Install requirements-qa.txt, run repository-native tests/native_acceptance.py first, then run full pytest."
+    }
+  ],
+  "current_evidence_boundary": "Windows-hosted app+QA dependency install, isolated native acceptance, and Python pytest suite only. PostgreSQL/RLS, browser offline/device soak, remote load/security and field UAT remain separate."
 }
