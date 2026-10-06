@@ -24,7 +24,27 @@
       "reason": "Third executable Windows run passed every functional native-acceptance check but the test process failed during temporary-directory cleanup because Windows still held db.sqlite briefly after the server process exited.",
       "run_id": 37394778758,
       "fix": "Keep the functional behavior unchanged; after server termination, explicitly verify SQLite file-handle release with bounded rename retries before TemporaryDirectory cleanup."
+    },
+    {
+      "reason": "A later Windows run proved the SQLite acceptance repair but exposed three independent full-suite regressions: demo participation access depended on expired fixed dates, Windows default text decoding used CP1252 for UTF-8 assets, and the local backup helper left SQLite handles open during temporary cleanup.",
+      "run_id": 37406849071,
+      "fix": "Keep permanent seeded demo memberships clock-stable, use explicit/forced UTF-8 text mode, explicitly close backup SQLite connections, and add regression coverage for future-clock demo access."
+    },
+    {
+      "reason": "The repaired exact application head passed the complete Windows gate.",
+      "run_id": 37407492507,
+      "fix": "Evidence only: isolated native acceptance passed 33 checks including sqlite_handle_released; full repository pytest passed 168 tests. No PostgreSQL/offline-soak/load/security/UAT/production promotion is inferred."
     }
   ],
-  "current_evidence_boundary": "Windows-hosted app+QA dependency install, isolated native acceptance, and Python pytest suite only. PostgreSQL/RLS, browser offline/device soak, remote load/security and field UAT remain separate."
+  "current_evidence_boundary": "Windows-hosted app+QA dependency install, isolated native acceptance (33/33), and Python pytest suite (168 passed) only. PostgreSQL/RLS, browser offline/device soak, remote load/security and field UAT remain separate.",
+  "latest_verified_source_head": "bf63c7b312b12b76cf26a06beebd9bf104673027",
+  "latest_successful_run": {
+    "run_id": 37407492507,
+    "conclusion": "success",
+    "isolated_native_acceptance_checks": 33,
+    "pytest_passed": 168,
+    "pytest_warnings": 1,
+    "windows_native": true
+  },
+  "verification_state": "NATIVE_CI_VERIFIED_WINDOWS_APPLICATION_QA_SCOPE"
 }
