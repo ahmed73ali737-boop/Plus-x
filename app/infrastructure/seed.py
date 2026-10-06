@@ -87,7 +87,7 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                 cfg.update(title='RTS', subtitle='من الحلول إلى المنصات إلى الأنظمة البيئية الرقمية.', description='RTS تعرض تجربة تقنية حيّة للتحول الرقمي والتكنولوجيا المالية وبوابات الدفع والتحصيل والمنصات المتكاملة، مع مؤشرات وتفاعل مباشر بدل موقع تعريفي جامد.', template='rts_tech', primary='#0B5CFF', secondary='#071D49', accent='#00C2FF', background='#F4F8FF', cover='')
                 cfg['records'][0].update(title='Digital Transformation', body='الاستراتيجية والرقمنة والأتمتة والتكامل والتحديث ضمن رحلة تنفيذ مترابطة.', order=1)
                 cfg['records'][1].update(title='FinTech & Payment Platforms', body='محافظ ومدفوعات وتحصيل ومنصات مالية وتكاملات قابلة للتوسع.', order=2)
-                cfg['records'][2].update(title='RTS Live Capabilities', value=6, unit='مسارات', source='بيانات عرض تجريبية لمساحة RTS التفاعلية', display='comparison')
+                cfg['records'][2].update(title='RTS Live Capabilities', value=10, unit='مسارات', source='بيانات عرض تجريبية لمساحة RTS التفاعلية', display='comparison')
                 cfg['records'][3].update(title='أي قدرة تقنية تريد استكشافها؟', options=['التحول الرقمي','FinTech والمدفوعات','بوابات الدفع والتحصيل','التكامل والمنصات','أنظمة الأعمال'])
                 cfg['records'][6].update(title='أين ترى أعلى قيمة للتحول؟', options=['أتمتة العمليات','تجربة العميل','التكامل والبيانات','المدفوعات والتحصيل'])
                 cfg['records'][7].update(title='ادخل التجربة التقنية', body='استكشف قدرة، شاهد المؤشر، ثم شارك رأيك أو طلب المتابعة.')
@@ -96,6 +96,10 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                     {'kind':'service','code':'service-4','title':'Integration & Platforms','body':'تكامل الأنظمة وواجهات API والمنصات المشتركة لبناء منظومات مترابطة بدل حلول معزولة.','order':4},
                     {'kind':'service','code':'service-5','title':'Business Systems','body':'أنظمة الأعمال والمحاسبة والمبيعات والإقراض والتحصيل والخدمات المؤسسية ضمن تصميم مرن.','order':5},
                     {'kind':'service','code':'service-6','title':'Data, Automation & Insights','body':'تحويل البيانات والعمليات إلى تدفقات قابلة للأتمتة والقياس والتحسين المستمر.','order':6},
+                    {'kind':'service','code':'service-7','title':'Accounting & Sales Systems','body':'أنظمة محاسبة ومبيعات وتشغيل تدعم الدورة اليومية والرقابة والتقارير والتكامل مع بقية المنظومة.','order':7},
+                    {'kind':'service','code':'service-8','title':'Lending, Requests & Billing','body':'إدارة التقييم والطلبات والإقراض والتحصيل والفوترة ضمن تدفقات واضحة قابلة للضبط والتكامل.','order':8},
+                    {'kind':'service','code':'service-9','title':'Humanitarian & Donations Platforms','body':'منصات لإدارة المبادرات الإنسانية والتبرعات والتحصيل والمتابعة والتقارير ضمن ضوابط وصلاحيات قابلة للتخصيص.','order':9},
+                    {'kind':'service','code':'service-10','title':'Exchange & Financial Products','body':'حلول للصرافة والمنتجات المالية والتكاملات المطلوبة لتقديم خدمات مترابطة وقابلة للتوسع.','order':10},
                 ])
             seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', sid, cfg))
 
