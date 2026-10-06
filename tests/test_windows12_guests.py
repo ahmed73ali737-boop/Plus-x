@@ -64,6 +64,20 @@ def test_same_phone_is_one_guest_and_one_event_registration(tmp_path):
         assert len(db.execute(select(event_guests)).mappings().all())==1
 
 
+def test_public_reregistration_does_not_disclose_or_overwrite_profile(tmp_path):
+    app,c=boot(tmp_path)
+    first=register(c,'777151515',name='Original Name',organization='Original Org')
+    assert 'phone' not in first and 'name' not in first and 'organization' not in first
+    second=register(c,'+967777151515',name='Attacker Name',organization='Changed Org')
+    assert second['guest_number']==first['guest_number']
+    assert 'phone' not in second and 'name' not in second and 'organization' not in second
+    login(c,app)
+    listed=c.get('/api/admin/events/event-demo/guests').json()['guests']
+    found=next(x for x in listed if x['guest_number']==first['guest_number'])
+    assert found['name']=='Original Name'
+    assert found['organization']=='Original Org'
+
+
 def test_public_guest_lookup_does_not_disclose_phone_or_name(tmp_path):
     app,c=boot(tmp_path)
     guest=register(c,'777111222',name='اسم خاص',job_title='مدير')
