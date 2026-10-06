@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="pulsex-guest-capacity-") as td:
                 "scan_id":str(uuid.uuid4()),
                 "guest_number":number,
                 "direction":"entry",
-                "checkpoint":"capacity-main",
+                "checkpoint":"main",
                 "client_time":"2026-10-06T02:00:00+03:00",
             })
         scan_batches.append(batch)
