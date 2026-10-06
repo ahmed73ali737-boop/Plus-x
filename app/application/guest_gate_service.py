@@ -154,9 +154,24 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
     if mode not in SCAN_MODES:
         fail("SCAN_MODE_INVALID")
     checkpoint=text(body.get("checkpoint") or "main",40,True)
+
+    # Resolve exact replay before evaluating mutable access rules. If an ACK was
+    # lost, the same scan remains idempotent even after a gate closes or changes.
+    if mode!="validate":
+        scan_id=text(body.get("scan_id") or new_id(),64,True)
+        existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+        if existing:
+            replay_guest=event_guest_by_number(conn,event_id,guest_number)
+            if not replay_guest:
+                fail("GUEST_NOT_REGISTERED",404)
+            current=guest_presence_state(conn,event_id,replay_guest["id"])
+            return {
+                "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
+                "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":staff_guest_view(replay_guest),
+            }
+
     validated=validate_guest(conn,event,guest_number,checkpoint)
     guest=validated["guest"]
-
     if mode=="validate":
         return {
             "scan_id":text(body.get("scan_id") or new_id(),64,True),
@@ -170,15 +185,6 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         }
     if validated["status"]!="valid":
         fail(validated.get("reason") or "ACCESS_DENIED",403)
-
-    scan_id=text(body.get("scan_id") or new_id(),64,True)
-    existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
-    if existing:
-        current=guest_presence_state(conn,event_id,guest["id"])
-        return {
-            "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
-            "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":guest,
-        }
 
     presence=_ensure_presence(conn,event_id,guest["id"])
     access=validated["access_control"]
@@ -228,7 +234,6 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         "scan_id":scan_id,"status":"accepted","mode":mode,"direction":mode,"checkpoint":checkpoint,
         "presence":next_state,"guest":guest,
     }
-
 
 def build_guest_manifest(conn,event_or_id) -> dict:
     event=_event(conn,event_or_id)
