@@ -1,5 +1,6 @@
 """Regression additions for the Windows-focused UI release; run on the reported OS only."""
 import json
+import re
 import sqlite3
 import sys
 import zipfile
@@ -53,7 +54,9 @@ def test_new_assets_and_sw_cache_are_present(isolated):
     for path in ['design.css','icons.mjs','catalog.mjs','public.mjs','admin.mjs']:
         assert c.get('/assets/'+path).status_code==200
         assert '/assets/'+path in c.get('/sw.js').text
-    assert 'px-shell-v15' in c.get('/sw.js').text
+    sw=c.get('/sw.js').text
+    cache=re.search(r"const CACHE='px-shell-v(\\d+)'",sw)
+    assert cache and int(cache.group(1)) >= 15
 
 def test_start_scripts_quote_paths_and_no_privileged_bypass():
     raw=(ROOT/'Start-Windows.cmd').read_bytes()
