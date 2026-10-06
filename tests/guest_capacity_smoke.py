@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import time
 import uuid
 from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -12,7 +16,6 @@ from sqlalchemy import func, select
 from app.db import event_guests, guest_checkins, guests
 from app.server import create_app
 
-ROOT=Path(__file__).resolve().parents[1]
 COUNT=1000
 BATCH=100
 
