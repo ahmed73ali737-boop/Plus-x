@@ -125,11 +125,18 @@ try:
         # Scanner resolves the QR payload. The CI path uses the exact QR URL text;
         # physical camera hardware is intentionally reported separately.
         page.goto(URL+"/e/demo/scan")
-        page.get_by_role("heading",name="مسح بطاقة الزائر",exact=True).wait_for()
+        page.get_by_role("heading",name="بوابة الدخول والتحقق",exact=True).wait_for()
         page.get_by_role("heading",name="جاهزية البوابة",exact=True).wait_for()
         page.get_by_text("سجل الزوار",exact=True).wait_for()
         mark("gate_preflight_visible")
-        page.get_by_label("امسح QR أو أدخل رقم الزائر",exact=True).fill(URL+"/e/demo/guest/"+guest_number)
+        page.get_by_text("نسخة السجل",exact=True).wait_for()
+        page.get_by_text("حداثة السجل",exact=True).wait_for()
+        mark("manifest_freshness_visible")
+        page.get_by_label("امسح QR أو ابحث بالاسم / الجهة / رقم الزائر",exact=True).fill("زائر تجربة")
+        page.get_by_role("button",name="بحث / فتح",exact=True).click()
+        page.get_by_text(guest_number,exact=True).wait_for()
+        mark("manual_guest_search_fallback")
+        page.get_by_label("امسح QR أو ابحث بالاسم / الجهة / رقم الزائر",exact=True).fill(URL+"/e/demo/guest/"+guest_number)
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
         page.get_by_text("زائر تجربة",exact=True).wait_for()
         page.get_by_text(guest_number,exact=True).wait_for()
@@ -138,7 +145,7 @@ try:
         # Validate-only mode checks eligibility/presence without writing a movement.
         page.get_by_label("وضع المسح",exact=True).select_option("validate")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
-        page.get_by_text("صالح للفعالية",exact=True).wait_for()
+        page.get_by_text("صالح للدخول",exact=True).wait_for()
         mark("validate_only_does_not_check_in")
 
         page.get_by_label("وضع المسح",exact=True).select_option("entry")
@@ -172,7 +179,7 @@ try:
 
         # The same operator flow supports exit and named checkpoints.
         page.get_by_label("وضع المسح",exact=True).select_option("exit")
-        page.get_by_label("نقطة المسح",exact=True).fill("Gate A")
+        page.get_by_label("نقطة الوصول",exact=True).select_option("main")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
         page.get_by_role("button",name="تسجيل خروج",exact=True).click()
         page.get_by_text("تم تسجيل الخروج ومزامنته.",exact=False).wait_for()
