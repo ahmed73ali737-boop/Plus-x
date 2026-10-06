@@ -60,6 +60,23 @@ def test_same_phone_is_one_guest_but_qr_recovery_requires_pass_possession(tmp_pa
         assert db.execute(select(func.count()).select_from(event_guests)).scalar_one()==1
 
 
+def test_lost_registration_ack_can_retry_with_same_pass_token(tmp_path):
+    app,c=boot(tmp_path);slug=event_slug(c)
+    pass_token='client-owned-pass-token-0123456789abcdef0123456789abcdef'
+    body={'client_id':'lost-ack-1','phone':'777321321','country_code':'+967','consent':True,'pass_token':pass_token}
+    first=c.post(f'/api/public/events/{slug}/guests/sync',json={'items':[body]})
+    assert first.status_code==200
+    a=first.json()['receipts'][0]
+    assert a['status']=='accepted' and a['guest_number'].startswith('G-')
+    retry=c.post(f'/api/public/events/{slug}/guests/sync',json={'items':[body]})
+    assert retry.status_code==200
+    b=retry.json()['receipts'][0]
+    assert b['status']=='accepted' and b['guest_number']==a['guest_number']
+    with app.state.engine.connect() as db:
+        assert db.execute(select(func.count()).select_from(guests)).scalar_one()==1
+        assert db.execute(select(func.count()).select_from(event_guests)).scalar_one()==1
+
+
 def test_guest_number_qr_and_public_view_do_not_expose_phone(tmp_path):
     app,c=boot(tmp_path);slug=event_slug(c)
     guest=register(c,slug,'777222333',name='Nash').json()
