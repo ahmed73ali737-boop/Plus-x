@@ -54,7 +54,7 @@ def stamp(v):
     return v
 
 def default_config(title='صفحة جديدة', kind='agency'):
-    return {'title':title,'subtitle':'مرحبًا بك في تجربتنا التفاعلية','description':'','primary':'#176B73','secondary':'#0F3D46','accent':'#29B8A8','background':'#F5F8FA','surface':'#FFFFFF','text_color':'#17313B','font':'system','template':'fintech','card_style':'soft','hero_style':'split','button_style':'rounded','nav_style':'clean','density':'comfortable','content_width':'wide','heading_scale':'balanced','radius':22,'logo':'','logo_dark':'','favicon':'','cover':'','welcome':True,'start':'','end':'','location':'','phone':'','website':'','expected_entities':70 if kind=='event' else 0,'privacy':'بيانات التعريف اختيارية. لا تُشارك مع الجهات الأخرى تلقائيًا.','rating_criteria':[{'key':'overall','label':'التقييم العام','weight':100}], 'surveys':[{'id':'main','title':'استبيان الزوار','description':'شاركنا رأيك في دقائق.','completion':'شكرًا لك، تم استلام إجاباتك.','presentation':'one_page','show_progress':True,'submit_label':'إرسال الاستبيان'}], 'sections':[{'key':k,'title':n,'enabled':True,'order':i,'layout':'cards','preview_count':3} for i,(k,n) in enumerate(SECTIONS)],'records':[]}
+    return {'title':title,'subtitle':'مرحبًا بك في تجربتنا التفاعلية','description':'','primary':'#176B73','secondary':'#0F3D46','accent':'#29B8A8','background':'#F5F8FA','surface':'#FFFFFF','text_color':'#17313B','font':'system','template':'fintech','card_style':'soft','hero_style':'split','button_style':'rounded','nav_style':'clean','density':'comfortable','content_width':'wide','heading_scale':'balanced','radius':22,'logo':'','logo_dark':'','favicon':'','cover':'','welcome':True,'start':'','end':'','location':'','phone':'','website':'','expected_entities':70 if kind=='event' else 0,'privacy':'بيانات التعريف اختيارية. لا تُشارك مع الجهات الأخرى تلقائيًا.','rating_criteria':[{'key':'overall','label':'التقييم العام','weight':100}], 'access_control':{'anti_passback':True,'allow_reentry':True,'manifest_max_age_minutes':60,'guest_types':[{'key':'visitor','label':'زائر'},{'key':'vip','label':'VIP'},{'key':'staff','label':'طاقم'},{'key':'speaker','label':'متحدث'},{'key':'exhibitor','label':'عارض'}],'checkpoints':[{'key':'main','label':'البوابة الرئيسية','enabled':True,'allowed_guest_types':[],'start':'','end':''}]}, 'surveys':[{'id':'main','title':'استبيان الزوار','description':'شاركنا رأيك في دقائق.','completion':'شكرًا لك، تم استلام إجاباتك.','presentation':'one_page','show_progress':True,'submit_label':'إرسال الاستبيان'}], 'sections':[{'key':k,'title':n,'enabled':True,'order':i,'layout':'cards','preview_count':3} for i,(k,n) in enumerate(SECTIONS)],'records':[]}
 
 def normalize_record(raw):
     if not isinstance(raw,dict): fail('RECORD_INVALID')
@@ -135,6 +135,38 @@ def normalize_config(raw):
         clean_criteria.append({'key':key,'label':label,'weight':weight}); total+=weight
     if len({x['key'] for x in clean_criteria})!=len(clean_criteria) or total<=0: fail('RATING_CRITERIA_INVALID')
     c['rating_criteria']=clean_criteria
+    access=raw.get('access_control') or c['access_control']
+    if not isinstance(access,dict): fail('ACCESS_CONTROL_INVALID')
+    guest_types=access.get('guest_types') or c['access_control']['guest_types']
+    if not isinstance(guest_types,list) or not guest_types or len(guest_types)>20: fail('GUEST_TYPES_INVALID')
+    clean_types=[]; type_keys=set()
+    for item in guest_types:
+        if not isinstance(item,dict): fail('GUEST_TYPES_INVALID')
+        key=text(item.get('key'),40,True); label=text(item.get('label') or key,100,True)
+        if not CODE.fullmatch(key) or key in type_keys: fail('GUEST_TYPE_INVALID')
+        type_keys.add(key);clean_types.append({'key':key,'label':label})
+    checkpoints=access.get('checkpoints') or c['access_control']['checkpoints']
+    if not isinstance(checkpoints,list) or not checkpoints or len(checkpoints)>50: fail('CHECKPOINTS_INVALID')
+    clean_checkpoints=[]; checkpoint_keys=set()
+    for item in checkpoints:
+        if not isinstance(item,dict): fail('CHECKPOINT_INVALID')
+        key=text(item.get('key'),40,True); label=text(item.get('label') or key,120,True)
+        if not CODE.fullmatch(key) or key in checkpoint_keys: fail('CHECKPOINT_INVALID')
+        checkpoint_keys.add(key)
+        allowed=item.get('allowed_guest_types') or []
+        if not isinstance(allowed,list) or len(allowed)>20: fail('CHECKPOINT_GUEST_TYPES_INVALID')
+        allowed=[text(x,40,True) for x in allowed]
+        if len(set(allowed))!=len(allowed) or any(x not in type_keys for x in allowed): fail('CHECKPOINT_GUEST_TYPES_INVALID')
+        start,end=stamp(item.get('start')),stamp(item.get('end'))
+        if start and end and datetime.fromisoformat(start)>=datetime.fromisoformat(end): fail('CHECKPOINT_DATE_RANGE')
+        clean_checkpoints.append({'key':key,'label':label,'enabled':boolean(item.get('enabled',True)),'allowed_guest_types':allowed,'start':start,'end':end})
+    c['access_control']={
+        'anti_passback':boolean(access.get('anti_passback',True)),
+        'allow_reentry':boolean(access.get('allow_reentry',True)),
+        'manifest_max_age_minutes':number(access.get('manifest_max_age_minutes'),60,5,1440),
+        'guest_types':clean_types,
+        'checkpoints':clean_checkpoints,
+    }
     c['welcome']=boolean(raw.get('welcome',True))
     c['start'],c['end']=stamp(raw.get('start')),stamp(raw.get('end'))
     if c['start'] and c['end'] and datetime.fromisoformat(c['start'])>=datetime.fromisoformat(c['end']): fail('DATE_RANGE')
