@@ -30,6 +30,14 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             fail("EVENT_NOT_FOUND",404)
         return dict(event)
 
+    def gate_device(conn, raw_token: str, event_id: str):
+        device=authenticate_device(conn,raw_token)
+        if device["site_id"]!=event_id:
+            fail("DEVICE_EVENT_SCOPE",403)
+        if device["device_type"]!="operator":
+            fail("DEVICE_GATE_PERMISSION",403)
+        return device
+
     @app.get("/api/public/events/{event_slug}/guest-config")
     def guest_config(event_slug: str):
         with engine.connect() as c:
@@ -291,7 +299,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             for item in items:
                 try:
                     result=record_checkin(c,event,text(item.get("guest_number"),32,True),item,scanner_id=device["id"],source="device")
-                    receipts.append({
+                    receipt={
                         "scan_id":result["scan_id"],
                         "status":result["status"],
                         "guest_number":result["guest"]["guest_number"],
@@ -299,7 +307,18 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                         "checkpoint":result.get("checkpoint"),
                         "presence":result.get("presence"),
                         "reason":result.get("reason"),
-                    })
+                    }
+                    receipts.append(receipt)
+                    if result["status"] in ("already_inside","already_outside","invalid"):
+                        log(c,{"id":device["id"]},event_id,"guest_scan_blocked",receipt)
                 except Exception as exc:
-                    receipts.append({"scan_id":item.get("scan_id"),"status":"rejected","error":getattr(exc,"detail",str(exc))})
+                    error=getattr(exc,"detail",str(exc))
+                    receipt={"scan_id":item.get("scan_id"),"status":"rejected","error":error}
+                    receipts.append(receipt)
+                    log(c,{"id":device["id"]},event_id,"guest_scan_rejected",{
+                        "guest_number":text(item.get("guest_number"),32),
+                        "checkpoint":text(item.get("checkpoint") or "main",40),
+                        "mode":text(item.get("mode") or item.get("direction") or "entry",20),
+                        "error":error,
+                    })
         return {"receipts":receipts}
