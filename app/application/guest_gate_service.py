@@ -44,6 +44,21 @@ def access_config(event: dict) -> dict:
     }
 
 
+def access_policy_version(access: dict) -> str:
+    source=json.dumps(access,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:20]
+
+
+def _scan_time(raw) -> datetime:
+    try:
+        value=datetime.fromisoformat(str(raw or ""))
+        if value.tzinfo is None:
+            value=value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    except (TypeError,ValueError):
+        fail("OFFLINE_SCAN_TIME_INVALID")
+
+
 def _checkpoint_rule(access: dict,key: str):
     for item in access["checkpoints"]:
         if item.get("key")==key:
@@ -51,8 +66,8 @@ def _checkpoint_rule(access: dict,key: str):
     return None
 
 
-def _in_window(rule: dict) -> bool:
-    current=datetime.now(timezone.utc)
+def _in_window(rule: dict,current: datetime|None=None) -> bool:
+    current=current or datetime.now(timezone.utc)
     for field,is_start in (("start",True),("end",False)):
         raw=rule.get(field)
         if not raw:
@@ -113,7 +128,7 @@ def event_presence_map(conn,event_id: str) -> dict[str,dict]:
     return {row["guest_id"]:dict(row) for row in rows}
 
 
-def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main") -> dict:
+def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main",at_time: datetime|None=None) -> dict:
     event=_event(conn,event_or_id)
     event_id=event["id"]
     guest=event_guest_by_number(conn,event_id,guest_number)
@@ -130,7 +145,7 @@ def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main") ->
         return {"status":"invalid","reason":"CHECKPOINT_NOT_FOUND","guest":staff_guest_view(guest),"presence":presence}
     if rule.get("enabled") is False:
         return {"status":"invalid","reason":"CHECKPOINT_DISABLED","guest":staff_guest_view(guest),"presence":presence}
-    if not _in_window(rule):
+    if not _in_window(rule,at_time):
         return {"status":"invalid","reason":"CHECKPOINT_WINDOW_CLOSED","guest":staff_guest_view(guest),"presence":presence}
     allowed=rule.get("allowed_guest_types") or []
     guest_type=guest.get("guest_type") or "visitor"
@@ -178,7 +193,20 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         if existing:
             return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,existing)
 
-    validated=validate_guest(conn,event,guest_number,checkpoint)
+    access_now=access_config(event)
+    offline_scan=body.get("offline_scan") is True
+    at_time=None
+    if offline_scan:
+        supplied_policy=text(body.get("access_policy_version"),40,True)
+        current_policy=access_policy_version(access_now)
+        if supplied_policy!=current_policy:
+            fail("ACCESS_POLICY_CHANGED",409)
+        at_time=_scan_time(body.get("client_time"))
+        if at_time>datetime.now(timezone.utc).replace(microsecond=0):
+            # Small clock differences are handled at field setup; future scans are never trusted.
+            if (at_time-datetime.now(timezone.utc)).total_seconds()>300:
+                fail("OFFLINE_SCAN_TIME_FUTURE")
+    validated=validate_guest(conn,event,guest_number,checkpoint,at_time=at_time)
     guest=validated["guest"]
     if mode=="validate":
         return {
@@ -274,11 +302,13 @@ def build_guest_manifest(conn,event_or_id) -> dict:
             "presence_updated_at":p.get("updated_at") or "",
         })
     access=access_config(event)
+    policy_version=access_policy_version(access)
     source=json.dumps({"guests":guests,"access_control":access},ensure_ascii=False,sort_keys=True,separators=(",",":"))
     return {
         "event_id":event_id,
         "generated_at":now(),
         "manifest_version":hashlib.sha256(source.encode("utf-8")).hexdigest()[:20],
+        "access_policy_version":policy_version,
         "guest_count":len(guests),
         "access_control":access,
         "guests":guests,
