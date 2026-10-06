@@ -152,6 +152,42 @@ def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
         assert len(rows)==1
 
 
+def test_gate_validate_and_anti_passback(tmp_path):
+    app,c=boot(tmp_path)
+    guest=register(c,'777454545')
+    login(c,app)
+    device=c.post('/api/admin/sites/event-demo/devices',json={'name':'Anti-passback Gate','device_type':'operator'})
+    token=device.json()['device_token']
+    c.headers.pop('X-CSRF',None); c.headers.pop('Origin',None)
+    headers={'X-PulseX-Device-Token':token}
+
+    valid=c.get(f"/api/device/events/event-demo/guests/{guest['guest_number']}/validate",headers=headers)
+    assert valid.status_code==200 and valid.json()['status']=='valid' and valid.json()['presence']=='outside'
+
+    entry1={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'entry','checkpoint':'Gate A'}]}
+    first=c.post('/api/device/events/event-demo/guest-checkins',json=entry1,headers=headers).json()['receipts'][0]
+    assert first['status']=='accepted' and first['presence']=='inside'
+
+    entry2={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'entry','checkpoint':'Gate B'}]}
+    repeated=c.post('/api/device/events/event-demo/guest-checkins',json=entry2,headers=headers).json()['receipts'][0]
+    assert repeated['status']=='already_inside' and repeated['presence']=='inside'
+
+    validated_inside=c.get(f"/api/device/events/event-demo/guests/{guest['guest_number']}/validate",headers=headers).json()
+    assert validated_inside['status']=='valid' and validated_inside['presence']=='inside'
+
+    exit1={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'Gate A'}]}
+    left=c.post('/api/device/events/event-demo/guest-checkins',json=exit1,headers=headers).json()['receipts'][0]
+    assert left['status']=='accepted' and left['presence']=='outside'
+
+    exit2={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'Gate B'}]}
+    repeated_exit=c.post('/api/device/events/event-demo/guest-checkins',json=exit2,headers=headers).json()['receipts'][0]
+    assert repeated_exit['status']=='already_outside' and repeated_exit['presence']=='outside'
+
+    with app.state.engine.connect() as db:
+        rows=db.execute(select(guest_checkins).where(guest_checkins.c.guest_number==guest['guest_number'])).mappings().all()
+        assert [x['direction'] for x in rows]==['entry','exit']
+
+
 def test_agency_cannot_access_event_wide_guest_directory_or_export(tmp_path):
     app,c=boot(tmp_path)
     login(c,app,'agency01@pulsex.test')
