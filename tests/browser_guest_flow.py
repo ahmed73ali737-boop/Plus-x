@@ -136,7 +136,7 @@ try:
         pair=page.get_by_role("button",name="ربط هذا المتصفح بهذه الطرفية",exact=True)
         pair.wait_for()
         pair.click()
-        page.get_by_text("تم ربط هذا المتصفح وتجهيزه للمسح.",exact=False).wait_for()
+        page.get_by_text("تم ربط بوابة المشغل وتجهيزها للمسح.",exact=False).wait_for()
         mark("event_operator_device_paired_in_browser")
 
         # Scanner resolves the QR payload. The CI path uses the exact QR URL text;
