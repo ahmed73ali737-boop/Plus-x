@@ -17,7 +17,7 @@ from app.application.guest_service import (
     public_guest_view,
     register_guest,
 )
-from app.application.guest_gate_service import event_presence_map, record_checkin, validate_guest
+from app.application.guest_gate_service import build_guest_manifest, record_checkin, validate_guest
 from app.application.access import require_scope
 from app.db import guest_checkins, sites
 from app.domain import fail, now, text
@@ -41,6 +41,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                 "country_code":"+967",
                 "guest_identity":"phone",
                 "guest_number_strategy":"keyed_hmac",
+                "offline_registration":"random_provisional_then_reconcile",
                 "offline_edge_recommended":True,
             }
 
@@ -167,7 +168,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=require_scope(c,u,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            guest=register_guest(c,event,{**body,"consent":body.get("consent") is True},allow_profile_update=True)
+            guest=register_guest(c,event,{**body,"consent":body.get("consent") is True},allow_profile_update=True,allow_guest_type=True)
             log(c,u,event_id,"guest_registered",{"guest_number":guest["guest_number"],"created":guest["created"]})
             return {**guest,"qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin)}
 
@@ -193,7 +194,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=require_scope(c,u,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            result=record_checkin(c,event_id,text(body.get("guest_number"),32,True),body,scanner_id=u["id"],source="admin")
+            result=record_checkin(c,event,text(body.get("guest_number"),32,True),body,scanner_id=u["id"],source="admin")
             log(c,u,event_id,"guest_checkin",{"guest_number":result["guest"]["guest_number"],"direction":result["direction"],"checkpoint":result["checkpoint"]})
             return result
 
@@ -207,13 +208,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            presence=event_presence_map(c,event_id)
-            manifest=[]
-            for guest in list_event_guests(c,event_id):
-                item={k:v for k,v in guest.items() if k!="phone"}
-                item["presence"]=presence.get(guest["id"],{}).get("state","outside")
-                manifest.append(item)
-            return {"event_id":event_id,"generated_at":now(),"guests":manifest}
+            return build_guest_manifest(c,event)
 
     @app.get("/api/device/events/{event_id}/guests/{guest_number}/validate")
     def device_validate_guest(event_id: str, guest_number: str, request: Request):
@@ -225,7 +220,8 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
-            result=validate_guest(c,event_id,text(guest_number,32,True))
+            checkpoint=text(request.query_params.get("checkpoint") or "main",40,True)
+            result=validate_guest(c,event,text(guest_number,32,True),checkpoint)
             guest=result["guest"]
             return {
                 "status":result["status"],
@@ -251,9 +247,12 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             device=authenticate_device(c,raw)
             if device["site_id"]!=event_id:
                 fail("DEVICE_EVENT_SCOPE",403)
+            event=site_row(c,event_id)
+            if event["kind"]!="event":
+                fail("EVENT_REQUIRED",404)
             for item in items:
                 try:
-                    result=record_checkin(c,event_id,text(item.get("guest_number"),32,True),item,scanner_id=device["id"],source="device")
+                    result=record_checkin(c,event,text(item.get("guest_number"),32,True),item,scanner_id=device["id"],source="device")
                     receipts.append({
                         "scan_id":result["scan_id"],
                         "status":result["status"],
@@ -261,6 +260,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                         "direction":result.get("direction"),
                         "checkpoint":result.get("checkpoint"),
                         "presence":result.get("presence"),
+                        "reason":result.get("reason"),
                     })
                 except Exception as exc:
                     receipts.append({"scan_id":item.get("scan_id"),"status":"rejected","error":getattr(exc,"detail",str(exc))})
