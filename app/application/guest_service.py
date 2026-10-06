@@ -13,6 +13,7 @@ from app.db import event_guests, guests
 from app.domain import boolean, fail, now, text
 
 PHONE_DIGIT_TRANSLATION=str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹','01234567890123456789')
+GUEST_TYPES=('visitor','vip','speaker','staff','media','exhibitor')
 
 
 def normalize_phone(raw, country_code="+967") -> str:
@@ -78,6 +79,11 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
     if body.get("consent") is not True and not boolean(body.get("consent",False)):
         fail("GUEST_CONSENT_REQUIRED")
     phone=normalize_phone(body.get("phone"),body.get("country_code") or "+967")
+    guest_type="visitor"
+    if allow_profile_update and body.get("guest_type"):
+        guest_type=text(body.get("guest_type"),40,True).lower()
+        if guest_type not in GUEST_TYPES:
+            fail("GUEST_TYPE_INVALID")
     p_hash=phone_hash(phone)
     g_number=guest_number_for_phone(phone)
     guest=conn.execute(
