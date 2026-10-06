@@ -37,8 +37,9 @@ with tempfile.TemporaryDirectory(prefix='px-sdk-') as td:
         event_guests=sdk.event_guests('event-demo')['guests']; assert any(x['guest_number']==guest['guest_number'] for x in event_guests)
         gate=sdk.create_device('event-demo','SDK Gate','operator','0.9.0'); assert gate['token_shown_once']
         manifest=sdk.device_guest_manifest('event-demo',gate['device_token']); assert any(x['guest_number']==guest['guest_number'] for x in manifest['guests'])
+        validated=sdk.device_validate_guest('event-demo',guest['guest_number'],gate['device_token']); assert validated['status']=='valid'
         sdk.logout()
-        report={'status':'passed','checks':14,'transport':'real localhost HTTP','sdk':'python','guest_qr_api':True}
+        report={'status':'passed','checks':15,'transport':'real localhost HTTP','sdk':'python','guest_qr_api':True}
     finally:
         proc.terminate();proc.wait(timeout=10);log.close()
 (ROOT/'qa/hardening/sdk-python-smoke.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
