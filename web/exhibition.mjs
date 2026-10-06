@@ -51,7 +51,7 @@ function easy(page,ctx){
        offer?ctx.h('a',{class:'expo-easy-offer',href:targetFor(ctx,page,offer,'offers')},ctx.h('span',{},'عرض المعرض'),ctx.h('strong',{},offer.title),ctx.icon('arrow',17)):null)));
  const rail=ctx.h('section',{class:'expo-easy-journey'},
    ctx.h('div',{class:'expo-easy-journey-head'},ctx.h('span',{class:'expo-overline'},'ONE TAP JOURNEY'),ctx.h('h2',{},'اكتشف Easy بطريقتك'),ctx.h('p',{},'ليست صفحة تعريفية؛ كل بطاقة تقود لتفاعل أو قرار أو ملاحظة قابلة للقياس.')),
-   ctx.h('div',{class:'expo-easy-feature-grid'},quick.slice(0,6).map((r,i)=>ctx.h('a',{class:'expo-easy-feature',href:r.code?targetFor(ctx,page,r,'services'):'#services'},ctx.h('span',{class:'expo-easy-feature-num'},String(i+1).padStart(2,'0')),ctx.h('strong',{},r.title),ctx.h('p',{},r.body||'افتح التجربة وتعرّف على التفاصيل.'),ctx.h('span',{class:'expo-easy-open'},'افتح التجربة ←')))));
+   ctx.h('div',{class:'expo-easy-feature-grid'},quick.slice(0,8).map((r,i)=>ctx.h('a',{class:'expo-easy-feature',href:r.code?targetFor(ctx,page,r,'services'):'#services'},ctx.h('span',{class:'expo-easy-feature-num'},String(i+1).padStart(2,'0')),ctx.h('strong',{},r.title),ctx.h('p',{},r.body||'افتح التجربة وتعرّف على التفاصيل.'),ctx.h('span',{class:'expo-easy-open'},'افتح التجربة ←')))));
  return {hero,after:rail,mode:'easy'};
 }
 
