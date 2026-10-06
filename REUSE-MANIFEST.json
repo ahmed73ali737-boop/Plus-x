@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0",
+  "artifact": {
+    "id": "PULSEX-ENGAGEMENT",
+    "name": "PulseX Live Experience & Engagement Platform",
+    "kind": "platform",
+    "repository": "ahmed73ali737-boop/Plus-x",
+    "version": "main@c7a10b8 / Windows11-era repository source; Windows12 reconciliation open",
+    "path": null
+  },
+  "canonical_owner": "PulseX / G Engagement",
+  "classification": "DOMAIN_SHARED",
+  "readiness": "R3",
+  "production_ready": false,
+  "capabilities": [
+    "question/survey engine",
+    "polling/voting",
+    "weighted rating",
+    "public visitor interaction",
+    "QR/kiosk",
+    "organization/event/participation hierarchy",
+    "people vs accounts",
+    "themes/white-label",
+    "CSV/XLSX import/export",
+    "offline/idempotency contract",
+    "OpenAPI and Python/JavaScript SDKs"
+  ],
+  "consumers": [
+    "events/exhibitions",
+    "Easy experiences",
+    "research/feedback products",
+    "future community/service evaluation products"
+  ],
+  "evidence": {
+    "state": "LOCAL_VERIFIED",
+    "verified_scope": [
+      "Windows11 repository flows and role model",
+      "local server/API/static/security evidence documented in repository",
+      "server-side idempotency/offline receipts",
+      "API/SDK contract snapshot"
+    ],
+    "receipts": [
+      "START_HERE_AR.md",
+      "CLOSURE_STATUS_WINDOWS11_AR.md",
+      "ROLE_AND_OFFLINE_FLOW_AR.md",
+      "SDK_API_AR.md",
+      "PRODUCTION_READINESS_AR.md"
+    ],
+    "open_gates": [
+      "Windows12 source reconciliation",
+      "GitHub CI workflow",
+      "Windows native E2E",
+      "PostgreSQL/RLS native",
+      "real IndexedDB/Service Worker",
+      "two-device outage/recovery",
+      "5-day offline soak",
+      "load/DAST/pentest",
+      "field/business UAT",
+      "production HTTPS/HA/DR"
+    ]
+  },
+  "contracts": {
+    "openapi": [
+      "ops/openapi.generated.json"
+    ],
+    "events": [
+      "interaction/result events require shared envelope alignment during extraction"
+    ],
+    "schemas": [
+      "ops/api-contract-v1.json"
+    ],
+    "sdks": [
+      "sdk/python/pulsex_sdk",
+      "sdk/javascript/index.mjs"
+    ],
+    "errors": [
+      "API contract error semantics; align with G ProblemDetails before shared extraction"
+    ]
+  },
+  "dependencies": [
+    "G Contracts",
+    "G Device",
+    "G ImportExport",
+    "G Content",
+    "G Consent",
+    "G Notification",
+    "U-SEAS PartyCustomer for authenticated organizational identities when required"
+  ],
+  "provider_ports": [
+    "PostgreSQL persistence",
+    "offline browser storage/service worker",
+    "notifications",
+    "media/storage",
+    "event broker",
+    "observability"
+  ],
+  "persistence_owner": "PulseX owns engagement/event/exposure/response data; enterprise Party identity and unrelated commercial/financial truth remain external.",
+  "truth_boundary": "Generic survey/vote/rating/QR primitives may be extracted under G Engagement, but PulseX event/experience composition remains PulseX-owned until a formal shared-service split.",
+  "extension_policy": {
+    "allowed": [
+      "new block/question types through governed schema",
+      "theme/brand adapters",
+      "channel/device adapters",
+      "generic engine extraction with compatibility tests"
+    ],
+    "forbidden": [
+      "duplicate enterprise Party master",
+      "duplicate financial/commercial engines",
+      "claim field-offline support without physical/native evidence"
+    ]
+  },
+  "promotion_gates": [
+    "reuse manifest validation",
+    "Windows12 controlled source reconciliation",
+    "CI/native Windows PASS",
+    "PostgreSQL/RLS PASS",
+    "offline physical/soak PASS",
+    "load/security PASS",
+    "field/business UAT",
+    "production observability/backup/DR"
+  ],
+  "rollback": [
+    "retain current main source and provenance until Windows12 promotion",
+    "extracted shared engines must preserve PulseX compatibility tests"
+  ]
+}
