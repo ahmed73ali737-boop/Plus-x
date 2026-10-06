@@ -50,11 +50,20 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
         with engine.begin() as c:
             event=event_by_slug(c,event_slug)
             guest=register_guest(c,event,body)
+            if not guest["verified"]:
+                return {
+                    "status":"verification_required",
+                    "verification_required":True,
+                    "created":False,
+                    "event_registration_created":False,
+                }
             return {
                 "guest_number":guest["guest_number"],
                 "status":guest["status"],
+                "verification_required":False,
                 "created":guest["created"],
                 "event_registration_created":guest["event_registration_created"],
+                "pass_token":guest.get("pass_token"),
                 "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
             }
 
@@ -70,13 +79,21 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                 client_id=item.get("client_id") if isinstance(item,dict) else None
                 try:
                     guest=register_guest(c,event,item)
-                    receipts.append({
-                        "client_id":client_id,
-                        "status":"accepted",
-                        "guest_number":guest["guest_number"],
-                        "created":guest["created"],
-                        "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
-                    })
+                    if guest["verified"]:
+                        receipts.append({
+                            "client_id":client_id,
+                            "status":"accepted",
+                            "guest_number":guest["guest_number"],
+                            "created":guest["created"],
+                            "pass_token":guest.get("pass_token"),
+                            "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
+                        })
+                    else:
+                        receipts.append({
+                            "client_id":client_id,
+                            "status":"verification_required",
+                            "verification_required":True,
+                        })
                 except Exception as exc:
                     detail=getattr(exc,"detail",str(exc))
                     receipts.append({"client_id":client_id,"status":"rejected","error":detail})
