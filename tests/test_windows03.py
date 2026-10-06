@@ -53,7 +53,7 @@ def test_new_assets_and_sw_cache_are_present(isolated):
     for path in ['design.css','icons.mjs','catalog.mjs','public.mjs','admin.mjs']:
         assert c.get('/assets/'+path).status_code==200
         assert '/assets/'+path in c.get('/sw.js').text
-    assert 'px-shell-v13' in c.get('/sw.js').text
+    assert 'px-shell-v14' in c.get('/sw.js').text
 
 def test_start_scripts_quote_paths_and_no_privileged_bypass():
     raw=(ROOT/'Start-Windows.cmd').read_bytes()
