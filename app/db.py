@@ -122,6 +122,7 @@ event_guests=Table('px_event_guests',metadata,
     Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
     Column('status',String(20),nullable=False,default='registered'),
     Column('guest_type',String(40),nullable=False,default='visitor'),
+    Column('pass_token_hash',String(64)),
     Column('metadata_json',JSON,nullable=False),
     Column('registered_at',String(64),nullable=False),
     Column('updated_at',String(64),nullable=False),
@@ -189,3 +190,8 @@ def ensure_compat_schema(engine):
         if 'must_change_password' not in cols:
             with engine.begin() as c:
                 c.execute(sa_text('ALTER TABLE px_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'))
+    if 'px_event_guests' in insp.get_table_names():
+        cols={c['name'] for c in insp.get_columns('px_event_guests')}
+        if 'pass_token_hash' not in cols:
+            with engine.begin() as c:
+                c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_token_hash VARCHAR(64)'))
