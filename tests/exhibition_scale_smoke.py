@@ -18,6 +18,8 @@ with tempfile.TemporaryDirectory(prefix='px-expo-scale-') as td:
         assert event.status_code==200
         body=event.json()
         assert len(body['agencies'])==70,len(body['agencies'])
+        slugs={row['slug'] for row in body['agencies']}
+        assert 'tharawat' in slugs and 'easy' in slugs and 'rts' in slugs
     slugs=[f'agency-{i:02}' for i in range(1,71)]
     def one(slug):
         t=time.perf_counter()
