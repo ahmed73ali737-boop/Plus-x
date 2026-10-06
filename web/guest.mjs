@@ -16,12 +16,16 @@ function cleanLocalPhone(raw,countryCode='+967'){
   if(!/^\d{8,15}$/.test(digits))throw new Error('أدخل رقم هاتف صحيحًا مع رمز الدولة.');
   return '+'+digits;
 }
-async function provisionalNumberForPhone(phone){
-  if(!crypto?.subtle)throw new Error('إنشاء رقم الزائر دون اتصال يحتاج متصفحًا آمنًا يدعم Web Crypto.');
+async function localPhoneFingerprint(phone){
+  if(!crypto?.subtle)throw new Error('التسجيل دون اتصال يحتاج متصفحًا آمنًا يدعم Web Crypto.');
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(phone));
-  const hex=[...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function newProvisionalNumber(){
+  const hex=crypto.randomUUID().replace(/-/g,'').toUpperCase();
   return 'P-'+hex.slice(0,4)+'-'+hex.slice(4,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16);
 }
+function localPhoneKey(slug,fingerprint){return 'phone-map:'+slug+':'+fingerprint;}
 function applyTheme(page){
   const c=page.config||{};
   document.documentElement.style.setProperty('--accent',c.primary||'#176B73');
@@ -62,6 +66,7 @@ async function syncGuestRegistrations(slug){
         const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,synced:true,provisional:false,created:receipt.created,updated_at:new Date().toISOString()};
         await put('guests',canonical);await cacheQr(slug,canonical);
         if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,status:'reconciled',redirect_to:canonicalId,synced:true,updated_at:new Date().toISOString()});
+        if(item.phone_key)await put('guests',{id:item.phone_key,kind:'phone_map',provisional_id:item.local_id,redirect_to:canonicalId,updated_at:new Date().toISOString()});
         synced++;
       }else await put('guest_outbox',{...item,status:'rejected',error:receipt.error});
     }
@@ -70,14 +75,22 @@ async function syncGuestRegistrations(slug){
 }
 async function registerGuestOfflineFirst(slug,values){
   const phone=cleanLocalPhone(values.phone,values.country_code);
-  const provisionalNumber=await provisionalNumberForPhone(phone);
-  const id=guestKey(slug,provisionalNumber);
-  const existing=await get('guests',id);
+  const fingerprint=await localPhoneFingerprint(phone);
+  const phoneKey=localPhoneKey(slug,fingerprint);
+  const mapping=await get('guests',phoneKey);
+  if(mapping?.redirect_to){const canonical=await get('guests',mapping.redirect_to);if(canonical)return canonical;}
+  let existing=mapping?.provisional_id?await get('guests',mapping.provisional_id):null;
   if(existing?.redirect_to){const canonical=await get('guests',existing.redirect_to);if(canonical)return canonical;}
+  const provisionalNumber=existing?.guest_number||newProvisionalNumber();
+  const id=existing?.id||guestKey(slug,provisionalNumber);
   const local={id,slug,guest_number:provisionalNumber,phone,name:values.name||existing?.name||'',job_title:values.job_title||existing?.job_title||'',organization:values.organization||existing?.organization||'',status:'pending_sync',synced:false,provisional:true,qr_data_url:'',updated_at:new Date().toISOString()};
   await put('guests',local);
-  const client_id=crypto.randomUUID();
-  await put('guest_outbox',{id:client_id,slug,local_id:id,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,consent:true}});
+  await put('guests',{id:phoneKey,kind:'phone_map',provisional_id:id,redirect_to:null,updated_at:new Date().toISOString()});
+  const pending=(await all('guest_outbox')).find(x=>x.slug===slug&&x.local_id===id&&x.status==='pending');
+  if(!pending){
+    const client_id=crypto.randomUUID();
+    await put('guest_outbox',{id:client_id,slug,local_id:id,phone_key:phoneKey,status:'pending',body:{client_id,phone,country_code:values.country_code,name:local.name,job_title:local.job_title,organization:local.organization,consent:true}});
+  }
   await syncGuestRegistrations(slug);
   const reconciled=await get('guests',id);
   if(reconciled?.redirect_to){const canonical=await get('guests',reconciled.redirect_to);if(canonical)return canonical;}
