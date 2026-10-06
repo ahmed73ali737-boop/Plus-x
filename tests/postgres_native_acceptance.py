@@ -30,7 +30,7 @@ with engine.begin() as con:
 migration_result=apply_migrations(engine)
 assert '004_windows12_guest_identity.sql' in migration_result['applied']
 migration_repeat=apply_migrations(engine)
-assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==3
+assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==4
 app=create_app(url,origin='http://testserver',seed_demo=True)
 c=TestClient(app)
 checks=[]
@@ -39,7 +39,7 @@ def ok(name,cond=True):
 
 ok('postgres_dialect',app.state.engine.dialect.name=='postgresql')
 ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
-ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==3)
+ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==4)
 with engine.connect() as con:
     ok('database_roundtrip',con.execute(text('select 1')).scalar_one()==1)
     tables=set(con.execute(text("select tablename from pg_tables where schemaname='public' and tablename like 'px_%'")).scalars())
@@ -70,6 +70,26 @@ ok('concurrent_same_phone_one_guest_number',len(numbers)==1 and None not in numb
 with engine.connect() as con:
     ok('concurrent_same_phone_one_guest_row',con.execute(text("select count(*) from px_guests where phone_e164='+967777909090'")).scalar_one()==1)
     ok('concurrent_same_phone_one_event_registration',con.execute(text("select count(*) from px_event_guests eg join px_guests g on g.id=eg.guest_id where eg.event_id='event-demo' and g.phone_e164='+967777909090'")).scalar_one()==1)
+
+gate=c.post('/api/admin/sites/event-demo/devices',json={'name':'Concurrent Gate','device_type':'operator'})
+ok('event_gate_device_created',gate.status_code==200)
+gate_token=gate.json()['device_token']
+gate_guest=c.post('/api/public/events/demo/guests/register',json={'phone':'777919191','country_code':'+967','consent':True}).json()
+
+def concurrent_gate_entry(_):
+    with TestClient(app) as client:
+        response=client.post('/api/device/events/event-demo/guest-checkins',headers={'X-PulseX-Device-Token':gate_token},json={'items':[{
+            'scan_id':str(uuid.uuid4()),'guest_number':gate_guest['guest_number'],'direction':'entry','checkpoint':'concurrent'
+        }]})
+        return response.status_code,response.json()['receipts'][0]['status']
+
+with ThreadPoolExecutor(max_workers=8) as pool:
+    gate_results=list(pool.map(concurrent_gate_entry,range(8)))
+ok('concurrent_gate_requests_all_200',all(code==200 for code,_ in gate_results))
+statuses=[status for _,status in gate_results]
+ok('concurrent_gate_single_entry',statuses.count('accepted')==1 and statuses.count('already_inside')==7)
+with engine.connect() as con:
+    ok('concurrent_gate_one_checkin_row',con.execute(text("select count(*) from px_guest_checkins where guest_number=:n"),{'n':gate_guest['guest_number']}).scalar_one()==1)
 report={'status':'passed','checks':checks,'database':'PostgreSQL','warning':'Application scope isolation was exercised; PostgreSQL RLS policies are not claimed by this script.'}
 (ROOT/'qa/postgres-native-acceptance.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 print(json.dumps(report,indent=2))
