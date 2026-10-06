@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='px-expo-scale-') as td:
         assert len(body['agencies'])==70,len(body['agencies'])
         slugs={row['slug'] for row in body['agencies']}
         assert 'tharawat' in slugs and 'easy' in slugs and 'rts' in slugs
-    slugs=[f'agency-{i:02}' for i in range(1,71)]
+    slugs=[{8:'tharawat',9:'easy',10:'rts'}.get(i,f'agency-{i:02}') for i in range(1,71)]
     def one(slug):
         t=time.perf_counter()
         with TestClient(app) as client:
