@@ -24,3 +24,13 @@ def test_critical_api_surface_present():
         '/api/device/events/{event_id}/guest-manifest',
         '/api/device/events/{event_id}/guest-checkins']:
         assert path in contract
+
+
+def test_mjs_assets_use_javascript_mime_type(tmp_path):
+    app=create_app('sqlite:///'+str(tmp_path/'mime.sqlite'),origin='http://testserver',seed_demo=True)
+    c=TestClient(app)
+    for path in ['/assets/app.mjs','/assets/public.mjs','/assets/ui.mjs','/assets/offline.mjs']:
+        response=c.get(path)
+        assert response.status_code==200, path
+        content_type=response.headers.get('content-type','').lower()
+        assert 'javascript' in content_type, (path,content_type)
