@@ -274,6 +274,57 @@ def test_checkpoint_access_policy_manifest_and_reentry_rules(tmp_path):
     assert reentry['status']=='rejected' and reentry['error']=='REENTRY_NOT_ALLOWED'
 
 
+def test_access_policy_guest_type_and_replay_survive_policy_change(tmp_path):
+    app,public=boot(tmp_path)
+    visitor=register(public,'777484848')
+    admin=TestClient(app)
+    login(admin,app)
+    vip=admin.post('/api/admin/events/event-demo/guests',json={
+        'phone':'777494949','country_code':'+967','consent':True,'guest_type':'vip','name':'VIP Access'
+    }).json()
+    event=admin.get('/api/admin/sites/event-demo').json()
+    config=event['draft']
+    config['access_control']={
+        'anti_passback':True,'allow_reentry':True,'manifest_max_age_minutes':7200,
+        'guest_types':[{'key':'visitor','label':'زائر'},{'key':'vip','label':'VIP'}],
+        'checkpoints':[
+            {'key':'main','label':'الرئيسية','enabled':True,'allowed_guest_types':[],'start':'','end':''},
+            {'key':'vip','label':'VIP Gate','enabled':True,'allowed_guest_types':['vip'],'start':'','end':''},
+        ],
+    }
+    saved=admin.put('/api/admin/sites/event-demo',json={'draft_rev':event['draft_rev'],'config':config})
+    assert saved.status_code==200,saved.text
+    device=admin.post('/api/admin/sites/event-demo/devices',json={'name':'Policy Gate','device_type':'operator'})
+    token=device.json()['device_token']; headers={'X-PulseX-Device-Token':token}
+    gate=TestClient(app)
+
+    vip_valid=gate.get(f"/api/device/events/event-demo/guests/{vip['guest_number']}/validate?checkpoint=vip",headers=headers)
+    assert vip_valid.status_code==200 and vip_valid.json()['status']=='valid'
+    visitor_invalid=gate.get(f"/api/device/events/event-demo/guests/{visitor['guest_number']}/validate?checkpoint=vip",headers=headers)
+    assert visitor_invalid.status_code==200 and visitor_invalid.json()['status']=='invalid'
+    assert visitor_invalid.json()['reason']=='GUEST_TYPE_NOT_ALLOWED'
+
+    denied=gate.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':str(uuid.uuid4()),'guest_number':visitor['guest_number'],'direction':'entry','checkpoint':'vip'
+    }]}).json()['receipts'][0]
+    assert denied['status']=='rejected' and denied['error']=='GUEST_TYPE_NOT_ALLOWED'
+
+    scan_id=str(uuid.uuid4())
+    first=gate.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':scan_id,'guest_number':vip['guest_number'],'direction':'entry','checkpoint':'vip'
+    }]}).json()['receipts'][0]
+    assert first['status']=='accepted'
+
+    latest=admin.get('/api/admin/sites/event-demo').json()
+    changed=latest['draft']; changed['access_control']['checkpoints'][1]['enabled']=False
+    assert admin.put('/api/admin/sites/event-demo',json={'draft_rev':latest['draft_rev'],'config':changed}).status_code==200
+
+    replay=gate.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':scan_id,'guest_number':vip['guest_number'],'direction':'entry','checkpoint':'vip'
+    }]}).json()['receipts'][0]
+    assert replay['status']=='duplicate'
+
+
 def test_agency_cannot_access_event_wide_guest_directory_or_export(tmp_path):
     app,c=boot(tmp_path)
     login(c,app,'agency01@pulsex.test')
