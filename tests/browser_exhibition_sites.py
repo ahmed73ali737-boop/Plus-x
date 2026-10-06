@@ -114,6 +114,8 @@ try:
         mark("easy_distinct_living_wallet_surface")
         page.goto(URL + "/e/demo/p/easy#services")
         page.get_by_text("تقاريرك وسجلّك", exact=True).wait_for()
+        page.get_by_text("الذهب", exact=True).wait_for()
+        page.get_by_text("التداول والاستثمار", exact=True).wait_for()
         mark("easy_full_exhibition_service_content")
 
         page.goto(URL + "/e/demo/p/easy#questions")
