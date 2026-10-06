@@ -74,7 +74,7 @@ try:
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         # Tharawat must be an editorial/financial experience, not the generic hero.
-        page.goto(URL + "/e/demo/p/agency-08")
+        page.goto(URL + "/e/demo/p/tharawat")
         page.locator(".expo-tharawat-stage").wait_for()
         dismiss_welcome(page)
         page.get_by_text("THARAWAT · EXHIBITION EDITION", exact=True).wait_for()
@@ -89,7 +89,7 @@ try:
         page.screenshot(path=str(ROOT / "qa/tharawat-exhibition.png"), full_page=True)
         mark("tharawat_distinct_exhibition_surface")
 
-        page.goto(URL + "/e/demo/p/agency-08#contact")
+        page.goto(URL + "/e/demo/p/tharawat#contact")
         page.get_by_role("button", name="إرسال طلب تواصل", exact=True).click()
         dialog = page.locator("dialog")
         dialog.get_by_label("الهاتف", exact=True).fill("777555555")
@@ -100,7 +100,7 @@ try:
         mark("tharawat_contact_consent_flow")
 
         # Easy must read and behave like a living wallet surface.
-        page.goto(URL + "/e/demo/p/agency-09")
+        page.goto(URL + "/e/demo/p/easy")
         page.locator(".expo-easy-stage").wait_for()
         dismiss_welcome(page)
         page.locator(".expo-easy-phone").wait_for()
@@ -112,11 +112,11 @@ try:
         assert_no_overflow(page)
         page.screenshot(path=str(ROOT / "qa/easy-exhibition.png"), full_page=True)
         mark("easy_distinct_living_wallet_surface")
-        page.goto(URL + "/e/demo/p/agency-09#services")
+        page.goto(URL + "/e/demo/p/easy#services")
         page.get_by_text("تقاريرك وسجلّك", exact=True).wait_for()
         mark("easy_full_exhibition_service_content")
 
-        page.goto(URL + "/e/demo/p/agency-09#questions")
+        page.goto(URL + "/e/demo/p/easy#questions")
         page.locator('fieldset[data-code="q-interest"] input').first.check()
         page.locator('fieldset[data-code="q-rate"] button').last.click()
         page.locator('form[data-form="main"]').get_by_role("button", name="إرسال الاستبيان", exact=True).click()
@@ -124,7 +124,7 @@ try:
         mark("easy_exhibition_survey_persisted")
 
         # RTS must expose a technical system map and capability rail.
-        page.goto(URL + "/e/demo/p/agency-10")
+        page.goto(URL + "/e/demo/p/rts")
         page.locator(".expo-rts-stage").wait_for()
         dismiss_welcome(page)
         page.locator(".expo-rts-system").wait_for()
@@ -137,14 +137,14 @@ try:
         assert_no_overflow(page)
         page.screenshot(path=str(ROOT / "qa/rts-exhibition-360.png"), full_page=True)
         mark("rts_distinct_command_center_surface")
-        page.goto(URL + "/e/demo/p/agency-10#services")
+        page.goto(URL + "/e/demo/p/rts#services")
         page.get_by_text("Accounting & Sales Systems", exact=True).wait_for()
         page.get_by_text("Lending, Requests & Billing", exact=True).wait_for()
         page.get_by_text("Humanitarian & Donations Platforms", exact=True).wait_for()
         page.get_by_text("Exchange & Financial Products", exact=True).wait_for()
         mark("rts_full_capability_content")
 
-        page.goto(URL + "/e/demo/p/agency-10#polls")
+        page.goto(URL + "/e/demo/p/rts#polls")
         page.locator('fieldset[data-code="p-first"] input').first.check()
         page.get_by_role("button", name="إرسال التصويت", exact=True).click()
         page.locator('[data-results="p-first"] strong').first.wait_for()
@@ -155,9 +155,9 @@ try:
         mobile = mobile_context.new_page()
         mobile.on("pageerror", lambda e: errors.append(str(e)))
         for slug, selector, name in [
-            ("agency-08", ".expo-tharawat-stage", "tharawat"),
-            ("agency-09", ".expo-easy-stage", "easy"),
-            ("agency-10", ".expo-rts-stage", "rts"),
+            ("tharawat", ".expo-tharawat-stage", "tharawat"),
+            ("easy", ".expo-easy-stage", "easy"),
+            ("rts", ".expo-rts-stage", "rts"),
         ]:
             mobile.goto(URL + f"/e/demo/p/{slug}")
             mobile.locator(selector).wait_for()
@@ -181,7 +181,7 @@ try:
             })();
         """)
         stalled_page = stalled.new_page()
-        stalled_page.goto(URL + "/e/demo/p/agency-10", wait_until="domcontentloaded")
+        stalled_page.goto(URL + "/e/demo/p/rts", wait_until="domcontentloaded")
         stalled_page.locator(".expo-rts-stage").wait_for(timeout=7000)
         mark("network_render_not_blocked_by_indexeddb_cache")
         stalled.close()
