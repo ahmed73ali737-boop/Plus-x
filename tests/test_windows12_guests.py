@@ -60,14 +60,19 @@ def test_phone_normalization_and_public_number_is_keyed_not_raw_phone_hash():
     assert phone_hash(phone)!=raw
 
 
-def test_same_phone_is_one_guest_and_one_event_registration(tmp_path):
+def test_same_phone_is_one_guest_and_requires_pass_to_recover_existing_qr(tmp_path):
     app,c=boot(tmp_path)
     first=register(c,'0777 123 456')
+    assert first['created'] is True and first['pass_token']
     second=register(c,'+967 777 123 456',name='الاسم المحدث')
-    assert first['guest_number']==second['guest_number']
-    assert first['created'] is True
-    assert second['created'] is False
-    assert second['event_registration_created'] is False
+    assert second['status']=='verification_required'
+    assert 'guest_number' not in second and 'qr_url' not in second
+    owner=c.post('/api/public/events/demo/guests/register',json={
+        'phone':'+967 777 123 456','country_code':'+967','consent':True,'pass_token':first['pass_token']
+    })
+    assert owner.status_code==200
+    assert owner.json()['guest_number']==first['guest_number']
+    assert owner.json()['created'] is False
     with app.state.engine.connect() as db:
         assert len(db.execute(select(guests)).mappings().all())==1
         assert len(db.execute(select(event_guests)).mappings().all())==1
@@ -77,9 +82,14 @@ def test_public_reregistration_does_not_disclose_or_overwrite_profile(tmp_path):
     app,c=boot(tmp_path)
     first=register(c,'777151515',name='Original Name',organization='Original Org')
     assert 'phone' not in first and 'name' not in first and 'organization' not in first
-    second=register(c,'+967777151515',name='Attacker Name',organization='Changed Org')
-    assert second['guest_number']==first['guest_number']
-    assert 'phone' not in second and 'name' not in second and 'organization' not in second
+    attacker=register(c,'+967777151515',name='Attacker Name',organization='Changed Org')
+    assert attacker['status']=='verification_required'
+    assert 'guest_number' not in attacker and 'qr_url' not in attacker
+    owner=c.post('/api/public/events/demo/guests/register',json={
+        'phone':'+967777151515','country_code':'+967','consent':True,
+        'pass_token':first['pass_token'],'name':'Attacker Name','organization':'Changed Org'
+    })
+    assert owner.status_code==200 and owner.json()['guest_number']==first['guest_number']
     login(c,app)
     listed=c.get('/api/admin/events/event-demo/guests').json()['guests']
     found=next(x for x in listed if x['guest_number']==first['guest_number'])
