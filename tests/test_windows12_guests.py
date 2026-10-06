@@ -1,4 +1,6 @@
+import csv
 import hashlib
+import io
 import uuid
 
 from fastapi.testclient import TestClient
@@ -100,6 +102,20 @@ def test_organizer_lists_guests_and_device_manifest_is_scoped(tmp_path):
     manifest_guests=manifest.json()['guests']
     assert any(x['guest_number']==guest['guest_number'] for x in manifest_guests)
     assert all('phone' not in x and 'phone_e164' not in x for x in manifest_guests)
+
+
+def test_guest_csv_export_is_scoped_and_spreadsheet_safe(tmp_path):
+    app,c=boot(tmp_path)
+    guest=register(c,'777343434',name='=FORMULA()',organization='+Injected')
+    login(c,app)
+    exported=c.get('/api/admin/events/event-demo/guests/export')
+    assert exported.status_code==200
+    assert exported.headers['content-type'].startswith('text/csv')
+    rows=list(csv.DictReader(io.StringIO(exported.text.lstrip('\ufeff'))))
+    row=next(x for x in rows if x['guest_number']==guest['guest_number'])
+    assert row['name'].startswith("'=")
+    assert row['organization'].startswith("'+")
+    assert row['phone']=='+967777343434'
 
 
 def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
