@@ -40,6 +40,8 @@ jobs:
           done
       - name: Run JavaScript SDK tests
         run: node tests/sdk_js_test.mjs
+      - name: Run Python SDK real HTTP smoke
+        run: python tests/sdk_native_smoke.py
 
   windows-core:
     runs-on: windows-latest
