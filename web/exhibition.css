@@ -6,3 +6,5 @@
 @media(prefers-reduced-motion:reduce){.expo-live-dot,.expo-rts-stage:after,.expo-rts-ring,.expo-easy-phone,.expo-easy-halo,.expo-tharawat-orbit .orbit{animation:none!important}}
 .brand-exhibition-topbar{position:sticky;top:0;z-index:50}.brand-visitor-nav{gap:6px}.brand-visitor-nav a{font-weight:800;font-size:11px;white-space:nowrap}.exhibition-closing,.exhibition-footer{max-width:1240px;margin-inline:auto}.exhibition-footer{margin-bottom:22px}
 @media(max-width:780px){.brand-exhibition-topbar .topbar-inner{gap:10px}.brand-visitor-nav{overflow:auto;max-width:68vw;scrollbar-width:none}.brand-visitor-nav a{flex:0 0 auto}.exhibition-closing,.exhibition-footer{margin-inline:14px}}
+.exhibition-brand{gap:10px}.exhibition-brand-logo{display:block;max-width:118px;height:34px;object-fit:contain}.exhibition-brand .brandmark{flex:0 0 auto}
+@media(max-width:620px){.exhibition-brand-logo{max-width:92px;height:30px}.exhibition-brand>span:last-child{display:none}}
