@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "source_repository": "ahmed73ali737-boop/Factory-Runtime",
+  "source_path": "factory/project-adoption/pulsex/.github/workflows/g-windows-native-gate.yml",
+  "source_blob_sha": "8bec44dd88163305c0653aeee1f020e8204ffd7d",
+  "target_repository": "ahmed73ali737-boop/Plus-x",
+  "target_path": ".github/workflows/g-windows-native-gate.yml",
+  "evidence_boundary": "Windows-hosted Python pytest only; no PostgreSQL/offline/load/security/UAT promotion.",
+  "action_versions_verified_on": "2026-10-06",
+  "checkout": "v7",
+  "setup_python": "v7"
+}
