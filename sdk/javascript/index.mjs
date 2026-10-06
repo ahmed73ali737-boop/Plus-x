@@ -49,7 +49,7 @@ export class PulseXClient {
   publicResults(slug) { return this.request('GET', `/api/public/site/${encodeURIComponent(slug)}/results`); }
   collect(items) { return this.request('POST', '/api/collect', { items }); }
   guestConfig(eventSlug) { return this.request('GET', `/api/public/events/${encodeURIComponent(eventSlug)}/guest-config`); }
-  registerGuest(eventSlug, phone, { countryCode = '+967', ...profile } = {}) { return this.request('POST', `/api/public/events/${encodeURIComponent(eventSlug)}/guests/register`, { phone, country_code: countryCode, consent: true, ...profile }); }
+  registerGuest(eventSlug, phone, { countryCode = '+967', passToken, ...profile } = {}) { return this.request('POST', `/api/public/events/${encodeURIComponent(eventSlug)}/guests/register`, { phone, country_code: countryCode, consent: true, ...(passToken ? { pass_token: passToken } : {}), ...profile }); }
   syncGuests(eventSlug, items) { return this.request('POST', `/api/public/events/${encodeURIComponent(eventSlug)}/guests/sync`, { items }); }
   publicGuest(eventSlug, guestNumber) { return this.request('GET', `/api/public/events/${encodeURIComponent(eventSlug)}/guests/${encodeURIComponent(guestNumber)}`); }
   adminSites() { return this.request('GET', '/api/admin/sites'); }
@@ -67,7 +67,7 @@ export class PulseXClient {
   guestCheckins(eventId) { return this.request('GET', `/api/admin/events/${encodeURIComponent(eventId)}/guest-checkins`); }
   checkinGuest(eventId, payload) { return this.request('POST', `/api/admin/events/${encodeURIComponent(eventId)}/guest-checkins`, payload); }
   deviceGuestManifest(eventId, deviceToken) { return this.request('GET', `/api/device/events/${encodeURIComponent(eventId)}/guest-manifest`, undefined, { 'X-PulseX-Device-Token': deviceToken }); }
-  deviceValidateGuest(eventId, guestNumber, deviceToken) { return this.request('GET', `/api/device/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestNumber)}/validate`, undefined, { 'X-PulseX-Device-Token': deviceToken }); }
+  deviceValidateGuest(eventId, guestNumber, deviceToken, checkpoint = 'main') { return this.request('GET', `/api/device/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestNumber)}/validate?checkpoint=${encodeURIComponent(checkpoint)}`, undefined, { 'X-PulseX-Device-Token': deviceToken }); }
   deviceGuestCheckins(eventId, deviceToken, items) { return this.request('POST', `/api/device/events/${encodeURIComponent(eventId)}/guest-checkins`, { items }, { 'X-PulseX-Device-Token': deviceToken }); }
 }
 
