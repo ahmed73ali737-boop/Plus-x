@@ -152,7 +152,7 @@ jobs:
 
   postgres-native:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:18
@@ -182,12 +182,16 @@ jobs:
           pip install -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
       - name: Run PostgreSQL native acceptance
         run: python tests/postgres_native_acceptance.py
+      - name: Run PostgreSQL application-path capacity smoke
+        run: python tests/postgres_capacity_smoke.py
       - name: Upload PostgreSQL QA artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: postgres-qa
-          path: qa/postgres-native-acceptance.json
+          path: |
+            qa/postgres-native-acceptance.json
+            qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
 
   container-import:
