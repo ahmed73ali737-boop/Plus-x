@@ -1,4 +1,4 @@
-import {h,root,api,field,check,button,toast,brand} from './ui.mjs';
+import {h,root,api,field,selectField,check,button,toast,brand} from './ui.mjs';
 import {bundle,get,put,del,all,activate} from './offline.mjs';
 
 function cleanLocalPhone(raw,countryCode='+967'){
@@ -219,6 +219,8 @@ export async function scanPage(slug){
   const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
   const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
+  const direction=selectField('نوع الحركة',[['entry','دخول'],['exit','خروج']],'entry');
+  const checkpoint=field('نقطة المسح','text','main',{maxlength:80,placeholder:'main / Gate A / VIP'});
   const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
   async function refreshSync(notify=false){
     const out=await syncCheckins(page.id,token);
@@ -231,10 +233,10 @@ export async function scanPage(slug){
     let g=(manifest.guests||[]).find(x=>x.guest_number===number);
     if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
     if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
-    const check=button('تسجيل دخول',async()=>{const scan_id=crypto.randomUUID();await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:'entry',checkpoint:'main',client_time:new Date().toISOString()}});const out=await refreshSync(false);toast(out.pending?'تم الحفظ محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل الدخول ومزامنته.');},'btn');
+    const check=button(direction.input.value==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{const scan_id=crypto.randomUUID();const movement=direction.input.value==='exit'?'exit':'entry';const point=checkpoint.input.value.trim()||'main';await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:movement,checkpoint:point,client_time:new Date().toISOString()}});const out=await refreshSync(false);const label=movement==='exit'?'الخروج':'الدخول';toast(out.pending?'تم حفظ '+label+' محليًا وسيُعاد الإرسال تلقائيًا.':'تم تسجيل '+label+' ومزامنته.');},'btn');
     result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title].filter(Boolean).join(' · ')),check);
   }
-  const tools=h('div',{class:'scanner-tools'},input.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
+  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
