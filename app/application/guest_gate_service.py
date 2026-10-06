@@ -32,7 +32,7 @@ def access_config(event: dict) -> dict:
     return {
         "anti_passback":raw.get("anti_passback",True) is not False,
         "allow_reentry":raw.get("allow_reentry",True) is not False,
-        "manifest_max_age_minutes":int(raw.get("manifest_max_age_minutes") or 60),
+        "manifest_max_age_minutes":int(raw.get("manifest_max_age_minutes") or 7200),
         "guest_types":raw.get("guest_types") if isinstance(raw.get("guest_types"),list) else [
             {"key":"visitor","label":"زائر"},{"key":"vip","label":"VIP"},{"key":"staff","label":"طاقم"},
             {"key":"speaker","label":"متحدث"},{"key":"media","label":"إعلام"},{"key":"exhibitor","label":"عارض"},
