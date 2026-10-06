@@ -1,6 +1,7 @@
 """Isolated local acceptance runnable on Windows without pytest or a browser driver.
 Never uses the operator's production database. Records the actual host OS in its report.
 """
+from contextlib import closing
 from pathlib import Path
 import base64, http.cookiejar, json, os, platform, socket, sqlite3, subprocess, sys, tempfile, time, urllib.error, urllib.request, uuid
 ROOT=Path(__file__).resolve().parents[1]
@@ -68,28 +69,28 @@ def main():
             status,png,_=req('/api/admin/sites/agency-01/qr');assert status==200 and png.startswith(b'\x89PNG');mark('qr_png_generated')
             assert req('/api/admin/sites/agency-01/export')[1].startswith(b'\xef\xbb\xbf');mark('csv_export_utf8_bom')
             proc.terminate();proc.wait(timeout=8);proc=start()
-            with sqlite3.connect(temp/'db.sqlite') as con:
+            with closing(sqlite3.connect(temp/'db.sqlite')) as con:
                 assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
                 assert con.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0]==1
             mark('restart_persists_database')
+            proc.terminate();proc.wait(timeout=8)
+            if os.name == 'nt':
+                db_path=temp/'db.sqlite';probe=temp/'db-release-probe.sqlite';released=False
+                for _ in range(40):
+                    try:
+                        if db_path.exists():
+                            os.replace(db_path,probe);os.replace(probe,db_path)
+                        released=True;break
+                    except PermissionError:
+                        time.sleep(.1)
+                assert released,'SQLite handle was not released after server shutdown'
+                mark('sqlite_handle_released')
             report={'status':'passed','passed':len(checks),'checks':checks,'host_os':platform.platform(),'native_windows':os.name=='nt','python':platform.python_version(),'database':'SQLite','browser_ui_tested':False,'physical_kiosks_tested':False,'postgresql_tested':False}
         except Exception as exc:
             report={'status':'failed','passed_before_failure':len(checks),'checks':checks,'error':str(exc),'host_os':platform.platform(),'native_windows':os.name=='nt'}
         finally:
             if proc.poll() is None:proc.terminate();proc.wait(timeout=8)
             log.close()
-            # Windows can hold the SQLite handle briefly after the server process exits.
-            # Prove the file is releasable before TemporaryDirectory removes it instead of
-            # hiding a persistent lock with ignore_cleanup_errors.
-            if os.name == 'nt':
-                db_path=temp/'db.sqlite';probe=temp/'db-release-probe.sqlite'
-                for _ in range(40):
-                    try:
-                        if db_path.exists():
-                            os.replace(db_path,probe);os.replace(probe,db_path)
-                        break
-                    except PermissionError:
-                        time.sleep(.1)
     dest=ROOT/'qa'/('windows-native-acceptance.json' if os.name=='nt' else 'linux-local-acceptance.json')
     dest.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print('Report:',dest);print(json.dumps(report,ensure_ascii=True,indent=2));return 0 if report['status']=='passed' else 1
