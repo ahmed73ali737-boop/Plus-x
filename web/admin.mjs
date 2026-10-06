@@ -178,10 +178,17 @@ async function guestsTab(){
     api('/api/admin/events/'+current.id+'/guest-checkins')
   ]);
   const guests=guestData.guests||[],checkins=checkinData.checkins||[];
-  const entered=new Set(checkins.filter(x=>x.direction==='entry').map(x=>x.guest_id));
+  const presence=new Map((checkinData.presence||[]).map(x=>[x.guest_id,x]));
+  const insideCount=Number.isFinite(checkinData.inside_count)?checkinData.inside_count:[...presence.values()].filter(x=>x.state==='inside').length;
+  const access=JSON.parse(JSON.stringify(current.draft.access_control||{
+    anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60,
+    guest_types:[{key:'visitor',label:'زائر'},{key:'vip',label:'VIP'},{key:'staff',label:'طاقم'},{key:'speaker',label:'متحدث'},{key:'media',label:'إعلام'},{key:'exhibitor',label:'عارض'}],
+    checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[],start:'',end:''}]
+  }));
+  const guestTypes=access.guest_types||[];
   host.append(
     h('div',{class:'kpi-grid'},
-      [['الزوار المسجلون',guests.length],['تم مسحهم للدخول',entered.size],['حركات المسح',checkins.length],['غير ممسوحين',Math.max(0,guests.length-entered.size)]]
+      [['الزوار المسجلون',guests.length],['داخل الفعالية الآن',insideCount],['حركات المسح',checkins.length],['خارج الفعالية',Math.max(0,guests.length-insideCount)]]
       .map(([label,value])=>h('div',{class:'kpi'},h('span',{},label),h('strong',{},value)))
     ),
     h('div',{class:'guest-admin-hero card'},
