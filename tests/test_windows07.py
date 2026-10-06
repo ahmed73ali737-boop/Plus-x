@@ -97,7 +97,7 @@ def test_admin_ui_has_devices_and_request_review():
 def test_service_worker_cache_bumped_and_assets_exist():
     sw=(ROOT/'web/sw.js').read_text(encoding='utf-8')
     import re
-    cache=re.search(r"const CACHE=\'px-shell-v(\\d+)\'",sw)
+    cache=re.search(r"const CACHE='px-shell-v(\d+)'",sw)
     assert cache and int(cache.group(1)) >= 15
     assets=re.findall(r"'/assets/([^']+)'",sw)
     assert assets and all((ROOT/'web'/name).is_file() for name in assets)
