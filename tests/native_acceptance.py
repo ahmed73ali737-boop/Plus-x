@@ -2,8 +2,11 @@
 Never uses the operator's production database. Records the actual host OS in its report.
 """
 from pathlib import Path
+from contextlib import closing
 import base64, http.cookiejar, json, os, platform, socket, sqlite3, subprocess, sys, tempfile, time, urllib.error, urllib.request, uuid
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
+from app.core.build_info import BUILD_LABEL
 checks=[]
 
 def main():
@@ -34,7 +37,7 @@ def main():
             status,data,_=req(path,body,method,extra);assert status==code,(path,status,data[:200]);return json.loads(data)
         def mark(name):checks.append(name);print('PASS',name,flush=True)
         try:
-            assert j('/api/health')['build']=='windows-08';mark('application_health')
+            assert j('/api/health')['build']==BUILD_LABEL;mark('application_health')
             for path in ['/','/e/demo','/e/demo/p/agency-01','/admin','/assets/design.css','/assets/catalog.mjs','/assets/public.mjs','/sw.js']:
                 assert req(path)[0]==200;mark('route_'+path)
             assert len(j('/api/public/site/demo')['agencies'])==10;mark('organizer_and_ten_agencies')
@@ -67,7 +70,7 @@ def main():
             status,png,_=req('/api/admin/sites/agency-01/qr');assert status==200 and png.startswith(b'\x89PNG');mark('qr_png_generated')
             assert req('/api/admin/sites/agency-01/export')[1].startswith(b'\xef\xbb\xbf');mark('csv_export_utf8_bom')
             proc.terminate();proc.wait(timeout=8);proc=start()
-            with sqlite3.connect(temp/'db.sqlite') as con:
+            with closing(sqlite3.connect(temp/'db.sqlite')) as con:
                 assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
                 assert con.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0]==1
             mark('restart_persists_database')

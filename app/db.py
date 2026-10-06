@@ -101,6 +101,60 @@ signup_requests=Table('px_signup_requests',metadata,
     Column('created_at',String(64),nullable=False))
 Index('px_signup_site_status',signup_requests.c.site_id,signup_requests.c.status)
 Index('px_signup_event_status',signup_requests.c.event_id,signup_requests.c.status)
+
+guests=Table('px_guests',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('phone_e164',String(24),unique=True,nullable=False),
+    Column('phone_hash',String(64),unique=True,nullable=False),
+    Column('guest_number',String(32),unique=True,nullable=False),
+    Column('name',String(160)),
+    Column('job_title',String(160)),
+    Column('organization',String(200)),
+    Column('status',String(20),nullable=False,default='active'),
+    Column('created_at',String(64),nullable=False),
+    Column('updated_at',String(64),nullable=False))
+Index('px_guests_phone_hash',guests.c.phone_hash)
+Index('px_guests_guest_number',guests.c.guest_number)
+
+event_guests=Table('px_event_guests',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('event_id',String(64),ForeignKey('px_sites.id'),nullable=False),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
+    Column('status',String(20),nullable=False,default='registered'),
+    Column('guest_type',String(40),nullable=False,default='visitor'),
+    Column('pass_number',String(32),unique=True),
+    Column('pass_token_hash',String(64)),
+    Column('metadata_json',JSON,nullable=False),
+    Column('registered_at',String(64),nullable=False),
+    Column('updated_at',String(64),nullable=False),
+    UniqueConstraint('event_id','guest_id',name='uq_px_event_guest'))
+Index('px_event_guests_event_status',event_guests.c.event_id,event_guests.c.status)
+Index('px_event_guests_guest',event_guests.c.guest_id)
+Index('px_event_guests_pass_number',event_guests.c.pass_number,unique=True)
+
+guest_checkins=Table('px_guest_checkins',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('event_id',String(64),ForeignKey('px_sites.id'),nullable=False),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
+    Column('guest_number',String(32),nullable=False),
+    Column('scanner_id',String(64)),
+    Column('source',String(20),nullable=False),
+    Column('direction',String(12),nullable=False,default='entry'),
+    Column('checkpoint',String(80),nullable=False,default='main'),
+    Column('client_time',String(64)),
+    Column('scanned_at',String(64),nullable=False))
+Index('px_guest_checkins_event_time',guest_checkins.c.event_id,guest_checkins.c.scanned_at)
+Index('px_guest_checkins_guest_time',guest_checkins.c.guest_id,guest_checkins.c.scanned_at)
+
+guest_presence=Table('px_guest_presence',metadata,
+    Column('event_id',String(64),ForeignKey('px_sites.id'),primary_key=True),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),primary_key=True),
+    Column('state',String(12),nullable=False,default='outside'),
+    Column('last_scan_id',String(64)),
+    Column('last_direction',String(12)),
+    Column('last_checkpoint',String(80)),
+    Column('updated_at',String(64),nullable=False))
+Index('px_guest_presence_event_state',guest_presence.c.event_id,guest_presence.c.state)
 audit=Table('px_audit',metadata,Column('id',String(64),primary_key=True),Column('user_id',String(64)),Column('site_id',String(64)),Column('action',String(80),nullable=False),Column('at',String(64),nullable=False),Column('details',JSON,nullable=False))
 
 def make_engine(url=None):
@@ -138,3 +192,12 @@ def ensure_compat_schema(engine):
         if 'must_change_password' not in cols:
             with engine.begin() as c:
                 c.execute(sa_text('ALTER TABLE px_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0'))
+    if 'px_event_guests' in insp.get_table_names():
+        cols={c['name'] for c in insp.get_columns('px_event_guests')}
+        if 'pass_token_hash' not in cols:
+            with engine.begin() as c:
+                c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_token_hash VARCHAR(64)'))
+        if 'pass_number' not in cols:
+            with engine.begin() as c:
+                c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_number VARCHAR(32)'))
+                c.execute(sa_text('CREATE UNIQUE INDEX IF NOT EXISTS px_event_guests_pass_number ON px_event_guests(pass_number)'))

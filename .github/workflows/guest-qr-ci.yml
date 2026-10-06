@@ -1,0 +1,75 @@
+name: guest-qr-ci
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guest-identity-and-offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install runtime and focused QA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest==9.0.2 httpx==0.28.1
+      - name: Compile Python
+        run: python -m compileall -q app
+      - name: Check JavaScript modules
+        run: |
+          node --check web/guest.mjs
+          node --check web/app.mjs
+          node --check web/public.mjs
+          node --check web/exhibition.mjs
+          node --check web/offline.mjs
+          node --check web/admin.mjs
+          node --check web/sw.js
+      - name: Guest QR and offline regression
+        run: python -m pytest -q tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py
+      - name: Run 1000-guest capacity smoke
+        run: python tests/guest_capacity_smoke.py
+      - name: Generate current OpenAPI artifact
+        run: python tools/generate_openapi.py --output qa/openapi.generated.json
+      - name: Install Chromium guest-journey dependencies
+        run: |
+          pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Run guest browser journey
+        run: python tests/browser_guest_flow.py
+      - name: Run exhibition brand journeys
+        run: python tests/browser_exhibition_sites.py
+      - name: Upload guest journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guest-qr-browser-qa
+          path: |
+            qa/windows12-guest-browser.json
+            qa/guest-capacity-smoke.json
+            qa/openapi.generated.json
+            qa/guest-browser-server.log
+            qa/exhibition-brands.json
+            qa/exhibition-browser-server.log
+            qa/tharawat-exhibition.png
+            qa/easy-exhibition.png
+            qa/rts-exhibition-360.png
+            qa/tharawat-exhibition-mobile.png
+            qa/easy-exhibition-mobile.png
+            qa/rts-exhibition-mobile.png
+            qa/guest-pass.png
+            qa/guest-admin-directory.png
+            qa/rts-live.png
+            qa/guest-mobile.png
+            qa/guest-browser-failure.png
+          if-no-files-found: ignore

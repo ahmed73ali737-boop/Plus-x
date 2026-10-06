@@ -39,12 +39,13 @@ def test_default_config_has_readable_survey():
 import uuid
 from fastapi.testclient import TestClient
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 
 
 def test_windows08_version_and_ui_contract(tmp_path):
     app=create_app('sqlite:///'+str(tmp_path/'w08.sqlite'),origin='http://testserver',seed_demo=True)
     c=TestClient(app)
-    assert c.get('/api/health').json()['build']=='windows-08'  # build label kept for backward compatibility in this candidate
+    assert c.get('/api/health').json()['build']==BUILD_LABEL  # build label kept for backward compatibility in this candidate
     assert app.openapi()['info']['version']=='0.9.0'
     admin=(__import__('pathlib').Path(__file__).resolve().parents[1]/'web/admin.mjs').read_text(encoding='utf-8')
     public=(__import__('pathlib').Path(__file__).resolve().parents[1]/'web/public.mjs').read_text(encoding='utf-8')

@@ -1,5 +1,6 @@
 """Regression additions for the Windows-focused UI release; run on the reported OS only."""
 import json
+import re
 import sqlite3
 import sys
 import zipfile
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools import launcher, backup_local
@@ -26,7 +28,7 @@ def test_unicode_accounts_are_utf8(isolated):
 
 def test_build_identification(isolated):
     c,_,_=isolated
-    assert c.get('/api/health').json()['build']=='windows-08'
+    assert c.get('/api/health').json()['build']==BUILD_LABEL
 
 def test_non_demo_event_slug_available_to_agency(isolated):
     c,a,_=isolated
@@ -52,7 +54,9 @@ def test_new_assets_and_sw_cache_are_present(isolated):
     for path in ['design.css','icons.mjs','catalog.mjs','public.mjs','admin.mjs']:
         assert c.get('/assets/'+path).status_code==200
         assert '/assets/'+path in c.get('/sw.js').text
-    assert 'px-shell-v09' in c.get('/sw.js').text
+    sw=c.get('/sw.js').text
+    cache=re.search(r"const CACHE='px-shell-v(\d+)'",sw)
+    assert cache and int(cache.group(1)) >= 15
 
 def test_start_scripts_quote_paths_and_no_privileged_bypass():
     raw=(ROOT/'Start-Windows.cmd').read_bytes()

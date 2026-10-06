@@ -23,16 +23,16 @@ try:
         window.PXO={enqueue,status,sync,get,put,all,bundle}; window.PXMode=x=>mode=x; window.PXBundle=(k,v)=>bundles[k]=v;
         """
         page.add_script_tag(content=harness)
-        result=page.evaluate("""async()=>{const e={id:crypto.randomUUID(),site_id:'agency-01',version:1,kind:'visit',visitor_id:crypto.randomUUID(),session_id:crypto.randomUUID(),source:'kiosk',target:'',payload:{},client_time:new Date().toISOString()};const r=await PXO.enqueue(e);return {r,s:await PXO.status(),receipt:await PXO.get('receipts',e.id)}}""")
+        result=page.evaluate("""async()=>{const e={id:'00000000-0000-4000-8000-000000000001',site_id:'agency-01',version:1,kind:'visit',visitor_id:'00000000-0000-4000-8000-000000000101',session_id:'00000000-0000-4000-8000-000000000201',source:'kiosk',target:'',payload:{},client_time:new Date().toISOString()};const r=await PXO.enqueue(e);return {r,s:await PXO.status(),receipt:await PXO.get('receipts',e.id)}}""")
         assert result['r']['status']=='accepted' and result['s']['pending']==0 and result['receipt']['status']=='accepted';report['checks'].append('accepted_receipt_removes_outbox')
-        result=page.evaluate("""async()=>{PXMode('offline');const e={id:crypto.randomUUID(),site_id:'agency-01',version:1,kind:'survey',visitor_id:crypto.randomUUID(),session_id:crypto.randomUUID(),source:'kiosk',target:'main',payload:{answers:{}},client_time:new Date().toISOString()};const r=await PXO.enqueue(e);const before=await PXO.status();PXMode('accept');await PXO.sync();const after=await PXO.status();return {r,before,after,receipt:await PXO.get('receipts',e.id)}}""")
+        result=page.evaluate("""async()=>{PXMode('offline');const e={id:'00000000-0000-4000-8000-000000000002',site_id:'agency-01',version:1,kind:'survey',visitor_id:'00000000-0000-4000-8000-000000000102',session_id:'00000000-0000-4000-8000-000000000202',source:'kiosk',target:'main',payload:{answers:{}},client_time:new Date().toISOString()};const r=await PXO.enqueue(e);const before=await PXO.status();PXMode('accept');await PXO.sync();const after=await PXO.status();return {r,before,after,receipt:await PXO.get('receipts',e.id)}}""")
         assert result['r']['status']=='pending' and result['before']['pending']==1 and result['after']['pending']==0 and result['receipt']['status']=='accepted';report['checks'].append('offline_pending_then_reconnect_sync')
-        result=page.evaluate("""async()=>{PXMode('offline');const e={id:crypto.randomUUID(),site_id:'agency-01',version:1,kind:'visit',visitor_id:crypto.randomUUID(),session_id:crypto.randomUUID(),source:'qr',target:'',payload:{},client_time:new Date().toISOString()};await PXO.enqueue(e);PXMode('duplicate');await PXO.sync();return {after:await PXO.status(),receipt:await PXO.get('receipts',e.id)}}""")
+        result=page.evaluate("""async()=>{PXMode('offline');const e={id:'00000000-0000-4000-8000-000000000003',site_id:'agency-01',version:1,kind:'visit',visitor_id:'00000000-0000-4000-8000-000000000103',session_id:'00000000-0000-4000-8000-000000000203',source:'qr',target:'',payload:{},client_time:new Date().toISOString()};await PXO.enqueue(e);PXMode('duplicate');await PXO.sync();return {after:await PXO.status(),receipt:await PXO.get('receipts',e.id)}}""")
         assert result['after']['pending']==0 and result['receipt']['status']=='duplicate';report['checks'].append('duplicate_receipt_is_safe_ack')
         browser.close()
     report.update(status='passed',passed=len(report['checks']))
 except Exception as exc:
-    report.update(status='blocked',not_passed=True,reason=str(exc),passed=0)
+    report.update(status='failed',not_passed=True,reason=str(exc),passed=0)
 (ROOT/'qa/windows11-browser-offline-indexeddb.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps(report,ensure_ascii=False))
-raise SystemExit(0 if report['status'] in ('passed','blocked') else 1)
+raise SystemExit(0 if report['status']=='passed' else 1)

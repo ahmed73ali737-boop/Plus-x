@@ -48,8 +48,8 @@ with sync_playwright() as p:
     def setup(mode,query=''):
         page.goto('about:blank')
         page.set_content('<html lang="ar" dir="rtl"><body><div id="app"></div><div id="toasts" aria-live="polite"></div></body></html>')
-        page.add_style_tag(content=(ROOT/'web/style.css').read_text())
-        page.add_style_tag(content=(ROOT/'web/design.css').read_text())
+        page.add_style_tag(content=(ROOT/'web/style.css').read_text(encoding='utf-8'))
+        page.add_style_tag(content=(ROOT/'web/design.css').read_text(encoding='utf-8'))
         page.evaluate('''arg=>{window._media=arg.media;window._query=arg.query;window.crypto.randomUUID=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]%16;return(c==='x'?r:(r&3|8)).toString(16)});for(const name of ['localStorage','sessionStorage']){const values={};Object.defineProperty(window,name,{configurable:true,value:{getItem:k=>values[k]||null,setItem:(k,v)=>{values[k]=v},removeItem:k=>delete values[k]}});}window.fetch=async(url,options={})=>{const r=await window.pxBridge({url:String(url),method:options.method||'GET',headers:options.headers||{},body:options.body});return{ok:r.ok,status:r.status,json:async()=>r.body};};}''',{'media':media,'query':query})
         page.add_script_tag(content='(()=>{'+common+icons+catalog+questions+(public if mode=='public' else admin)+'})()')
     try:

@@ -17,6 +17,7 @@ if str(ROOT / 'sdk/python') not in sys.path:
 from app.application.access import active_window
 from app.core.security import hash_password, verify_password
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 from pulsex_sdk import PulseXClient
 
 
@@ -38,7 +39,7 @@ def test_health_readiness_and_api_version(tmp_path):
     app = create_app(f"sqlite:///{tmp_path/'w05.sqlite3'}", origin='http://testserver', seed_demo=True, credentials_path=tmp_path/'creds.json')
     client = TestClient(app)
     h = client.get('/api/health')
-    assert h.status_code == 200 and h.json()['build'] == 'windows-08'
+    assert h.status_code == 200 and h.json()['build'] == BUILD_LABEL
     assert h.headers['X-PulseX-API-Version'] == '1'
     assert client.get('/api/health/live').json()['status'] == 'ok'
     assert client.get('/api/health/ready').json()['status'] == 'ready'

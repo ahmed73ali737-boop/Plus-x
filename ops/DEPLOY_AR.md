@@ -16,7 +16,7 @@
 cp .env.example .env
 chmod 600 .env
 openssl rand -hex 32
-# ضع قيمة التوليد في POSTGRES_PASSWORD، ونطاقك في DOMAIN باستخدام محرر آمن.
+# ضع قيمة توليد مستقلة في POSTGRES_PASSWORD وقيمة أخرى في GUEST_ID_SECRET، وحدد DOMAIN وBOOTSTRAP_ADMIN_EMAIL باستخدام محرر آمن.
 docker compose config --quiet
 docker compose up --build -d
 docker compose ps
@@ -25,11 +25,19 @@ docker compose logs --tail=80 app
 
 لا تُرفق مخرجات `docker compose config` الكاملة أو السجلات المحتوية أسرارًا في رسائل عامة. إعداد DATABASE_URL داخل Compose يستخدم كلمة مرور hex لتجنب تعقيدات ترميز URI. `.env` لا يُحفظ في مستودع Git.
 
-ملف الحسابات يُقرأ بواسطة المشغل فقط:
+في أول تشغيل لقاعدة فارغة فقط، ينشئ bootstrap مساحة Platform وحساب المدير الأول ويكتب كلمة المرور المؤقتة مرة واحدة في ملف محمي داخل volume:
 
 ```sh
-docker compose exec app cat /app/data/first-run-accounts.json
+docker compose exec app cat /app/data/bootstrap-admin.json
 ```
+
+سجّل الدخول فورًا، غيّر كلمة المرور المؤقتة، ثم احذف الملف بأمان:
+
+```sh
+docker compose exec app rm -f /app/data/bootstrap-admin.json
+```
+
+إعادة تشغيل الحاوية لا تنشئ مديرًا جديدًا إذا كانت القاعدة مهيأة. وجود قاعدة جزئية (Sites بلا Users أو العكس) يوقف bootstrap ويتطلب مراجعة يدوية بدل التخمين أو إعادة التهيئة.
 
 عند نجاح التشغيل اختبر `/api/health`: ينبغي أن يذكر `postgresql` لا `sqlite`. حقل `native_postgres_tested_here:false` يصف بيئة إعداد هذه الحزمة، وليس نتيجة قبول مضيفك. سجّل نتيجة اختبار المضيف وتاريخه منفصلًا. اجعل كلمة مرور كل حساب جديدة قبل تسليم المستخدمين، ولا تعرض ملف الحسابات في اجتماع أو رابط عام.
 
@@ -72,3 +80,13 @@ python tests/browser_smoke.py
 ```
 
 اختبارات Python الحالية تستخدم SQLite؛ تشغيلها ناجحًا ليس إثبات PostgreSQL. testclient/fixtures ليست بديلًا للمتصفح المتصل أو الأجهزة الفعلية. لا تغيّر سياسة المتصفح أو الشبكة للتحايل على حظر إداري؛ شغّل الاختبارات في بيئة اختبار مصرح بها.
+
+
+## Windows 12 startup migration/bootstrap
+Production container لا يعتمد على `create_all` وحده. قبل التطبيق:
+1. `tools/production_gate.py`
+2. `tools/migrate_postgres.py` — migrations checksum-tracked.
+3. `tools/bootstrap_production.py` — فقط لقاعدة فارغة.
+4. `run.py`
+
+احتفظ بنسخة PostgreSQL قبل الترقية. إذا تغير checksum migration سبق تطبيقها، يتوقف startup بدل تنفيذ SQL مختلف بنفس الاسم.

@@ -3,6 +3,7 @@ import {sectionsMeta,snippet,route,sectionLink,itemLink} from './catalog.mjs';
 import{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}from'./ui.mjs';
 import{bundle,enqueue,prepare,status,backup,sync,activate,saveDeviceToken,deviceHeartbeat}from'./offline.mjs';
 import{question,visible}from'./questions.mjs';
+import{exhibitionExperience}from'./exhibition.mjs';
 const params=new URLSearchParams(location.search);let page,preview=params.has('preview'),kiosk=params.get('kiosk')==='1',source=kiosk?'kiosk':params.get('source')==='qr'?'qr':'web';let visitor,session;const timers=[];
 function identity(){const event=page.event_id||page.id;const key='px-visitor-'+event;if(kiosk){visitor=sessionStorage.getItem('px-kiosk-visitor')||crypto.randomUUID();sessionStorage.setItem('px-kiosk-visitor',visitor);}else{visitor=localStorage.getItem(key)||crypto.randomUUID();localStorage.setItem(key,visitor);}const sk='px-session-'+page.id;session=sessionStorage.getItem(sk)||crypto.randomUUID();sessionStorage.setItem(sk,session);}
 export function pathFor(p){return p.kind==='platform'?'/':p.kind==='event'?'/e/'+p.slug:'/e/'+(p.event?.slug||'demo')+'/p/'+p.slug;}
@@ -136,7 +137,7 @@ function fullSection(key){
 function renderRoute(scroll=true){
   adObserver?.disconnect();
   const state=route(location.hash);const validKeys=page.kind==='platform'?['events','about','facts','news']:enabledSections().map(s=>s.key);
-  mainHost.replaceChildren();const hero=document.querySelector('.hero');hero.hidden=state.type!=='home';
+  mainHost.replaceChildren();document.querySelectorAll('.hero,.expo-stage,.expo-home-only,.brand-live').forEach(node=>node.hidden=state.type!=='home');
   document.querySelectorAll('[data-nav-key]').forEach(a=>a.setAttribute('aria-current',state.type==='section'&&a.dataset.navKey===state.key?'page':'false'));
   if(state.type==='home')renderHome();
   else{
@@ -152,23 +153,62 @@ function renderRoute(scroll=true){
   if(scroll){window.scrollTo({top:0,behavior:'instant'});if(state.type!=='home')mainHost.querySelector('h1')?.focus({preventScroll:true});}
   refreshResults();
 }
+function brandLiveLayer(){
+  const tpl=page?.config?.template||'';
+  if(!['rts_tech','easy_finance','tharawat_finance'].includes(tpl))return null;
+  const records=(page.config.records||[]).filter(enabled);
+  const facts=records.filter(r=>r.kind==='fact').slice(0,3);
+  const services=records.filter(r=>r.kind==='service').slice(0,4);
+  const activePolls=records.filter(r=>r.kind==='poll'&&r.status==='open');
+  if(tpl==='rts_tech'){
+    return h('section',{class:'brand-live rts-live','aria-label':'RTS live experience'},
+      h('div',{class:'brand-live-status'},h('span',{class:'live-signal'}),h('strong',{},'RTS LIVE SYSTEM'),h('small',{},page.offline?'OFFLINE READY':'CONNECTED EXPERIENCE')),
+      h('div',{class:'live-metrics'},
+        h('div',{},h('small',{},'CAPABILITIES'),h('strong',{},String(services.length||records.filter(r=>['service','media'].includes(r.kind)).length).padStart(2,'0'))),
+        h('div',{},h('small',{},'LIVE POLLS'),h('strong',{},String(activePolls.length).padStart(2,'0'))),
+        h('div',{},h('small',{},'INTERACTIONS'),h('strong',{},String(records.filter(r=>['question','poll','rating'].includes(r.kind)).length).padStart(2,'0')))),
+      h('a',{href:services[0]?itemLink(page.id,services[0].code):sectionLink('services'),class:'brand-live-action'},'ENTER EXPERIENCE',icon('arrow',18)));
+  }
+  if(tpl==='easy_finance'){
+    return h('section',{class:'brand-live easy-live','aria-label':'Easy live experience'},
+      h('div',{class:'easy-live-copy'},h('span',{class:'live-signal'}),h('div',{},h('strong',{},'Easy · explore in one tap'),h('small',{},page.offline?'المحتوى جاهز على هذا الجهاز':'تجربة متصلة وتتحدث مع تفاعلك'))),
+      h('div',{class:'easy-live-rail'},(services.length?services:records.filter(r=>['offer','fact'].includes(r.kind)).slice(0,4)).map((r,i)=>h('a',{href:itemLink(page.id,r.code),class:'easy-live-chip'},h('span',{},String(i+1).padStart(2,'0')),h('strong',{},r.title)))),
+      activePolls[0]?h('a',{href:itemLink(page.id,activePolls[0].code),class:'brand-live-action'},'صوّت الآن',icon('arrow',18)):null);
+  }
+  const insights=[...facts,...records.filter(r=>['news','offer'].includes(r.kind))].slice(0,4);
+  return h('section',{class:'brand-live tharawat-live','aria-label':'Tharawat live experience'},
+    h('div',{class:'tharawat-live-title'},h('span',{class:'eyebrow'},'THARAWAT · LIVE PERSPECTIVE'),h('strong',{},'المعلومة تتحول إلى تجربة قابلة للاستكشاف')),
+    h('div',{class:'tharawat-live-ticker'},(insights.length?insights:[{title:'اكتشف المحتوى والتجربة',value:'•'}]).map(r=>h('a',{href:r.code?itemLink(page.id,r.code):'#about',class:'tharawat-tick'},h('small',{},r.kind==='fact'?'INSIGHT':'DISCOVER'),h('strong',{},r.kind==='fact'?String(r.value)+(r.unit?' '+r.unit:''):r.title),r.kind==='fact'?h('span',{},r.title):null))),
+    h('span',{class:'tharawat-live-mark'},'ث'));
+}
+
 export async function publicPage(slug){
   page=preview?await api('/api/admin/sites/'+params.get('preview')+'/preview'):await bundle(slug);identity();document.title=page.config.title+' | PulseX';document.documentElement.style.setProperty('--accent',page.config.primary);document.documentElement.style.setProperty('--secondary',page.config.secondary||'#0F3D46');document.documentElement.style.setProperty('--theme-accent',page.config.accent||page.config.primary);document.documentElement.style.setProperty('--page-bg',page.config.background||'#F5F8FA');document.documentElement.style.setProperty('--surface',page.config.surface||'#FFFFFF');document.documentElement.style.setProperty('--text-color',page.config.text_color||'#17313B');document.documentElement.style.setProperty('--radius',String(page.config.radius||22)+'px');document.body.dataset.template=page.config.template||'fintech';document.body.dataset.cards=page.config.card_style||'soft';document.body.dataset.hero=page.config.hero_style||'split';document.body.dataset.font=page.config.font||'system';document.body.dataset.buttons=page.config.button_style||'rounded';document.body.dataset.nav=page.config.nav_style||'clean';document.body.dataset.density=page.config.density||'comfortable';document.body.dataset.width=page.config.content_width||'wide';document.body.dataset.headings=page.config.heading_scale||'balanced';root.replaceChildren();document.body.classList.add('public-site');
-  const home=pathFor(page);const header=h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(),h('nav',{class:'toplinks','aria-label':'التنقل العام'},h('a',{href:'/'},'المنصة'),page.event?h('a',{href:'/e/'+page.event.slug},'موقع المعرض'):null,h('a',{href:'#about'},'عن الصفحة'),h('a',{href:'/admin',class:'studio-link'},icon('layers',17),'دخول الإدارة')),button(page.kind==='platform'?'اشترك / طلب حساب':'طلب حساب',requestAccess,'btn secondary small')));root.append(h('a',{href:'#main-content',class:'skip-link'},'انتقل إلى المحتوى'),header);
+  const c=page.config;const home=pathFor(page);const publicMark=(c.title||'PulseX').trim().slice(0,1).toUpperCase()||'P';const guestEventSlug=page.kind==='event'?page.slug:page.event?.slug||'';const branded=['rts_tech','easy_finance','tharawat_finance'].includes(c.template);
+  const visitorNav=branded?h('nav',{class:'toplinks brand-visitor-nav','aria-label':'التنقل في تجربة المعرض'},page.event?h('a',{href:'/e/'+page.event.slug},'المعرض'):null,h('a',{href:'#services'},'استكشف'),h('a',{href:'#polls'},'صوّت'),h('a',{href:'#questions'},'شاركنا رأيك'),guestEventSlug?h('a',{href:'/e/'+guestEventSlug+'/guest'},'بطاقة الزائر'):null):h('nav',{class:'toplinks','aria-label':'التنقل العام'},h('a',{href:'/'},'المنصة'),page.event?h('a',{href:'/e/'+page.event.slug},'موقع المعرض'):null,h('a',{href:'#about'},'عن الصفحة'),h('a',{href:'/admin',class:'studio-link'},icon('layers',17),'دخول الإدارة'));
+  const siteBrand=()=>branded?h('a',{href:home,class:'brand exhibition-brand'},c.logo?h('img',{src:c.logo,alt:'شعار '+c.title,class:'exhibition-brand-logo'}):h('span',{class:'brandmark'},publicMark),h('span',{},c.title||'PulseX')):brand(c.title||'PulseX',publicMark,home);
+  const header=h('header',{class:'topbar site-topbar'+(branded?' brand-exhibition-topbar':'')},h('div',{class:'topbar-inner'},siteBrand(),visitorNav,branded?null:button(page.kind==='platform'?'اشترك / طلب حساب':'طلب حساب',requestAccess,'btn secondary small')));root.append(h('a',{href:'#main-content',class:'skip-link'},'انتقل إلى المحتوى'),header);
   if(preview)root.append(h('div',{class:'preview-banner'},'وضع المعاينة · نسخة المسودة · لا تُسجل أصوات أو إحصائيات'));
-  root.append(h('div',{class:'pilot-note'},h('span',{class:'status-dot'}),'بيئة تجربة · المحتوى النموذجي توضيحي، وليس بيانات حضور فعلية'));
+  if(params.get('demo')==='1')root.append(h('div',{class:'pilot-note'},h('span',{class:'status-dot'}),'بيئة تجربة · المحتوى النموذجي توضيحي، وليس بيانات حضور فعلية'));
   if(page.offline)root.append(h('div',{class:'notice offline-notice'},'تصفح نسخة محفوظة على الجهاز · آخر تنزيل: '+new Date(page.cached_at).toLocaleString('ar-YE')+' · النتائج والتحديثات تحتاج اتصالًا.'));
-  const c=page.config;
   const keys=page.kind==='platform'?[{key:'events',title:'الفعاليات'},{key:'about',title:'عن المنصة'},{key:'facts',title:'الحقائق'},{key:'news',title:'المستجدات'}]:enabledSections();
   const primary=page.kind==='platform'?'events':keys.some(s=>s.key==='services')?'services':keys[0]?.key;
   const second=keys.some(s=>s.key==='questions')?'questions':page.kind==='platform'?'about':keys[1]?.key;
-  const heroText=h('div',{class:'hero-content'},h('span',{class:'hero-kicker'},icon('spark',17),page.kind==='platform'?'منصة للتجارب التي تترك أثرًا':page.kind==='event'?'الفعالية · المعرفة · التجربة':'تعرف علينا. استكشف. وشاركنا رأيك.'),c.logo?h('img',{src:c.logo,alt:'شعار '+c.title,class:'site-logo'}):null,h('h1',{},c.title),h('p',{class:'hero-subtitle'},c.subtitle),h('p',{class:'hero-description'},snippet(c.description,185)),h('div',{class:'actions'},primary?h('a',{href:sectionLink(primary),class:'btn'},page.kind==='platform'?'استكشف الفعاليات':'اكتشف ما نقدمه',icon('arrow',19)):null,second?h('a',{href:sectionLink(second),class:'btn hero-secondary'},second==='questions'?'شاركنا رأيك':'تعرّف أكثر'):null),h('div',{class:'hero-assurances'},h('span',{},icon('check',16),'تصفح بحرية'),h('span',{},icon('shield',16),'البيانات الشخصية اختيارية')));
+  const exhibition=exhibitionExperience(page,{h,icon,itemLink,sectionLink});
+  const heroText=h('div',{class:'hero-content'},h('span',{class:'hero-kicker'},icon('spark',17),page.kind==='platform'?'منصة للتجارب التي تترك أثرًا':page.kind==='event'?'الفعالية · المعرفة · التجربة':'تعرف علينا. استكشف. وشاركنا رأيك.'),c.logo?h('img',{src:c.logo,alt:'شعار '+c.title,class:'site-logo'}):null,h('h1',{},c.title),h('p',{class:'hero-subtitle'},c.subtitle),h('p',{class:'hero-description'},snippet(c.description,185)),h('div',{class:'actions'},primary?h('a',{href:sectionLink(primary),class:'btn'},page.kind==='platform'?'استكشف الفعاليات':'اكتشف ما نقدمه',icon('arrow',19)):null,second?h('a',{href:sectionLink(second),class:'btn hero-secondary'},second==='questions'?'شاركنا رأيك':'تعرّف أكثر'):null,guestEventSlug?h('a',{href:'/e/'+guestEventSlug+'/guest',class:'btn hero-secondary'},'بطاقة الزائر'):null),h('div',{class:'hero-assurances'},h('span',{},icon('check',16),'تصفح بحرية'),h('span',{},icon('shield',16),'البيانات الشخصية اختيارية')));
   const stage=h('div',{class:'hero-art'},h('div',{class:'visual-grid'}),h('div',{class:'visual-disc'}),c.cover?h('img',{src:c.cover,alt:'المحتوى التعريفي للصفحة',class:'hero-picture'}):h('div',{class:'hero-logo'},icon('spark',92)),h('div',{class:'float-card float-top'},h('span',{class:'surface-icon'},icon('layers',21)),h('div',{},h('strong',{},keys.length+' أقسام قابلة للاستكشاف'),h('small',{},'محتوى مرتبط بمدخلات الجهة'))),h('div',{class:'float-card float-bottom'},h('span',{class:'surface-icon'},icon('message',21)),h('div',{},h('strong',{},'رأيك يصنع فرقًا'),h('small',{},'أسئلة وتصويت وتقييم اختياري'))));
-  root.append(h('section',{class:'hero'},heroText,stage));
+  if(exhibition){root.append(exhibition.hero);if(exhibition.after){exhibition.after.classList.add('expo-home-only');root.append(exhibition.after);}}else root.append(h('section',{class:'hero'},heroText,stage));
+  const liveLayer=exhibition?null:brandLiveLayer();if(liveLayer)root.append(liveLayer);
   const nav=h('nav',{class:'section-nav site-section-nav','aria-label':'أقسام الصفحة'},keys.map(s=>h('a',{href:'#'+s.key,'data-nav-key':s.key},icon(sectionsMeta[s.key]?.icon||'spark',17),s.title)));
   root.append(nav);mainHost=h('main',{class:'public-main',id:'main-content'});root.append(mainHost);renderRoute(false);window.addEventListener('hashchange',()=>{const r=route(location.hash);renderRoute(r.type!=='home');if(r.type==='home'&&r.anchor)requestAnimationFrame(()=>document.getElementById(r.anchor)?.scrollIntoView({behavior:'smooth',block:'start'}));});
-  const floating=h('div',{class:'devicebar'},button('تجهيز دون إنترنت',offlinePanel,'text-btn'),h('span',{id:'connection-status',class:'connection'},'جارٍ فحص المزامنة'),kiosk?button('زائر جديد',resetKiosk,'btn small'):button('وضع التاب',()=>{const u=new URL(location.href);u.searchParams.set('kiosk','1');location.href=u.href;},'text-btn'));
-  root.append(h('section',{class:'closing-cta'},h('div',{},h('span',{class:'eyebrow'},'EXPERIENCES THAT CONNECT'),h('h2',{},'كل مشاركة بداية لفكرة جديدة.'),h('p',{},'استكشف المحتوى أو شارك برأيك. أنت تختار طريقة تفاعلك.')),h('a',{href:second?sectionLink(second):'#',class:'btn'},'استكشف التجربة',icon('arrow',18))),floating,h('footer',{class:'footer'},h('div',{},brand(),h('p',{},'تجربة تصنعها الجهة، ورأي يترك أثرًا.')),h('nav',{},h('a',{href:'/'},'المنصة'),h('a',{href:'/admin'},'الإدارة'),button('طلب حساب للجهة',requestAccess,'text-btn'),button('الخصوصية والموافقة',()=>modal('الخصوصية والموافقة',h('div',{},h('p',{},page.config.privacy),h('p',{},'يمكن تصفح المحتوى والتفاعل دون إدخال الاسم والهاتف. الموافقة على المتابعة منفصلة.'))),'text-btn')),h('small',{},'PulseX · Windows 10 Role & Template Candidate')));
+  const floating=(kiosk||params.get('operator')==='1'||preview)?h('div',{class:'devicebar'},button('تجهيز دون إنترنت',offlinePanel,'text-btn'),h('span',{id:'connection-status',class:'connection'},'جارٍ فحص المزامنة'),kiosk?button('زائر جديد',resetKiosk,'btn small'):button('وضع التاب',()=>{const u=new URL(location.href);u.searchParams.set('kiosk','1');location.href=u.href;},'text-btn')):null;
+  const closing=branded?({
+    rts_tech:['RTS / NEXT STEP','حوّل الفكرة إلى مسار رقمي قابل للتنفيذ.','اختر القدرة الأقرب لاحتياجك، شارك رأيك، واترك إشارة واضحة للخطوة التالية.'],
+    easy_finance:['EASY / ONE MORE TAP','خطوتك التالية أسهل.','جرّب الخدمة التي تهمك، صوّت، أو اترك لنا ما تريد أن يصبح أبسط.'],
+    tharawat_finance:['THARAWAT / NEXT PERSPECTIVE','الرؤية تبدأ من سؤال جيّد.','استكشف المسار الأقرب لك وشاركنا ما يستحق أن نراه من زاوية مختلفة.']
+  })[c.template]:['EXPERIENCES THAT CONNECT','كل مشاركة بداية لفكرة جديدة.','استكشف المحتوى أو شارك برأيك. أنت تختار طريقة تفاعلك.'];
+  const footerNav=branded?h('nav',{},page.event?h('a',{href:'/e/'+page.event.slug},'المعرض'):h('a',{href:'/'},'الفعالية'),button('الخصوصية والموافقة',()=>modal('الخصوصية والموافقة',h('div',{},h('p',{},page.config.privacy),h('p',{},'يمكن تصفح المحتوى والتفاعل دون إدخال الاسم والهاتف. الموافقة على المتابعة منفصلة.'))),'text-btn')):h('nav',{},h('a',{href:'/'},'المنصة'),h('a',{href:'/admin'},'الإدارة'),button('طلب حساب للجهة',requestAccess,'text-btn'),button('الخصوصية والموافقة',()=>modal('الخصوصية والموافقة',h('div',{},h('p',{},page.config.privacy),h('p',{},'يمكن تصفح المحتوى والتفاعل دون إدخال الاسم والهاتف. الموافقة على المتابعة منفصلة.'))),'text-btn'));
+  root.append(h('section',{class:'closing-cta'+(branded?' exhibition-closing':'')},h('div',{},h('span',{class:'eyebrow'},closing[0]),h('h2',{},closing[1]),h('p',{},closing[2])),h('a',{href:second?sectionLink(second):'#',class:'btn'},branded?'شارك في التجربة':'استكشف التجربة',icon('arrow',18))),floating,h('footer',{class:'footer'+(branded?' exhibition-footer':'')},h('div',{},siteBrand(),h('p',{},branded?'مساحة معرض حيّة للاستكشاف والتفاعل.':'تجربة تصنعها الجهة، ورأي يترك أثرًا.'),page.kind!=='platform'?h('small',{class:'platform-attribution'},'Powered by PulseX · Live Experience Platform'):null),footerNav,h('small',{},'PulseX · Live Experience & Insights Platform')));
   window.addEventListener('px-sync',connectionBar);window.addEventListener('online',connectionBar);window.addEventListener('offline',connectionBar);await connectionBar();activate();if(!preview&&page.kind!=='platform'){const visitKey='visited-'+page.id+'-'+session;if(!sessionStorage.getItem(visitKey)){await enqueue({id:crypto.randomUUID(),site_id:page.id,version:page.version,kind:'visit',visitor_id:visitor,session_id:session,source,target:'',payload:{},client_time:new Date().toISOString()});sessionStorage.setItem(visitKey,'1');}welcome();}
   if(kiosk&&!preview){let idle;const reset=()=>{clearTimeout(idle);idle=setTimeout(resetKiosk,120000);};for(const ev of ['pointerdown','keydown','touchstart'])document.addEventListener(ev,reset,{passive:true});reset();}
   timers.push(setInterval(refreshResults,5000));

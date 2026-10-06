@@ -40,13 +40,13 @@ def install_security_middleware(app, public_origin: str) -> None:
 
         if request.url.path.startswith('/api/'):
             ip = request.client.host if request.client else 'unknown'
-            bucket = 'auth' if request.url.path.startswith('/api/auth/login') else 'api'
+            bucket = 'auth' if request.url.path.startswith('/api/auth/login') else 'guest' if request.url.path.startswith('/api/public/events/') and '/guests' in request.url.path else 'api'
             key = (ip, bucket)
             queue = limits[key]
             current = time.monotonic()
             while queue and current - queue[0] > 60:
                 queue.popleft()
-            limit = 20 if bucket == 'auth' else 12000
+            limit = 20 if bucket == 'auth' else 300 if bucket == 'guest' else 12000
             if len(queue) >= limit:
                 return JSONResponse({'detail': 'RATE_LIMIT'}, 429, headers={'Retry-After': '60'})
             queue.append(current)
@@ -58,7 +58,7 @@ def install_security_middleware(app, public_origin: str) -> None:
         response = await call_next(request)
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'same-origin'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        response.headers['Permissions-Policy'] = 'camera=(self), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' https: data:; media-src 'self' https:; connect-src 'self'; "

@@ -2,6 +2,7 @@ from pathlib import Path
 import os, subprocess, sys, json
 from app.db import metadata
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 from tests.load_profiles import PROFILES
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -10,7 +11,7 @@ def test_v06_openapi_and_build(tmp_path):
     app=create_app(f"sqlite:///{tmp_path/'db.sqlite3'}",seed_demo=False)
     assert app.openapi()['info']['version']=='0.9.0'
     from fastapi.testclient import TestClient
-    assert TestClient(app).get('/api/health').json()['build']=='windows-08'
+    assert TestClient(app).get('/api/health').json()['build']==BUILD_LABEL
 
 def test_scaled_profiles_are_multiples():
     assert PROFILES['x10']['writes'] >= PROFILES['pilot']['writes']*10
@@ -28,7 +29,7 @@ def test_production_gate_rejects_insecure_config():
     assert json.loads(r.stdout)['status']=='fail'
 
 def test_production_gate_accepts_required_shape():
-    env={**os.environ,'DATABASE_URL':'postgresql+psycopg://pulsex:0123456789abcdef@postgres:5432/pulsex','PUBLIC_ORIGIN':'https://pulsex.example.org','SEED_DEMO':'false','WEB_WORKERS':'4','PX_NATIVE_POSTGRES_ACCEPTED':'true','PX_LOAD_ACCEPTED':'true','PX_SECURITY_ACCEPTED':'true','PX_FIELD_OFFLINE_ACCEPTED':'true'}
+    env={**os.environ,'DATABASE_URL':'postgresql+psycopg://pulsex:0123456789abcdef@postgres:5432/pulsex','PUBLIC_ORIGIN':'https://pulsex.example.org','SEED_DEMO':'false','WEB_WORKERS':'4','GUEST_ID_SECRET':'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef','BOOTSTRAP_ADMIN_EMAIL':'admin@pulsex.org','PX_NATIVE_POSTGRES_ACCEPTED':'true','PX_LOAD_ACCEPTED':'true','PX_SECURITY_ACCEPTED':'true','PX_FIELD_OFFLINE_ACCEPTED':'true'}
     r=subprocess.run([sys.executable,str(ROOT/'tools/production_gate.py')],env=env,capture_output=True,text=True)
     assert r.returncode==0
     assert json.loads(r.stdout)['status']=='pass'

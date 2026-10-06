@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -27,7 +28,7 @@ def login(c,app,index=0):
 
 def test_windows07_version_and_device_schema(client):
     h=client.get('/api/health').json()
-    assert h['build']=='windows-08'
+    assert h['build']==BUILD_LABEL
     assert client.app.openapi()['info']['version']=='0.9.0'
     paths=client.app.openapi()['paths']
     assert '/api/admin/sites/{sid}/devices' in paths
@@ -95,8 +96,9 @@ def test_admin_ui_has_devices_and_request_review():
 
 def test_service_worker_cache_bumped_and_assets_exist():
     sw=(ROOT/'web/sw.js').read_text(encoding='utf-8')
-    assert "px-shell-v09" in sw
     import re
+    cache=re.search(r"const CACHE='px-shell-v(\d+)'",sw)
+    assert cache and int(cache.group(1)) >= 15
     assets=re.findall(r"'/assets/([^']+)'",sw)
     assert assets and all((ROOT/'web'/name).is_file() for name in assets)
 

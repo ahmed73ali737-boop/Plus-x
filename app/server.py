@@ -1,38 +1,47 @@
-"""PulseX Windows 06 scale & hardening candidate.
+"""PulseX HTTP composition root.
+
 SQLite remains the local QA backend; PostgreSQL requires native acceptance before production.
-HTTP composition intentionally delegates security, access, publishing and collection rules to dedicated modules.
+Delivery endpoints delegate security, access, publishing and collection rules to dedicated modules.
+Build identity is centralized in app.core.build_info.
 """
 from __future__ import annotations
-import base64, copy, hashlib, io, json, os, re, secrets, uuid
+import base64, copy, hashlib, io, json, mimetypes, os, re, secrets, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select, update, insert, delete, func, text as sql_text
+from sqlalchemy import select, update, insert, delete, func
 from sqlalchemy.exc import IntegrityError
 from .db import make_engine, metadata, ensure_compat_schema, sites, versions, users, sessions, imports, submissions, requests, audit, organizations, organization_people, memberships, event_participations, assignments, devices, signup_requests
 from .domain import fail, now, text, number, boolean, normalize_config, normalize_record, default_config, survey_answers, answer_value, stamp, KINDS, QTYPES, SECTIONS
 from .imports import parse as parse_import
 from .core.security import digest, hash_password as password_hash, verify_password as password_ok, new_session_token, new_csrf_token, new_temporary_password
 from .core.serialization import canonical_json as canon
+from .core.build_info import APP_NAME, APP_VERSION
 from .infrastructure.repository import fetch_one as row, get_site as site_row
 from .application.access import can_manage, require_scope, organization_visible
 from .application.audit_service import new_id as uid, write_audit as log
 from .application.publishing import publish_site_version as publish, get_site_version as get_version
 from .infrastructure.seed import seed_demo_data as seed
 from .api.middleware import install_security_middleware
+from .api.routers.health import create_health_router
 from .application.auth_service import identify_request
 from .application.collection_service import validate_submission, build_metrics
 from .application.device_service import create_device, list_devices, update_device, heartbeat as device_heartbeat
 from .application.access_request_service import list_requests, set_request_status
 from .application.public_service import build_public_bundle, build_public_poll_results
+from .api.guest_routes import install_guest_routes
 
 ROOT=Path(__file__).resolve().parent.parent
+# Do not inherit OS-specific MIME registry drift for browser module assets.
+# Chromium refuses ES modules unless .mjs is served with a JavaScript MIME type.
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
     engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
-    app=FastAPI(title='PulseX',version='0.9.0',docs_url=None,redoc_url=None)
+    app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None)
     app.state.engine=engine;app.state.seed_credentials=seed(engine,credentials_path) if seed_demo else []
     public_origin=(origin or os.environ.get('PUBLIC_ORIGIN','http://127.0.0.1:4310')).rstrip('/')
     media_dir=Path(os.environ.get('MEDIA_DIR',str(ROOT/'data/media')));media_dir.mkdir(parents=True,exist_ok=True)
@@ -40,26 +49,16 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
 
     install_security_middleware(app, public_origin)
 
+    app.include_router(create_health_router(engine))
+
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
         if u.get('must_change_password') and req.url.path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
+    install_guest_routes(app, engine, public_origin, identify=identify, site_row=site_row, log=log)
 
-    @app.get('/api/health')
-    def health(): return {'status':'hardening_candidate','build':'windows-08','api_version':'1','database':engine.dialect.name,'native_postgres_tested_here':False,'production_ready':False,'analytics_refresh_seconds':5}
-
-    @app.get('/api/health/live')
-    def liveness(): return {'status':'ok','build':'windows-08'}
-
-    @app.get('/api/health/ready')
-    def readiness():
-        try:
-            with engine.connect() as c: c.execute(sql_text('SELECT 1')).scalar_one()
-            return {'status':'ready','database':engine.dialect.name}
-        except Exception:
-            return JSONResponse({'status':'not_ready'},503)
 
     @app.post('/api/auth/login')
     def login(body:dict,request:Request):

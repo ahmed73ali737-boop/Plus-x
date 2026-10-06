@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from app.server import create_app
+from app.core.build_info import BUILD_LABEL
 from app.domain import normalize_config, normalize_record, answer_value
 
 @pytest.fixture
@@ -19,7 +20,7 @@ def login(c,app,index=0):
 
 def test_health_v04(env):
     _,c=env
-    x=c.get('/api/health').json(); assert x['build']=='windows-08'
+    x=c.get('/api/health').json(); assert x['build']==BUILD_LABEL
 
 def test_seed_permanent_organizations_and_participations(env):
     app,c=env; login(c,app,0)
@@ -127,13 +128,13 @@ def test_platform_can_add_permanent_user_to_org(env):
     assert any(x['id']=='agency-01' for x in sites)
 
 def test_public_ui_contains_signup_and_section_layout_support():
-    public=Path('web/public.mjs').read_text()
-    css=Path('web/design.css').read_text()
+    public=Path('web/public.mjs').read_text(encoding='utf-8')
+    css=Path('web/design.css').read_text(encoding='utf-8')
     assert 'طلب اشتراك / حساب' in public and 'ما تم إنجازه' in public and 'القادمة' in public
     assert 'previewLimit' in public and 'layout-featured' in css and 'layout-list' in css
 
 def test_admin_ui_exposes_templates_audit_orgs_quiz_score_and_notes():
-    admin=Path('web/admin.mjs').read_text()
+    admin=Path('web/admin.mjs').read_text(encoding='utf-8')
     for token in ['الهوية والقالب','المؤسسات والمشاركات','السجل والتدقيق','الإجابة الصحيحة للاختبار','أحدث الملاحظات المكتوبة','إضافة مستخدم']:
         assert token in admin
 

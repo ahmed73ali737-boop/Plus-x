@@ -56,7 +56,55 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                 {'kind':'ad','code':'ad-1','title':'مساحة إعلان الجهة','body':'محتوى ترويجي قابل للتغيير من لوحة الإدارة.','placement':'all','media':'/media/ad-demo.svg'},
                 {'kind':'contact','code':'contact-1','title':'فريق الجهة','body':'أضف طرق التواصل المعتمدة.'},
             ]
-            seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', sid, cfg))
+            if i == 8:
+                cfg.update(title='ثروات', subtitle='رؤية مالية تتفاعل مع اللحظة، لا صفحة تعريفية ثابتة.', description='مساحة ثروات الحيّة داخل الفعالية: استكشف المبادرات والخدمات والرؤى، شارك في التصويت، واترك ملاحظتك ضمن تجربة متغيرة مع تفاعل الجمهور.', template='tharawat_finance', primary='#7A5B19', secondary='#1E1A12', accent='#C9A552', background='#FBF8F0', cover='')
+                cfg['records'][0].update(title='منظومة ثروات الرقمية', body='استكشف المبادرات والمنصات والخدمات من نقطة واحدة، ثم انتقل مباشرة إلى التفاعل المناسب.', order=1)
+                cfg['records'][1].update(title='حلول مالية للأفراد والأعمال', body='رحلة مختصرة من التعرف إلى الاهتمام ثم طلب المتابعة، مع حفظ قرار الزائر بوضوح.', order=2)
+                cfg['records'][2].update(title='نبض التجربة', value=91, source='قيمة عرض تجريبية لواجهة ثروات الحيّة', display='trend')
+                cfg['records'][3].update(title='أي مساحة مالية تهمك أكثر؟', options=['الخدمات المالية الرقمية','المنصات والحلول المؤسسية','الاستثمار والنمو','الشراكات والتكامل'])
+                cfg['records'][6].update(title='ما الذي تريد أن تستكشفه أولًا؟', options=['الخدمات والمنصات','الرؤية والابتكار','فرص التعاون'])
+                cfg['records'][7].update(title='فرصة للاستكشاف', body='محتوى حي يتبدل مع أولويات الفعالية بدل بطاقة عرض ثابتة.')
+                cfg['records'].extend([
+                    {'kind':'service','code':'service-3','title':'رؤية وابتكار مالي','body':'مساحة تربط احتياج السوق بالمنتج والتقنية والقرار، وتحوّل العرض إلى حوار قابل للقياس.','order':3},
+                    {'kind':'service','code':'service-4','title':'شراكات وتكاملات','body':'استكشف مسارات التعاون والتكامل مع الأنظمة والقنوات والجهات ضمن رحلة واضحة من الاهتمام إلى المتابعة.','order':4},
+                    {'kind':'service','code':'service-5','title':'بيانات ورؤى قابلة للتنفيذ','body':'قراءة التفاعل والاهتمامات والملاحظات كإشارات عملية تساعد على اتخاذ القرار بعد المعرض.','order':5},
+                ])
+            elif i == 9:
+                cfg.update(title='Easy', subtitle='محفظتك وخدماتك اليومية — اكتشفها وتفاعل معها في لمسة.', description='تجربة Easy في المعرض مصممة لتكون عملية وسريعة: خدمات المحفظة، الخصوصية، الحصالة، بطاقات Wi-Fi وحسابات الأطفال، مع تصويت وأسئلة لحظية.', template='easy_finance', primary='#12A594', secondary='#073F45', accent='#E8B74A', background='#F4FBF9', cover='')
+                cfg['records'][0].update(title='الخصوصية والرقم البديل', body='اكتشف كيف يمكن إنجاز التعاملات مع خيارات خصوصية أكثر وضوحًا.', order=1)
+                cfg['records'][1].update(title='الحصالة والكسر المباشر', body='حوّل الباقي تلقائيًا إلى حصالتك ضمن تجربة ادخار يومية بسيطة ومرئية.', order=2)
+                cfg['records'][2].update(title='خدمات في لمسة', value=8, unit='تجارب', source='محتوى توضيحي لرحلة Easy في المعرض', display='number')
+                cfg['records'][3].update(title='أي خدمة في Easy تريد تجربتها أولًا؟', options=['الخصوصية والرقم البديل','الحصالة والكسر المباشر','بطاقات Wi-Fi','حسابات الأطفال','الدفع والتحويل','الذهب','التداول والاستثمار'])
+                cfg['records'][6].update(title='ما الذي يصنع التجربة الأسهل بالنسبة لك؟', options=['سرعة التنفيذ','وضوح الخطوات','الأمان والخصوصية','تنوع الخدمات'])
+                cfg['records'][7].update(title='جرّب مسار Easy', body='اختر الخدمة التي تهمك ثم صوّت وقيّم التجربة مباشرة.')
+                cfg['records'].extend([
+                    {'kind':'service','code':'service-3','title':'بطاقات Wi‑Fi','body':'شراء بطاقات Wi‑Fi والوصول إليها ضمن نفس الرحلة اليومية للمحفظة.','order':3},
+                    {'kind':'service','code':'service-4','title':'حسابات الأطفال','body':'مساحة عائلية لإدارة حسابات الأطفال ومتابعتها بصورة أبسط وأكثر وضوحًا.','order':4},
+                    {'kind':'service','code':'service-5','title':'الدفع والتحويل','body':'مدفوعات وتحويلات مصممة للوصول إلى الإجراء المطلوب بأقل خطوات ممكنة.','order':5},
+                    {'kind':'service','code':'service-6','title':'تقاريرك وسجلّك','body':'عرض أوضح للحركة والتفاصيل لمساعدة المستخدم على الفهم والمتابعة من نفس التطبيق.','order':6},
+                    {'kind':'service','code':'service-7','title':'الذهب','body':'مسار استكشاف لتجربة خدمات الذهب ضمن واجهة Easy وبنفس منطق البساطة والوضوح.','order':7},
+                    {'kind':'service','code':'service-8','title':'التداول والاستثمار','body':'مسار عرض للتداول والاستثمار يوضح كيف تنتقل من الاستكشاف إلى متابعة الفرص من نفس التجربة.','order':8},
+                ])
+            elif i == 10:
+                cfg.update(title='RTS', subtitle='من الحلول إلى المنصات إلى الأنظمة البيئية الرقمية.', description='RTS تعرض تجربة تقنية حيّة للتحول الرقمي والتكنولوجيا المالية وبوابات الدفع والتحصيل والمنصات المتكاملة، مع مؤشرات وتفاعل مباشر بدل موقع تعريفي جامد.', template='rts_tech', primary='#0B5CFF', secondary='#071D49', accent='#00C2FF', background='#F4F8FF', cover='')
+                cfg['records'][0].update(title='Digital Transformation', body='الاستراتيجية والرقمنة والأتمتة والتكامل والتحديث ضمن رحلة تنفيذ مترابطة.', order=1)
+                cfg['records'][1].update(title='FinTech & Payment Platforms', body='محافظ ومدفوعات وتحصيل ومنصات مالية وتكاملات قابلة للتوسع.', order=2)
+                cfg['records'][2].update(title='RTS Live Capabilities', value=10, unit='مسارات', source='بيانات عرض تجريبية لمساحة RTS التفاعلية', display='comparison')
+                cfg['records'][3].update(title='أي قدرة تقنية تريد استكشافها؟', options=['التحول الرقمي','FinTech والمدفوعات','بوابات الدفع والتحصيل','التكامل والمنصات','أنظمة الأعمال'])
+                cfg['records'][6].update(title='أين ترى أعلى قيمة للتحول؟', options=['أتمتة العمليات','تجربة العميل','التكامل والبيانات','المدفوعات والتحصيل'])
+                cfg['records'][7].update(title='ادخل التجربة التقنية', body='استكشف قدرة، شاهد المؤشر، ثم شارك رأيك أو طلب المتابعة.')
+                cfg['records'].extend([
+                    {'kind':'service','code':'service-3','title':'Payment & Collection','body':'بوابات دفع وفوترة وتحصيل وتسوية وربط للقنوات والخدمات ضمن بنية قابلة للتوسع.','order':3},
+                    {'kind':'service','code':'service-4','title':'Integration & Platforms','body':'تكامل الأنظمة وواجهات API والمنصات المشتركة لبناء منظومات مترابطة بدل حلول معزولة.','order':4},
+                    {'kind':'service','code':'service-5','title':'Business Systems','body':'أنظمة الأعمال والمحاسبة والمبيعات والإقراض والتحصيل والخدمات المؤسسية ضمن تصميم مرن.','order':5},
+                    {'kind':'service','code':'service-6','title':'Data, Automation & Insights','body':'تحويل البيانات والعمليات إلى تدفقات قابلة للأتمتة والقياس والتحسين المستمر.','order':6},
+                    {'kind':'service','code':'service-7','title':'Accounting & Sales Systems','body':'أنظمة محاسبة ومبيعات وتشغيل تدعم الدورة اليومية والرقابة والتقارير والتكامل مع بقية المنظومة.','order':7},
+                    {'kind':'service','code':'service-8','title':'Lending, Requests & Billing','body':'إدارة التقييم والطلبات والإقراض والتحصيل والفوترة ضمن تدفقات واضحة قابلة للضبط والتكامل.','order':8},
+                    {'kind':'service','code':'service-9','title':'Humanitarian & Donations Platforms','body':'منصات لإدارة المبادرات الإنسانية والتبرعات والتحصيل والمتابعة والتقارير ضمن ضوابط وصلاحيات قابلة للتخصيص.','order':9},
+                    {'kind':'service','code':'service-10','title':'Exchange & Financial Products','body':'حلول للصرافة والمنتجات المالية والتكاملات المطلوبة لتقديم خدمات مترابطة وقابلة للتوسع.','order':10},
+                ])
+            public_slug={8:'tharawat',9:'easy',10:'rts'}.get(i,sid)
+            seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', public_slug, cfg))
 
         for sid, parent, event_id, kind, slug, cfg in seed_sites:
             cfg = normalize_config(cfg)
@@ -70,7 +118,13 @@ def seed_demo_data(engine, credentials_path=None, count=10):
             oid = f'org-{i:02}'
             site_id = f'agency-{i:02}'
             orgmap[site_id] = oid
-            c.execute(insert(organizations).values(id=oid, slug=f'organization-{i:02}', name=f'المؤسسة التجريبية {i:02}', profile={'description':'ملف مؤسسة دائم يمكن ربطه بأكثر من فعالية','logo':'','primary':['#176B73','#2759A5','#8047A1','#9B6724'][i % 4]}, status='active', created_at=now()))
+            brand_orgs={
+                8:('ثروات','ملف ثروات الدائم وربطه بمشاركاتها عبر الفعاليات','#7A5B19'),
+                9:('Easy','ملف Easy الدائم للمحفظة والخدمات المالية الرقمية','#12A594'),
+                10:('RTS','ملف RTS الدائم للتقنية والتحول الرقمي والتكنولوجيا المالية','#0B5CFF'),
+            }
+            org_name,org_desc,org_primary=brand_orgs.get(i,(f'المؤسسة التجريبية {i:02}','ملف مؤسسة دائم يمكن ربطه بأكثر من فعالية',['#176B73','#2759A5','#8047A1','#9B6724'][i % 4]))
+            c.execute(insert(organizations).values(id=oid, slug=f'organization-{i:02}', name=org_name, profile={'description':org_desc,'logo':'','primary':org_primary}, status='active', created_at=now()))
             c.execute(insert(event_participations).values(id=new_id(), event_id='event-demo', organization_id=oid, agency_site_id=site_id, participation_type='exhibitor', status='active', booth=f'A-{i:02}', summary='مشاركة تجريبية مرتبطة بالمؤسسة الدائمة', services=[], valid_from=event['start'], valid_until=event['end'], created_at=now()))
 
         accounts = [('platform','platform','admin@pulsex.test','مدير المنصة'), ('organizer','event-demo','organizer@pulsex.test','الجهة المنظمة')]

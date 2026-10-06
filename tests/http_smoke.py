@@ -10,7 +10,7 @@ try:
     for _ in range(80):
         try:urllib.request.urlopen(url+'/api/health',timeout=1);break
         except:time.sleep(.15)
-    accounts=json.loads((temp/'accounts.json').read_text());checks=[]
+    accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'));checks=[]
     with httpx.Client(base_url=url,timeout=30) as c:
         assert c.get('/').status_code==200;assert c.get('/api/public/site/demo').status_code==200;checks.append('real_http_platform_and_event')
         u=accounts[2];r=c.post('/api/auth/login',json={'email':u['email'],'password':u['password']});assert r.status_code==200;c.headers['X-CSRF']=r.json()['csrf'];checks.append('real_http_cookie_login')
@@ -33,5 +33,5 @@ try:
         r=c.post('/api/collect',json={'items':items[:50]});assert all(x['status']=='duplicate' for x in r.json()['receipts']);checks.append('replay_50_exact_bodies_no_extra_writes')
     conn=sqlite3.connect(temp/'db.sqlite');count=conn.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0];assert count==1000;conn.close();checks.append('database_count_matches_1000')
     report={'checks':checks,'passed':len(checks),'backend':'SQLite','transport':'real local HTTP; Python clients, not browser','distinct_synthetic_submissions':1000,'batch_size':50,'concurrent_batch_clients':4,'elapsed_seconds':round(elapsed,3),'batch_request_p95_seconds':round(sorted(durations)[int(.95*len(durations))-1],3),'data_loss':0,'extra_rows_after_replay':0,'not_a_concurrent_1000_user_or_postgresql_benchmark':True,'not_physical_kiosk_test':True}
-    (ROOT/'qa/http-smoke.json').write_text(json.dumps(report,ensure_ascii=False,indent=2));print(json.dumps(report))
+    (ROOT/'qa/http-smoke.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report))
 finally:proc.terminate();proc.wait(timeout=10);log.close()

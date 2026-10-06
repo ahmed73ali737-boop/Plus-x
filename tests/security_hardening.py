@@ -19,7 +19,7 @@ def main():
                 try: urllib.request.urlopen(base+'/api/health',timeout=.3); break
                 except Exception: time.sleep(.1)
             else: raise RuntimeError('server timeout')
-            accounts=json.loads((temp/'accounts.json').read_text())
+            accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'))
             with httpx.Client(base_url=base,timeout=20) as c:
                 r=c.get('/api/health');
                 assert r.headers['x-content-type-options']=='nosniff'; checks.append('security_headers')
