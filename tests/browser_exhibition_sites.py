@@ -89,6 +89,16 @@ try:
         page.screenshot(path=str(ROOT / "qa/tharawat-exhibition.png"), full_page=True)
         mark("tharawat_distinct_exhibition_surface")
 
+        page.goto(URL + "/e/demo/p/agency-08#contact")
+        page.get_by_role("button", name="إرسال طلب تواصل", exact=True).click()
+        dialog = page.locator("dialog")
+        dialog.get_by_label("الهاتف", exact=True).fill("777555555")
+        dialog.get_by_label("كيف يمكننا مساعدتك؟", exact=True).fill("أرغب بمعرفة مسار التعاون بعد المعرض.")
+        dialog.get_by_text("أوافق على مشاركة البيانات", exact=False).click()
+        dialog.get_by_role("button", name="إرسال طلب التواصل", exact=True).click()
+        dialog.wait_for(state="detached")
+        mark("tharawat_contact_consent_flow")
+
         # Easy must read and behave like a living wallet surface.
         page.goto(URL + "/e/demo/p/agency-09")
         page.locator(".expo-easy-stage").wait_for()
@@ -105,6 +115,13 @@ try:
         page.goto(URL + "/e/demo/p/agency-09#services")
         page.get_by_text("تقاريرك وسجلّك", exact=True).wait_for()
         mark("easy_full_exhibition_service_content")
+
+        page.goto(URL + "/e/demo/p/agency-09#questions")
+        page.locator('fieldset[data-code="q-interest"] input').first.check()
+        page.locator('fieldset[data-code="q-rate"] button').last.click()
+        page.locator('form[data-form="main"]').get_by_role("button", name="إرسال الاستبيان", exact=True).click()
+        page.get_by_text("شكرًا لك، تم استلام إجاباتك.", exact=True).wait_for()
+        mark("easy_exhibition_survey_persisted")
 
         # RTS must expose a technical system map and capability rail.
         page.goto(URL + "/e/demo/p/agency-10")
@@ -126,6 +143,12 @@ try:
         page.get_by_text("Humanitarian & Donations Platforms", exact=True).wait_for()
         page.get_by_text("Exchange & Financial Products", exact=True).wait_for()
         mark("rts_full_capability_content")
+
+        page.goto(URL + "/e/demo/p/agency-10#polls")
+        page.locator('fieldset[data-code="p-first"] input').first.check()
+        page.get_by_role("button", name="إرسال التصويت", exact=True).click()
+        page.locator('[data-results="p-first"] strong').first.wait_for()
+        mark("rts_live_poll_result_roundtrip")
 
         # Mobile layout for all three surfaces must stay inside the viewport.
         mobile_context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, locale="ar-YE")
