@@ -15,9 +15,9 @@ from app.application.guest_service import (
     guest_qr_payload,
     list_event_guests,
     public_guest_view,
-    record_checkin,
     register_guest,
 )
+from app.application.guest_gate_service import event_presence_map, record_checkin, validate_guest
 from app.application.access import require_scope
 from app.db import guest_checkins, sites
 from app.domain import fail, now, text
@@ -40,7 +40,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
                 "title":event["draft"].get("title") or event["slug"],
                 "country_code":"+967",
                 "guest_identity":"phone",
-                "guest_number_strategy":"deterministic_phone_hash",
+                "guest_number_strategy":"keyed_hmac",
                 "offline_edge_recommended":True,
             }
 
@@ -207,10 +207,38 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
+            presence=event_presence_map(c,event_id)
             manifest=[]
             for guest in list_event_guests(c,event_id):
-                manifest.append({k:v for k,v in guest.items() if k!="phone"})
+                item={k:v for k,v in guest.items() if k!="phone"}
+                item["presence"]=presence.get(guest["id"],{}).get("state","outside")
+                manifest.append(item)
             return {"event_id":event_id,"generated_at":now(),"guests":manifest}
+
+    @app.get("/api/device/events/{event_id}/guests/{guest_number}/validate")
+    def device_validate_guest(event_id: str, guest_number: str, request: Request):
+        raw=request.headers.get("X-PulseX-Device-Token","")
+        with engine.begin() as c:
+            device=authenticate_device(c,raw)
+            if device["site_id"]!=event_id:
+                fail("DEVICE_EVENT_SCOPE",403)
+            event=site_row(c,event_id)
+            if event["kind"]!="event":
+                fail("EVENT_REQUIRED",404)
+            result=validate_guest(c,event_id,text(guest_number,32,True))
+            guest=result["guest"]
+            return {
+                "status":result["status"],
+                "presence":result["presence"],
+                "guest":{
+                    "guest_number":guest["guest_number"],
+                    "name":guest["name"],
+                    "organization":guest["organization"],
+                    "job_title":guest["job_title"],
+                    "guest_type":guest["guest_type"],
+                    "status":guest["status"],
+                },
+            }
 
     @app.post("/api/device/events/{event_id}/guest-checkins")
     def device_guest_checkins(event_id: str, body: dict, request: Request):
