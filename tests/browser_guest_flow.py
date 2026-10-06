@@ -144,11 +144,11 @@ try:
         page.wait_for_function("navigator.onLine === true")
         page.evaluate("window.dispatchEvent(new Event('online'))")
         for _ in range(120):
-            sync_state=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return {accepted:xs.filter(x=>x.status==='accepted').length,pending:xs.filter(x=>x.status==='pending').length}}""")
-            if sync_state['accepted']>=1 and sync_state['pending']==0:
+            sync_state=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');const rs=await m.all('checkin_receipts');return {accepted:rs.filter(x=>['accepted','duplicate'].includes(x.status)).length,pending:xs.filter(x=>x.status==='pending').length,outbox:xs.length}}""")
+            if sync_state['accepted']>=1 and sync_state['pending']==0 and sync_state['outbox']==0:
                 break
             page.wait_for_timeout(100)
-        assert sync_state['accepted']>=1 and sync_state['pending']==0, sync_state
+        assert sync_state['accepted']>=1 and sync_state['pending']==0 and sync_state['outbox']==0, sync_state
         page.get_by_text("تمت المزامنة",exact=False).first.wait_for()
         mark("offline_checkin_synced_after_reconnect")
 
@@ -178,8 +178,9 @@ try:
         final_number=page.locator(".guest-number strong").inner_text().strip()
         assert final_number.startswith("G-") and final_number!=provisional
         page.locator("img.guest-qr").wait_for()
-        pending_guests_after=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('guest_outbox');return xs.filter(x=>x.status==='pending').length}""")
-        assert pending_guests_after==0
+        guest_storage=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('guest_outbox');const gs=await m.all('guests');return {pending:xs.filter(x=>x.status==='pending').length,outbox:xs.length,rawPhones:gs.filter(x=>typeof x.phone==='string'&&x.phone.length>0).length}}""")
+        assert guest_storage['pending']==0 and guest_storage['outbox']==0
+        assert guest_storage['rawPhones']==0
         mark("offline_guest_auto_reconciled_to_secure_qr")
 
         # Mobile guest registration view must not overflow.
