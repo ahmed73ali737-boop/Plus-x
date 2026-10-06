@@ -1,23 +1,54 @@
-# PulseX Windows 07 — Production Readiness
+# PulseX Windows 12 — Production Readiness
 
 ## Release Gate
-`python tools/production_gate.py` لا يمر إلا إذا كانت الإعدادات Production صحيحة **وكذلك** أعلام الأدلة التالية true بعد نجاح اختبارات فعلية:
-- `PX_NATIVE_POSTGRES_ACCEPTED`
-- `PX_LOAD_ACCEPTED`
-- `PX_SECURITY_ACCEPTED`
-- `PX_FIELD_OFFLINE_ACCEPTED`
+`tools/production_gate.py` يتطلب:
+- PostgreSQL URL.
+- HTTPS PUBLIC_ORIGIN.
+- SEED_DEMO=false.
+- WEB_WORKERS >= 2.
+- DB password غير placeholder.
+- `GUEST_ID_SECRET` مستقلًا 32+ وغير placeholder.
+- `BOOTSTRAP_ADMIN_EMAIL` حقيقيًا.
+- evidence flags: native PostgreSQL / load / security / field offline.
 
-Docker يشغل هذا Gate قبل التطبيق. إبقاء أي علم false يمنع اعتبار النشر Production.
+الأعلام acknowledgements بعد التوقيع؛ ليست اختبارات بحد ذاتها.
 
-## PASS محلي
-135 pytest، 31 HTTP acceptance، 28 UI bridge، 9 browser components، 13 security smoke، Python SDK 8، JS SDK 5، API contract، x10 synthetic load.
+## Startup sequence داخل Production image
+1. Production configuration gate.
+2. Checksum-tracked PostgreSQL migrations.
+3. One-time Platform/Admin bootstrap إذا كانت القاعدة فارغة.
+4. Application multi-worker start.
 
-## BLOCKED خارج البيئة
-Windows native؛ PostgreSQL native/RLS؛ HTTPS target; physical kiosks/5-day soak; remote concurrent load; DAST/Pentest; PostgreSQL PITR; field/business UAT signatures; distributed WebSocket/Redis.
+القاعدة الجزئية لا يعاد تهيئتها تلقائيًا؛ bootstrap يفشل ويتطلب مراجعة.
 
+## Automated gates
+- full pytest Linux/Windows.
+- real browser Linux/Windows.
+- Guest QR/offline focused gate.
+- IndexedDB.
+- native PostgreSQL + additive migrations + concurrent same-phone dedupe.
+- 1000 guest capacity smoke.
+- security bounded smoke.
+- Python/JS SDK.
+- API contract/OpenAPI.
+- production Docker build/import/migration assets.
 
-## Guest Identity / QR hardening
-- الإنتاج يتطلب `GUEST_ID_SECRET` مستقلًا بطول 32+ حرفًا عبر Release Gate.
-- رقم الزائر العام و`phone_hash` يستخدمان HMAC keyed digest؛ لا يتم اشتقاق QR العام من SHA مباشر للهاتف.
-- التسجيل من متصفح معزول تمامًا يحتفظ فقط بمعرف محلي مؤقت `P-...` حتى الوصول إلى خادم الفعالية/شبكة LAN؛ QR النهائي لا يصدر إلا من الخادم.
-- قاعدة البيانات تفرض unique على الهاتف/البصمة/رقم الزائر، واختبار PostgreSQL يتضمن تسجيل نفس الهاتف بالتوازي من عدة عملاء.
+## Guest privacy
+- HMAC-keyed server identity.
+- final public QR does not contain phone.
+- isolated offline ID random provisional P only.
+- gate manifest excludes phone.
+- completed guest/check-in outboxes are deleted after receipts.
+- raw phone removed from reconciled local guest record.
+
+## Still external before Production sign-off
+- physical camera/scanner UAT.
+- physical two/multi-device outage.
+- venue LAN/local edge deployment.
+- real HTTPS/domain.
+- 5-day soak.
+- independent DAST/Pentest.
+- production backup restore/PITR/retention.
+- business/field UAT signatures.
+
+راجع `GUEST_QR_360_COMPLETION_AR.md`.
