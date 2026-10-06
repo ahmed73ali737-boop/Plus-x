@@ -3,7 +3,9 @@ from pathlib import Path
 import json, os, socket, subprocess, sys, tempfile, time, urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/'sdk/python'))
+from app.core.build_info import BUILD_LABEL
 from pulsex_sdk import PulseXClient
 
 with tempfile.TemporaryDirectory(prefix='px-sdk-') as td:
@@ -19,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='px-sdk-') as td:
             except Exception: time.sleep(.1)
         accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'))
         sdk=PulseXClient(base)
-        assert sdk.health()['build']=='windows-08'
+        assert sdk.health()['build']==BUILD_LABEL
         assert sdk.public_site('agency-01')['slug']=='agency-01'
         assert sdk.guest_config('demo')['event_id']=='event-demo'
         guest=sdk.register_guest('demo','0777 606 060',name='SDK Guest')
