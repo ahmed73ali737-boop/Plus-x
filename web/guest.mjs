@@ -180,9 +180,13 @@ async function loadManifest(eventId,token){
   try{
     const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-manifest',{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});
     if(!r.ok)throw new Error('MANIFEST_FETCH_FAILED');
-    const data=await r.json();await put('guest_manifests',{id:eventId,data,cached_at:new Date().toISOString()});for(const guest of data.guests||[])await put('gate_presence',{id:gatePresenceKey(eventId,guest.guest_number),event_id:eventId,guest_number:guest.guest_number,state:guest.presence||'outside',updated_at:new Date().toISOString(),source:'manifest'});return data;
+    const data=await r.json(),cached_at=new Date().toISOString();
+    await put('guest_manifests',{id:eventId,data,cached_at});
+    for(const guest of data.guests||[])await put('gate_presence',{id:gatePresenceKey(eventId,guest.guest_number),event_id:eventId,guest_number:guest.guest_number,state:guest.presence||'outside',last_direction:guest.last_direction||'',last_checkpoint:guest.last_checkpoint||'',updated_at:guest.presence_updated_at||cached_at,source:'manifest'});
+    return {...data,cached_at,offline:false};
   }catch{
-    return (await get('guest_manifests',eventId))?.data||{event_id:eventId,guests:[]};
+    const cached=await get('guest_manifests',eventId);
+    return cached?{...cached.data,cached_at:cached.cached_at,offline:true}:{event_id:eventId,guests:[],access_control:{checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}],anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60},cached_at:'',offline:true};
   }
 }
 let checkinSyncing=null;
@@ -199,16 +203,17 @@ async function syncCheckins(eventId,token){
       const out=await r.json();let synced=0,rejected=0;
       for(const rc of out.receipts||[]){
         const item=items.find(x=>x.payload.scan_id===rc.scan_id);if(!item)continue;
+        const terminal=['accepted','duplicate','already_inside','already_outside'];
         const priorReceipt=await get('checkin_receipts',item.id);
-        if(priorReceipt?.status&&['accepted','duplicate'].includes(priorReceipt.status)){await del('checkin_outbox',item.id);continue;}
-        const accepted=['accepted','duplicate'].includes(rc.status);
+        if(priorReceipt?.status&&terminal.includes(priorReceipt.status)){await del('checkin_outbox',item.id);continue;}
+        const accepted=terminal.includes(rc.status);
         if(accepted)synced++;else rejected++;
         await put('checkin_receipts',{id:item.id,...rc,at:new Date().toISOString()});
-        if(rc.presence)await put('gate_presence',{id:gatePresenceKey(eventId,item.payload.guest_number),event_id:eventId,guest_number:item.payload.guest_number,state:rc.presence,updated_at:new Date().toISOString(),source:'server'});
+        if(rc.presence)await put('gate_presence',{id:gatePresenceKey(eventId,item.payload.guest_number),event_id:eventId,guest_number:item.payload.guest_number,state:rc.presence,last_direction:rc.direction||item.payload.direction||'',last_checkpoint:rc.checkpoint||item.payload.checkpoint||'',updated_at:new Date().toISOString(),source:'server'});
         if(accepted)await del('checkin_outbox',item.id);
-        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||rc.status});
+        else await put('checkin_outbox',{...item,status:'rejected',error:rc.error||rc.reason||rc.status});
       }
-      return{synced,rejected,pending:(await pending()).length};
+      return{synced,rejected,pending:(await pending()).length,receipts:out.receipts||[]};
     }catch(e){return{synced:0,pending:(await pending()).length,error:String(e?.message||e)};}
   })();
   try{return await checkinSyncing;}finally{checkinSyncing=null;}
