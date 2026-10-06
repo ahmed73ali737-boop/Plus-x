@@ -147,6 +147,20 @@ def _set_presence(conn,event_id: str,guest_id: str,state: str,scan_id: str,direc
     )
 
 
+def _duplicate_scan_result(conn,event_id: str,guest_number: str,scan_id: str,mode: str,checkpoint: str,existing) -> dict:
+    existing=dict(existing)
+    if existing["guest_number"]!=guest_number.upper() or existing["direction"]!=mode or existing["checkpoint"]!=checkpoint:
+        fail("SCAN_ID_CONFLICT",409)
+    replay_guest=event_guest_by_number(conn,event_id,guest_number)
+    if not replay_guest:
+        fail("GUEST_NOT_REGISTERED",404)
+    current=guest_presence_state(conn,event_id,replay_guest["id"])
+    return {
+        "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
+        "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":staff_guest_view(replay_guest),
+    }
+
+
 def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: str|None,source: str) -> dict:
     event=_event(conn,event_or_id)
     event_id=event["id"]
@@ -161,14 +175,7 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         scan_id=text(body.get("scan_id") or new_id(),64,True)
         existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
         if existing:
-            replay_guest=event_guest_by_number(conn,event_id,guest_number)
-            if not replay_guest:
-                fail("GUEST_NOT_REGISTERED",404)
-            current=guest_presence_state(conn,event_id,replay_guest["id"])
-            return {
-                "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
-                "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":staff_guest_view(replay_guest),
-            }
+            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,existing)
 
     validated=validate_guest(conn,event,guest_number,checkpoint)
     guest=validated["guest"]
@@ -207,6 +214,9 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
             )
         )
         if transition.rowcount!=1:
+            replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+            if replay:
+                return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay)
             current=conn.execute(
                 select(guest_presence).where(
                     guest_presence.c.event_id==event_id,
@@ -225,11 +235,18 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
     else:
         _set_presence(conn,event_id,guest["id"],next_state,scan_id,mode,checkpoint)
 
-    conn.execute(insert(guest_checkins).values(
-        id=scan_id,event_id=event_id,guest_id=guest["id"],guest_number=guest["guest_number"],
-        scanner_id=scanner_id,source=source,direction=mode,checkpoint=checkpoint,
-        client_time=text(body.get("client_time"),64),scanned_at=now(),
-    ))
+    try:
+        with conn.begin_nested():
+            conn.execute(insert(guest_checkins).values(
+                id=scan_id,event_id=event_id,guest_id=guest["id"],guest_number=guest["guest_number"],
+                scanner_id=scanner_id,source=source,direction=mode,checkpoint=checkpoint,
+                client_time=text(body.get("client_time"),64),scanned_at=now(),
+            ))
+    except IntegrityError:
+        replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+        if replay:
+            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay)
+        raise
     return {
         "scan_id":scan_id,"status":"accepted","mode":mode,"direction":mode,"checkpoint":checkpoint,
         "presence":next_state,"guest":guest,
