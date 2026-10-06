@@ -16,6 +16,9 @@
     "get",
     "post"
   ],
+  "/api/admin/events/{event_id}/guests/export": [
+    "get"
+  ],
   "/api/admin/events/{event_id}/participations": [
     "get",
     "post"
