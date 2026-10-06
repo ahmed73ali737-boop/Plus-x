@@ -236,6 +236,8 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             device=authenticate_device(c,raw)
             if device["site_id"]!=event_id:
                 fail("DEVICE_EVENT_SCOPE",403)
+            if device["device_type"]!="operator":
+                fail("DEVICE_ROLE_FORBIDDEN",403)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
@@ -248,6 +250,8 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             device=authenticate_device(c,raw)
             if device["site_id"]!=event_id:
                 fail("DEVICE_EVENT_SCOPE",403)
+            if device["device_type"]!="operator":
+                fail("DEVICE_ROLE_FORBIDDEN",403)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
@@ -279,6 +283,8 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             device=authenticate_device(c,raw)
             if device["site_id"]!=event_id:
                 fail("DEVICE_EVENT_SCOPE",403)
+            if device["device_type"]!="operator":
+                fail("DEVICE_ROLE_FORBIDDEN",403)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
