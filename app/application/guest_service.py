@@ -228,11 +228,11 @@ def event_guest_by_number(conn, event_id: str, guest_number: str):
 
 
 def public_guest_view(row: dict) -> dict:
+    # Possession of a pass URL is enough to render/scan the credential, but it
+    # should not expose attendee classification, profile, phone, or timestamps.
     return {
         "guest_number":row["guest_number"],
         "status":row.get("event_guest_status") or row.get("status") or "registered",
-        "guest_type":row.get("guest_type") or "visitor",
-        "registered_at":row.get("registered_at"),
     }
 
 
