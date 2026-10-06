@@ -122,8 +122,12 @@ try:
         page.get_by_role("heading",name="الزوار و QR",exact=True).wait_for()
         page.get_by_text(guest_number,exact=True).first.wait_for()
         page.get_by_text("+967777500600",exact=True).wait_for()
+        page.get_by_role("heading",name="سياسة الوصول والبوابات",exact=True).wait_for()
+        page.get_by_label("منع دخول/خروج متكرر دون انتقال حالة فعلي",exact=True).wait_for()
+        page.get_by_label("السماح بإعادة الدخول بعد تسجيل خروج صحيح",exact=True).wait_for()
+        page.get_by_text("البوابة الرئيسية",exact=True).first.wait_for()
         page.screenshot(path=str(ROOT/"qa/guest-admin-directory.png"),full_page=True)
-        mark("organizer_guest_directory")
+        mark("organizer_guest_directory_and_access_policy")
 
         page.get_by_role("button",name="الأجهزة والطرفيات",exact=True).click()
         page.get_by_label("اسم الجهاز",exact=True).fill("Gate QA")
