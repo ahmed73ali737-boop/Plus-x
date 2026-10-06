@@ -29,7 +29,7 @@ def test_production_gate_rejects_insecure_config():
     assert json.loads(r.stdout)['status']=='fail'
 
 def test_production_gate_accepts_required_shape():
-    env={**os.environ,'DATABASE_URL':'postgresql+psycopg://pulsex:0123456789abcdef@postgres:5432/pulsex','PUBLIC_ORIGIN':'https://pulsex.example.org','SEED_DEMO':'false','WEB_WORKERS':'4','PX_NATIVE_POSTGRES_ACCEPTED':'true','PX_LOAD_ACCEPTED':'true','PX_SECURITY_ACCEPTED':'true','PX_FIELD_OFFLINE_ACCEPTED':'true'}
+    env={**os.environ,'DATABASE_URL':'postgresql+psycopg://pulsex:0123456789abcdef@postgres:5432/pulsex','PUBLIC_ORIGIN':'https://pulsex.example.org','SEED_DEMO':'false','WEB_WORKERS':'4','GUEST_ID_SECRET':'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef','BOOTSTRAP_ADMIN_EMAIL':'admin@pulsex.org','PX_NATIVE_POSTGRES_ACCEPTED':'true','PX_LOAD_ACCEPTED':'true','PX_SECURITY_ACCEPTED':'true','PX_FIELD_OFFLINE_ACCEPTED':'true'}
     r=subprocess.run([sys.executable,str(ROOT/'tools/production_gate.py')],env=env,capture_output=True,text=True)
     assert r.returncode==0
     assert json.loads(r.stdout)['status']=='pass'
