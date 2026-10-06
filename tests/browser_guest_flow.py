@@ -126,6 +126,9 @@ try:
         # physical camera hardware is intentionally reported separately.
         page.goto(URL+"/e/demo/scan")
         page.get_by_role("heading",name="مسح بطاقة الزائر",exact=True).wait_for()
+        page.get_by_role("heading",name="جاهزية البوابة",exact=True).wait_for()
+        page.get_by_text("سجل الزوار",exact=True).wait_for()
+        mark("gate_preflight_visible")
         page.get_by_label("امسح QR أو أدخل رقم الزائر",exact=True).fill(URL+"/e/demo/guest/"+guest_number)
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
         page.get_by_text("زائر تجربة",exact=True).wait_for()
