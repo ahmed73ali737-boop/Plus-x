@@ -7,6 +7,7 @@ COPY web ./web
 COPY templates ./templates
 COPY run.py ./run.py
 COPY tools ./tools
+COPY ops ./ops
 RUN mkdir -p /app/data/media && chown -R pulsex:pulsex /app
 USER pulsex
 ENV HOST=0.0.0.0 PORT=4310
