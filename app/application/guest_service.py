@@ -9,6 +9,7 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.application.audit_service import new_id
+from app.core.security import digest, new_session_token
 from app.db import event_guests, guests
 from app.domain import boolean, fail, now, text
 
@@ -143,18 +144,23 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
         )
     ).mappings().first()
     event_registration_created=False
+    issued_pass_token=None
+    supplied_pass_token=text(body.get("pass_token"),200)
+    verified=False
     requested_type=text(body.get("guest_type") or "visitor",40).lower()
     configured_types={x.get("key") for x in (event.get("draft") or {}).get("access_control",{}).get("guest_types",[]) if isinstance(x,dict)}
     guest_type=requested_type if allow_guest_type else "visitor"
     if configured_types and guest_type not in configured_types:
         fail("GUEST_TYPE_INVALID")
     if not reg:
+        issued_pass_token=new_session_token()
         candidate_reg={
             "id":new_id(),
             "event_id":event["id"],
             "guest_id":guest["id"],
             "status":"registered",
             "guest_type":guest_type,
+            "pass_token_hash":digest(issued_pass_token),
             "metadata_json":body.get("metadata") if isinstance(body.get("metadata"),dict) else {},
             "registered_at":now(),
             "updated_at":now(),
@@ -164,7 +170,9 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
                 conn.execute(insert(event_guests).values(**candidate_reg))
             reg=candidate_reg
             event_registration_created=True
+            verified=True
         except IntegrityError:
+            issued_pass_token=None
             reg=conn.execute(
                 select(event_guests).where(
                     event_guests.c.event_id==event["id"],
@@ -174,7 +182,15 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
             if not reg:
                 raise
             reg=dict(reg)
-    elif allow_guest_type and guest_type!=reg.get("guest_type"):
+    if reg and not event_registration_created:
+        token_hash=reg.get("pass_token_hash")
+        verified=bool(allow_profile_update or (token_hash and supplied_pass_token and hmac.compare_digest(token_hash,digest(supplied_pass_token))))
+        if allow_profile_update and not token_hash:
+            issued_pass_token=new_session_token()
+            conn.execute(update(event_guests).where(event_guests.c.id==reg["id"]).values(pass_token_hash=digest(issued_pass_token),updated_at=now()))
+            reg={**dict(reg),"pass_token_hash":digest(issued_pass_token),"updated_at":now()}
+            verified=True
+    if allow_guest_type and guest_type!=reg.get("guest_type"):
         conn.execute(update(event_guests).where(event_guests.c.id==reg["id"]).values(guest_type=guest_type,updated_at=now()))
         reg={**dict(reg),"guest_type":guest_type,"updated_at":now()}
     return {
@@ -188,6 +204,8 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
         "guest_type":reg.get("guest_type") or "visitor",
         "created":created,
         "event_registration_created":event_registration_created,
+        "verified":verified,
+        "pass_token":issued_pass_token,
     }
 
 
