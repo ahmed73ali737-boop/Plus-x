@@ -222,6 +222,7 @@ export async function scanPage(slug){
   const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
   const direction=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
+  const laneType=selectField('مسار الزوار',[['all','كل الأنواع'],['visitor','زائر'],['vip','VIP'],['speaker','متحدث'],['staff','طاقم'],['media','إعلام'],['exhibitor','عارض']],'all');
   const checkpoint=field('نقطة المسح','text','main',{maxlength:80,placeholder:'main / Gate A / VIP'});
   const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
   async function refreshSync(notify=false){
@@ -235,6 +236,8 @@ export async function scanPage(slug){
     let g=(manifest.guests||[]).find(x=>x.guest_number===number);
     if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
     if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
+    const lane=laneType.input.value;
+    if(lane!=='all'&&(g.guest_type||'visitor')!==lane){result.replaceChildren(h('h3',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},'هذه البطاقة لا تطابق مسار الزوار المحدد لهذه البوابة.'));return;}
     const mode=direction.input.value;
     if(mode==='validate'){
       result.replaceChildren(h('span',{class:'tag status-current'},'صالح للفعالية'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+((await get('gate_presence',gatePresenceKey(page.id,g.guest_number)))?.state||g.presence||'outside')));
@@ -255,7 +258,7 @@ export async function scanPage(slug){
     },'btn');
     result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),check);
   }
-  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
+  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,laneType.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
