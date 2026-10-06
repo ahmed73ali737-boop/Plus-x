@@ -122,6 +122,7 @@ event_guests=Table('px_event_guests',metadata,
     Column('guest_id',String(64),ForeignKey('px_guests.id'),nullable=False),
     Column('status',String(20),nullable=False,default='registered'),
     Column('guest_type',String(40),nullable=False,default='visitor'),
+    Column('pass_number',String(32),unique=True),
     Column('pass_token_hash',String(64)),
     Column('metadata_json',JSON,nullable=False),
     Column('registered_at',String(64),nullable=False),
@@ -129,6 +130,7 @@ event_guests=Table('px_event_guests',metadata,
     UniqueConstraint('event_id','guest_id',name='uq_px_event_guest'))
 Index('px_event_guests_event_status',event_guests.c.event_id,event_guests.c.status)
 Index('px_event_guests_guest',event_guests.c.guest_id)
+Index('px_event_guests_pass_number',event_guests.c.pass_number,unique=True)
 
 guest_checkins=Table('px_guest_checkins',metadata,
     Column('id',String(64),primary_key=True),
@@ -195,3 +197,7 @@ def ensure_compat_schema(engine):
         if 'pass_token_hash' not in cols:
             with engine.begin() as c:
                 c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_token_hash VARCHAR(64)'))
+        if 'pass_number' not in cols:
+            with engine.begin() as c:
+                c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_number VARCHAR(32)'))
+                c.execute(sa_text('CREATE UNIQUE INDEX IF NOT EXISTS px_event_guests_pass_number ON px_event_guests(pass_number)'))
