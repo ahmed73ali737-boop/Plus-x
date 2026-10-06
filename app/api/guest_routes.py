@@ -241,11 +241,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
     def device_guest_manifest(event_id: str, request: Request):
         raw=request.headers.get("X-PulseX-Device-Token","")
         with engine.connect() as c:
-            device=authenticate_device(c,raw)
-            if device["site_id"]!=event_id:
-                fail("DEVICE_EVENT_SCOPE",403)
-            if device["device_type"]!="operator":
-                fail("DEVICE_ROLE_FORBIDDEN",403)
+            device=gate_device(c,raw,event_id)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
@@ -255,11 +251,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
     def device_validate_guest(event_id: str, guest_number: str, request: Request):
         raw=request.headers.get("X-PulseX-Device-Token","")
         with engine.begin() as c:
-            device=authenticate_device(c,raw)
-            if device["site_id"]!=event_id:
-                fail("DEVICE_EVENT_SCOPE",403)
-            if device["device_type"]!="operator":
-                fail("DEVICE_ROLE_FORBIDDEN",403)
+            device=gate_device(c,raw,event_id)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
@@ -288,11 +280,7 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             fail("CHECKIN_BATCH_1_TO_100")
         receipts=[]
         with engine.begin() as c:
-            device=authenticate_device(c,raw)
-            if device["site_id"]!=event_id:
-                fail("DEVICE_EVENT_SCOPE",403)
-            if device["device_type"]!="operator":
-                fail("DEVICE_ROLE_FORBIDDEN",403)
+            device=gate_device(c,raw,event_id)
             event=site_row(c,event_id)
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
