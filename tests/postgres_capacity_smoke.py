@@ -9,7 +9,7 @@ url=os.environ.get('PX_POSTGRES_TEST_URL','')
 if not url.startswith('postgresql+psycopg://'): raise SystemExit('POSTGRES_TEST_URL_REQUIRED')
 app=create_app(url,origin='http://testserver',seed_demo=True)
 with TestClient(app) as c:
-    site=c.get('/api/public/site/agency-09')
+    site=c.get('/api/public/site/easy')
     assert site.status_code==200
     version=site.json()['version']
 def pct(xs,p):
@@ -17,7 +17,7 @@ def pct(xs,p):
 def read_one(_):
     t=time.perf_counter()
     try:
-        with TestClient(app) as c: ok=c.get('/api/public/site/agency-09').status_code==200
+        with TestClient(app) as c: ok=c.get('/api/public/site/easy').status_code==200
     except Exception: ok=False
     return time.perf_counter()-t,ok
 read_lat=[]; read_errors=0; t0=time.perf_counter()
