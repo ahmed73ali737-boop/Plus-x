@@ -1,6 +1,6 @@
-# قبول PostgreSQL الأصلي
+# قبول PostgreSQL الأصلي — Windows 12
 
-هذا الاختبار **إتلافي** ويعمل فقط على قاعدة اختبار مخصصة. لا تستخدم قاعدة الإنتاج.
+الاختبار إتلافي ويعمل فقط على قاعدة اختبار مخصصة:
 
 ```bash
 pip install -r requirements-postgres.txt
@@ -9,4 +9,13 @@ export PX_ALLOW_POSTGRES_TEST_RESET=YES
 python tests/postgres_native_acceptance.py
 ```
 
-ينشئ الجداول من metadata، يختبر الاتصال، جميع الجداول، login، جهاز/heartbeat، submission وidempotency ووجود Foreign Keys. لا يدّعي اختبار RLS لأن Windows 07 ما زال يعتمد عزل التطبيق؛ RLS يبقى Release Gate منفصلًا إذا تقرر فرضه في قاعدة البيانات.
+الاختبار يبدأ من schema سابقة عبر `ops/001_full_schema_postgres.sql` ثم:
+- يشغل `tools/migrate_postgres.py`.
+- يطبق 002/003/004 ويسجل checksum في `px_schema_migrations`.
+- يعيد التشغيل ويتحقق من idempotent skip.
+- يتحقق من جميع metadata tables وForeign Keys.
+- login/device/heartbeat/submission/idempotency.
+- يسجل نفس الهاتف 16 مرة بالتوازي عبر عدة عملاء وصيغ محلية/دولية.
+- يجب أن تكون النتيجة Guest row واحد وEvent registration واحد وGuest number واحد.
+
+لا يدعي هذا الاختبار PostgreSQL RLS؛ العزل الحالي Application-level ومغطى باختبارات scope. إذا تقرر فرض RLS فهو Gate إضافي مستقل.
