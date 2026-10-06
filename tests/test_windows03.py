@@ -55,7 +55,7 @@ def test_new_assets_and_sw_cache_are_present(isolated):
         assert c.get('/assets/'+path).status_code==200
         assert '/assets/'+path in c.get('/sw.js').text
     sw=c.get('/sw.js').text
-    cache=re.search(r"const CACHE='px-shell-v(\\d+)'",sw)
+    cache=re.search(r"const CACHE='px-shell-v(\d+)'",sw)
     assert cache and int(cache.group(1)) >= 15
 
 def test_start_scripts_quote_paths_and_no_privileged_bypass():
