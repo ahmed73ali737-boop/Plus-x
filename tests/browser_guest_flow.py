@@ -99,9 +99,9 @@ try:
 
         # Distinct live brand experiences, not one visual template recolored.
         for slug,title,selector in [
-            ("agency-08","ثروات",".tharawat-live"),
-            ("agency-09","Easy",".easy-live"),
-            ("agency-10","RTS",".rts-live"),
+            ("tharawat","ثروات",".expo-tharawat-stage"),
+            ("easy","Easy",".expo-easy-stage"),
+            ("rts","RTS",".expo-rts-stage"),
         ]:
             page.goto(URL+"/e/demo/p/"+slug)
             page.get_by_role("heading",name=title,exact=True,level=1).wait_for()
@@ -109,7 +109,7 @@ try:
             assert title in page.locator(".site-topbar .brand").inner_text()
             assert "Powered by PulseX" in page.locator(".platform-attribution").inner_text()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
-            mark("brand_live_"+slug)
+            mark("brand_exhibition_"+slug)
         page.screenshot(path=str(ROOT/"qa/rts-live.png"),full_page=False)
 
         # Organizer sees the guest directory and can provision/pair an event scanner.
