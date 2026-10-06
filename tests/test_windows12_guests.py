@@ -2,6 +2,7 @@ import csv
 import hashlib
 import io
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -307,6 +308,50 @@ def test_checkpoint_access_policy_manifest_and_reentry_rules(tmp_path):
         'scan_id':str(uuid.uuid4()),'guest_number':visitor['guest_number'],'mode':'entry','checkpoint':'main'
     }]}).json()['receipts'][0]
     assert reentry['status']=='rejected' and reentry['error']=='REENTRY_NOT_ALLOWED'
+
+
+def test_offline_scan_uses_scan_time_and_detects_policy_change(tmp_path):
+    app,c=boot(tmp_path)
+    guest_a=register(c,'777525252')
+    guest_b=register(c,'777535353')
+    login(c,app)
+    now_utc=datetime.now(timezone.utc)
+    start=(now_utc-timedelta(hours=2)).isoformat()
+    end=(now_utc-timedelta(hours=1)).isoformat()
+    set_access_policy(c,{
+        'anti_passback':True,'allow_reentry':True,'manifest_max_age_minutes':7200,
+        'guest_types':[{'key':'visitor','label':'زائر'}],
+        'checkpoints':[{'key':'main','label':'الرئيسية','enabled':True,'allowed_guest_types':[],'start':start,'end':end}],
+    })
+    device=c.post('/api/admin/sites/event-demo/devices',json={'name':'Offline Policy Gate','device_type':'operator'})
+    token=device.json()['device_token'];headers={'X-PulseX-Device-Token':token}
+    c.headers.pop('X-CSRF',None);c.headers.pop('Origin',None)
+    manifest=c.get('/api/device/events/event-demo/guest-manifest',headers=headers).json()
+    policy_version=manifest['access_policy_version']
+    scan_time=(now_utc-timedelta(minutes=90)).isoformat()
+
+    offline=c.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':str(uuid.uuid4()),'guest_number':guest_a['guest_number'],'direction':'entry','checkpoint':'main',
+        'client_time':scan_time,'offline_scan':True,'access_policy_version':policy_version,
+    }]}).json()['receipts'][0]
+    assert offline['status']=='accepted'
+
+    online_now=c.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':str(uuid.uuid4()),'guest_number':guest_b['guest_number'],'direction':'entry','checkpoint':'main',
+        'client_time':now_utc.isoformat(),
+    }]}).json()['receipts'][0]
+    assert online_now['status']=='rejected' and online_now['error']=='CHECKPOINT_WINDOW_CLOSED'
+
+    admin=TestClient(app);login(admin,app)
+    site=admin.get('/api/admin/sites/event-demo').json();cfg=site['draft']
+    cfg['access_control']['checkpoints'][0]['label']='Main Gate Updated'
+    assert admin.put('/api/admin/sites/event-demo',json={'draft_rev':site['draft_rev'],'config':cfg}).status_code==200
+
+    changed=c.post('/api/device/events/event-demo/guest-checkins',headers=headers,json={'items':[{
+        'scan_id':str(uuid.uuid4()),'guest_number':guest_b['guest_number'],'direction':'entry','checkpoint':'main',
+        'client_time':scan_time,'offline_scan':True,'access_policy_version':policy_version,
+    }]}).json()['receipts'][0]
+    assert changed['status']=='rejected' and changed['error']=='ACCESS_POLICY_CHANGED'
 
 
 def test_access_policy_guest_type_and_replay_survive_policy_change(tmp_path):
