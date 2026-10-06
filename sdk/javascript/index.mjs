@@ -67,6 +67,7 @@ export class PulseXClient {
   guestCheckins(eventId) { return this.request('GET', `/api/admin/events/${encodeURIComponent(eventId)}/guest-checkins`); }
   checkinGuest(eventId, payload) { return this.request('POST', `/api/admin/events/${encodeURIComponent(eventId)}/guest-checkins`, payload); }
   deviceGuestManifest(eventId, deviceToken) { return this.request('GET', `/api/device/events/${encodeURIComponent(eventId)}/guest-manifest`, undefined, { 'X-PulseX-Device-Token': deviceToken }); }
+  deviceValidateGuest(eventId, guestNumber, deviceToken) { return this.request('GET', `/api/device/events/${encodeURIComponent(eventId)}/guests/${encodeURIComponent(guestNumber)}/validate`, undefined, { 'X-PulseX-Device-Token': deviceToken }); }
   deviceGuestCheckins(eventId, deviceToken, items) { return this.request('POST', `/api/device/events/${encodeURIComponent(eventId)}/guest-checkins`, { items }, { 'X-PulseX-Device-Token': deviceToken }); }
 }
 
