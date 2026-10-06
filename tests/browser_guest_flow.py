@@ -84,6 +84,19 @@ try:
         assert page.locator(".guest-number strong").inner_text().strip()==guest_number
         mark("same_phone_returns_same_guest_number")
 
+        # A different device that only knows the phone number must not receive the existing QR.
+        stranger_context=browser.new_context(viewport={"width":900,"height":760},locale="ar-YE")
+        stranger=stranger_context.new_page()
+        stranger.goto(URL+"/e/demo/guest")
+        stranger.get_by_label("رقم الهاتف",exact=True).fill("+967 777 500 600")
+        stranger.get_by_text("أوافق على استخدام رقم الهاتف",exact=False).click()
+        stranger.get_by_role("button",name="إنشاء / فتح بطاقة الزائر",exact=True).click()
+        stranger.get_by_role("heading",name="البطاقة موجودة بالفعل",exact=True).wait_for()
+        assert stranger.locator("img.guest-qr").count()==0
+        assert guest_number not in stranger.locator("body").inner_text()
+        stranger_context.close()
+        mark("new_device_phone_only_cannot_recover_existing_qr")
+
         # Distinct live brand experiences, not one visual template recolored.
         for slug,title,selector in [
             ("agency-08","ثروات",".tharawat-live"),
