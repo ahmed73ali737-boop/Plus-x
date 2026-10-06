@@ -35,7 +35,7 @@ def access_config(event: dict) -> dict:
         "manifest_max_age_minutes":int(raw.get("manifest_max_age_minutes") or 60),
         "guest_types":raw.get("guest_types") if isinstance(raw.get("guest_types"),list) else [
             {"key":"visitor","label":"زائر"},{"key":"vip","label":"VIP"},{"key":"staff","label":"طاقم"},
-            {"key":"speaker","label":"متحدث"},{"key":"exhibitor","label":"عارض"},
+            {"key":"speaker","label":"متحدث"},{"key":"media","label":"إعلام"},{"key":"exhibitor","label":"عارض"},
         ],
         "checkpoints":raw.get("checkpoints") if isinstance(raw.get("checkpoints"),list) else [
             {"key":"main","label":"البوابة الرئيسية","enabled":True,"allowed_guest_types":[],"start":"","end":""}
