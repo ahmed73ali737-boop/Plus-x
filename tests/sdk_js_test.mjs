@@ -10,6 +10,7 @@ const fakeFetch=async (url,opts={})=>{
   if(url.endsWith('/api/public/events/demo/guests/register')) return {ok:true,status:200,json:async()=>({guest_number:'G-1111-2222-3333-4444',created:true})};
   if(url.endsWith('/api/public/events/demo/guests/G-1111-2222-3333-4444')) return {ok:true,status:200,json:async()=>({guest_number:'G-1111-2222-3333-4444',status:'registered'})};
   if(url.endsWith('/api/device/events/event-demo/guest-manifest')) return {ok:true,status:200,json:async()=>({guests:[{guest_number:'G-1111-2222-3333-4444'}]})};
+  if(url.endsWith('/api/device/events/event-demo/guests/G-1111-2222-3333-4444/validate')) return {ok:true,status:200,json:async()=>({status:'valid',presence:'outside',guest:{guest_number:'G-1111-2222-3333-4444'}})};
   return {ok:true,status:200,json:async()=>({status:'ok'})};
 };
 const c=new PulseXClient({baseUrl:'http://localhost:4310',fetchImpl:fakeFetch});
@@ -24,6 +25,8 @@ assert.equal(guest.guest_number,'G-1111-2222-3333-4444');
 assert.equal((await c.publicGuest('demo',guest.guest_number)).status,'registered');
 const manifest=await c.deviceGuestManifest('event-demo','device-secret-token');
 assert.equal(manifest.guests.length,1);
+const validated=await c.deviceValidateGuest('event-demo','G-1111-2222-3333-4444','device-secret-token');
+assert.equal(validated.status,'valid');
 const manifestCall=calls.find(x=>x.url.endsWith('/api/device/events/event-demo/guest-manifest'));
 assert.equal(manifestCall.opts.headers['X-PulseX-Device-Token'],'device-secret-token');
-console.log(JSON.stringify({status:'passed',checks:9}));
+console.log(JSON.stringify({status:'passed',checks:10}));
