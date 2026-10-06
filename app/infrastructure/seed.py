@@ -101,7 +101,8 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                     {'kind':'service','code':'service-9','title':'Humanitarian & Donations Platforms','body':'منصات لإدارة المبادرات الإنسانية والتبرعات والتحصيل والمتابعة والتقارير ضمن ضوابط وصلاحيات قابلة للتخصيص.','order':9},
                     {'kind':'service','code':'service-10','title':'Exchange & Financial Products','body':'حلول للصرافة والمنتجات المالية والتكاملات المطلوبة لتقديم خدمات مترابطة وقابلة للتوسع.','order':10},
                 ])
-            seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', sid, cfg))
+            public_slug={8:'tharawat',9:'easy',10:'rts'}.get(i,sid)
+            seed_sites.append((sid, 'event-demo', 'event-demo', 'agency', public_slug, cfg))
 
         for sid, parent, event_id, kind, slug, cfg in seed_sites:
             cfg = normalize_config(cfg)
