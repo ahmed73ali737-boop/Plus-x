@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS px_event_guests (
     guest_id VARCHAR(64) NOT NULL REFERENCES px_guests(id),
     status VARCHAR(20) NOT NULL DEFAULT 'registered',
     guest_type VARCHAR(40) NOT NULL DEFAULT 'visitor',
+    pass_token_hash VARCHAR(64),
     metadata_json JSON NOT NULL,
     registered_at VARCHAR(64) NOT NULL,
     updated_at VARCHAR(64) NOT NULL,
