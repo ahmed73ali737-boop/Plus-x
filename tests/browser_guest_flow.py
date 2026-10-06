@@ -135,7 +135,7 @@ try:
         # Offline scan/check-in from the already prepared local manifest.
         context.set_offline(True)
         page.get_by_role("button",name="تسجيل دخول",exact=True).click()
-        page.get_by_text("تم الحفظ محليًا",exact=False).wait_for()
+        page.get_by_text("تم حفظ الدخول محليًا",exact=False).wait_for()
         pending=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return xs.filter(x=>x.status==='pending').length}""")
         assert pending>=1
         mark("offline_checkin_queued")
