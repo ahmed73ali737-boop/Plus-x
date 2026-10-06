@@ -31,7 +31,7 @@
 | Offline guest | provisional local guest → server reconciliation | guest browser journey | Verified on prior head; two-device field open |
 | Offline check-in | local manifest/outbox → reconnect sync | IndexedDB/guest journey | Verified on prior head; multi-device outage open |
 | First render resilience | IndexedDB cache must not block network render | stalled IndexedDB regression | Implemented, CI pending |
-| Service Worker/PWA | shell + brand assets cached | `sw.js` v17 + offline component | Implemented, CI pending |
+| Service Worker/PWA | shell + brand assets cached | `sw.js` v18 + offline component | Implemented, CI pending |
 | Admin | scoped login/dashboard/content/questions/import/publish/results | browser smoke | Verified on prior head; re-run required |
 | Organizer | guest directory/access policy/devices | guest browser | Verified on prior head; re-run required |
 | Import | Excel/CSV preview + commit | browser/API tests | Verified on prior head; re-run required |
