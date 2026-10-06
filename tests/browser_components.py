@@ -37,13 +37,13 @@ public="const Public=(()=>{const{h,root,api,field,selectField,check,button,modal
 admin="const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error('Read-only')};"+code('admin.mjs')+";return{adminPage};})();window.PXAdmin=Admin;"
 checks=[];errors=[]
 with sync_playwright() as p:
-    browser=p.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox'])
+    browser=p.chromium.launch(args=['--no-sandbox'])
     page=browser.new_page(viewport={'width':1440,'height':1000});page.on('pageerror',lambda e:errors.append(str(e)))
     def setup(modules):
         page.goto('about:blank')
         page.set_content('<html lang="ar" dir="rtl"><body><div id="app"></div><div id="toasts"></div></body></html>')
-        page.add_style_tag(content=(ROOT/'web/style.css').read_text())
-        page.add_style_tag(content=(ROOT/'web/design.css').read_text())
+        page.add_style_tag(content=(ROOT/'web/style.css').read_text(encoding='utf-8'))
+        page.add_style_tag(content=(ROOT/'web/design.css').read_text(encoding='utf-8'))
         page.evaluate('''arg=>{window._routes=arg.routes;window._qr=arg.qr;window.crypto.randomUUID=()=>"component-"+Math.random().toString(36).slice(2);for(const name of ['localStorage','sessionStorage']){const values={};Object.defineProperty(window,name,{configurable:true,value:{getItem:k=>values[k]||null,setItem:(k,v)=>{values[k]=v},removeItem:k=>delete values[k]}});}window.fetch=async(url,options)=>{if(options?.method&&options.method!=='GET')throw Error('Read-only component harness forbids writes');if(!(url in window._routes))throw Error('Missing read fixture: '+url);return{ok:true,json:async()=>structuredClone(window._routes[url])}};}''',{'routes':routes,'qr':'data:image/png;base64,'+qr})
         page.add_script_tag(content='(async()=>{'+common+icons+catalog+questions+modules+'})()')
     setup(public)
@@ -59,4 +59,4 @@ with sync_playwright() as p:
     browser.close()
 assert not errors,errors
 report={'scope':'read-only browser DOM components; in-memory fixtures','network_used':False,'not_e2e':True,'not_offline_storage_test':True,'passed':len(checks),'checks':checks,'page_errors':errors}
-(ROOT/'qa/browser-components.json').write_text(json.dumps(report,ensure_ascii=False,indent=2));print(json.dumps(report))
+(ROOT/'qa/browser-components.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report))
