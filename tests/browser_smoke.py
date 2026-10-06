@@ -12,6 +12,10 @@ import urllib.request
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT = Path(__file__).resolve().parents[1]
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 TEMP = Path(tempfile.mkdtemp(prefix="pulsex-browser-"))
 
 with socket.socket() as port_socket:
@@ -64,6 +68,30 @@ try:
         except PlaywrightTimeoutError:
             pass
 
+    def wait_semantic_heading(target, selector, expected):
+        heading = target.locator(selector).first
+        try:
+            heading.wait_for(state="visible", timeout=30000)
+        except PlaywrightTimeoutError:
+            diagnostic = {
+                "url": target.url,
+                "title": target.title(),
+                "selector": selector,
+                "expected": expected,
+                "body_text": target.locator("body").inner_text()[:3000],
+                "page_errors": list(errors),
+            }
+            (ROOT / "qa/browser-platform-diagnostic.json").write_text(
+                json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            target.screenshot(path=str(ROOT / "qa/browser-platform-failure.png"), full_page=True)
+            raise
+        actual = heading.inner_text().strip()
+        assert actual == expected, (actual, expected)
+        tag = heading.evaluate("el => el.tagName.toLowerCase()")
+        assert tag in {"h1", "h2", "h3", "h4", "h5", "h6"}, tag
+        return heading
+
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = browser.new_context(viewport={"width": 1440, "height": 1000}, locale="ar-YE")
@@ -71,7 +99,7 @@ try:
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         page.goto(URL)
-        page.get_by_role("heading", name="الفعاليات الجارية والقادمة").wait_for()
+        wait_semantic_heading(page, "#events h2", "الفعاليات الجارية والقادمة")
         page.screenshot(path=str(ROOT / "qa/platform-desktop.png"), full_page=True)
         mark("platform_real_http_render")
 
