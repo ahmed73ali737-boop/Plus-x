@@ -69,11 +69,13 @@ def concurrent_guest_register(i):
 with ThreadPoolExecutor(max_workers=8) as pool:
     concurrent_results=list(pool.map(concurrent_guest_register,range(16)))
 ok('concurrent_guest_requests_all_200',all(code==200 for code,_ in concurrent_results))
-numbers={body.get('guest_number') for _,body in concurrent_results}
-ok('concurrent_same_phone_one_guest_number',len(numbers)==1 and None not in numbers)
+owners=[body for _,body in concurrent_results if body.get('guest_number')]
+blocked=[body for _,body in concurrent_results if body.get('status')=='verification_required']
+ok('concurrent_same_phone_one_pass_owner',len(owners)==1 and len(blocked)==15 and bool(owners[0].get('pass_token')))
 with engine.connect() as con:
     ok('concurrent_same_phone_one_guest_row',con.execute(text("select count(*) from px_guests where phone_e164='+967777909090'")).scalar_one()==1)
     ok('concurrent_same_phone_one_event_registration',con.execute(text("select count(*) from px_event_guests eg join px_guests g on g.id=eg.guest_id where eg.event_id='event-demo' and g.phone_e164='+967777909090'")).scalar_one()==1)
+    ok('concurrent_same_phone_pass_hash_stored',con.execute(text("select count(*) from px_event_guests eg join px_guests g on g.id=eg.guest_id where eg.event_id='event-demo' and g.phone_e164='+967777909090' and eg.pass_token_hash is not null")).scalar_one()==1)
 
 gate=c.post('/api/admin/sites/event-demo/devices',json={'name':'Concurrent Gate','device_type':'operator'})
 ok('event_gate_device_created',gate.status_code==200)
@@ -83,7 +85,7 @@ gate_guest=c.post('/api/public/events/demo/guests/register',json={'phone':'77791
 def concurrent_gate_entry(_):
     with TestClient(app) as client:
         response=client.post('/api/device/events/event-demo/guest-checkins',headers={'X-PulseX-Device-Token':gate_token},json={'items':[{
-            'scan_id':str(uuid.uuid4()),'guest_number':gate_guest['guest_number'],'direction':'entry','checkpoint':'concurrent'
+            'scan_id':str(uuid.uuid4()),'guest_number':gate_guest['guest_number'],'direction':'entry','checkpoint':'main'
         }]})
         return response.status_code,response.json()['receipts'][0]['status']
 
