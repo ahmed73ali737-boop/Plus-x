@@ -72,7 +72,7 @@ def guest_qr_payload(event_slug: str, guest_number: str, public_origin: str) -> 
     return f"{public_origin.rstrip('/')}/e/{event_slug}/guest/{guest_number}"
 
 
-def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool = False) -> dict:
+def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool = False, allow_guest_type: bool = False) -> dict:
     if event["kind"]!="event":
         fail("EVENT_REQUIRED",404)
     if body.get("consent") is not True and not boolean(body.get("consent",False)):
@@ -100,10 +100,11 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
         # overwrite an established guest profile. Admin flows opt in explicitly.
         current=dict(guest)
         updates={"updated_at":values["updated_at"]}
-        for key in ("name","job_title","organization"):
-            incoming=values.get(key)
-            if incoming and (allow_profile_update or not current.get(key)):
-                updates[key]=incoming
+        if allow_profile_update:
+            for key in ("name","job_title","organization"):
+                incoming=values.get(key)
+                if incoming:
+                    updates[key]=incoming
         conn.execute(update(guests).where(guests.c.id==guest["id"]).values(**updates))
         guest={**current,**updates}
     else:
@@ -142,13 +143,18 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
         )
     ).mappings().first()
     event_registration_created=False
+    requested_type=text(body.get("guest_type") or "visitor",40)
+    configured_types={x.get("key") for x in (event.get("draft") or {}).get("access_control",{}).get("guest_types",[]) if isinstance(x,dict)}
+    guest_type=requested_type if allow_guest_type else "visitor"
+    if configured_types and guest_type not in configured_types:
+        fail("GUEST_TYPE_INVALID")
     if not reg:
         candidate_reg={
             "id":new_id(),
             "event_id":event["id"],
             "guest_id":guest["id"],
             "status":"registered",
-            "guest_type":text(body.get("guest_type") or "visitor",40),
+            "guest_type":guest_type,
             "metadata_json":body.get("metadata") if isinstance(body.get("metadata"),dict) else {},
             "registered_at":now(),
             "updated_at":now(),
@@ -168,6 +174,9 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
             if not reg:
                 raise
             reg=dict(reg)
+    elif allow_guest_type and guest_type!=reg.get("guest_type"):
+        conn.execute(update(event_guests).where(event_guests.c.id==reg["id"]).values(guest_type=guest_type,updated_at=now()))
+        reg={**dict(reg),"guest_type":guest_type,"updated_at":now()}
     return {
         "id":guest["id"],
         "guest_number":guest["guest_number"],
@@ -176,6 +185,7 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
         "job_title":guest.get("job_title") or "",
         "organization":guest.get("organization") or "",
         "status":reg["status"],
+        "guest_type":reg.get("guest_type") or "visitor",
         "created":created,
         "event_registration_created":event_registration_created,
     }
