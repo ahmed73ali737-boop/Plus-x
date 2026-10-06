@@ -27,21 +27,34 @@ def event_slug(c):
 
 
 def register(c,slug,phone,**extra):
-    return c.post(f'/api/public/events/{slug}/guests/register',json={
+    body={
         'phone':phone,'country_code':'+967','consent':True,
         'name':extra.get('name','Guest One'),
         'organization':extra.get('organization','Demo Co'),
         'job_title':extra.get('job_title','Visitor'),
-    })
+    }
+    if extra.get('pass_token'): body['pass_token']=extra['pass_token']
+    return c.post(f'/api/public/events/{slug}/guests/register',json=body)
 
 
-def test_same_phone_local_and_international_is_one_guest(tmp_path):
+def test_same_phone_is_one_guest_but_qr_recovery_requires_pass_possession(tmp_path):
     app,c=boot(tmp_path);slug=event_slug(c)
     first=register(c,slug,'777123456'); assert first.status_code==200
-    second=register(c,slug,'+967777123456'); assert second.status_code==200
-    a,b=first.json(),second.json()
-    assert a['guest_number']==b['guest_number']
-    assert a['created'] is True and b['created'] is False
+    a=first.json()
+    assert a['created'] is True and a['guest_number'].startswith('G-')
+    assert isinstance(a['pass_token'],str) and len(a['pass_token'])>=32
+
+    unknown_device=register(c,slug,'+967777123456'); assert unknown_device.status_code==200
+    b=unknown_device.json()
+    assert b['status']=='verification_required' and b['verification_required'] is True
+    assert 'guest_number' not in b and 'qr_url' not in b and 'pass_token' not in b
+
+    owner_retry=register(c,slug,'+967777123456',pass_token=a['pass_token'])
+    assert owner_retry.status_code==200
+    owner=owner_retry.json()
+    assert owner['guest_number']==a['guest_number']
+    assert owner['created'] is False and owner['verification_required'] is False
+
     with app.state.engine.connect() as db:
         assert db.execute(select(func.count()).select_from(guests)).scalar_one()==1
         assert db.execute(select(func.count()).select_from(event_guests)).scalar_one()==1
