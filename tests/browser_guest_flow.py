@@ -162,6 +162,8 @@ try:
         page.get_by_role("heading",name="زائر أوفلاين",exact=True).wait_for()
         provisional=page.locator(".guest-number strong").inner_text().strip()
         assert provisional.startswith("P-")
+        old_phone_derived=page.evaluate("""async()=>{const phone='+967777808080';const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(phone));const h=[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();return 'P-'+h.slice(0,4)+'-'+h.slice(4,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)}""")
+        assert provisional!=old_phone_derived
         assert page.locator("img.guest-qr").count()==0
         pending_guests=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('guest_outbox');return xs.filter(x=>x.status==='pending').length}""")
         assert pending_guests>=1
