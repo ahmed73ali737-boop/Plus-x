@@ -142,6 +142,16 @@ guest_checkins=Table('px_guest_checkins',metadata,
     Column('scanned_at',String(64),nullable=False))
 Index('px_guest_checkins_event_time',guest_checkins.c.event_id,guest_checkins.c.scanned_at)
 Index('px_guest_checkins_guest_time',guest_checkins.c.guest_id,guest_checkins.c.scanned_at)
+
+guest_presence=Table('px_guest_presence',metadata,
+    Column('event_id',String(64),ForeignKey('px_sites.id'),primary_key=True),
+    Column('guest_id',String(64),ForeignKey('px_guests.id'),primary_key=True),
+    Column('state',String(12),nullable=False,default='outside'),
+    Column('last_scan_id',String(64)),
+    Column('last_direction',String(12)),
+    Column('last_checkpoint',String(80)),
+    Column('updated_at',String(64),nullable=False))
+Index('px_guest_presence_event_state',guest_presence.c.event_id,guest_presence.c.state)
 audit=Table('px_audit',metadata,Column('id',String(64),primary_key=True),Column('user_id',String(64)),Column('site_id',String(64)),Column('action',String(80),nullable=False),Column('at',String(64),nullable=False),Column('details',JSON,nullable=False))
 
 def make_engine(url=None):
