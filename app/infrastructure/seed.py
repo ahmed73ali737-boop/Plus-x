@@ -73,8 +73,8 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                 cfg.update(title='Easy', subtitle='محفظتك وخدماتك اليومية — اكتشفها وتفاعل معها في لمسة.', description='تجربة Easy في المعرض مصممة لتكون عملية وسريعة: خدمات المحفظة، الخصوصية، الحصالة، بطاقات Wi-Fi وحسابات الأطفال، مع تصويت وأسئلة لحظية.', template='easy_finance', primary='#12A594', secondary='#073F45', accent='#E8B74A', background='#F4FBF9', cover='')
                 cfg['records'][0].update(title='الخصوصية والرقم البديل', body='اكتشف كيف يمكن إنجاز التعاملات مع خيارات خصوصية أكثر وضوحًا.', order=1)
                 cfg['records'][1].update(title='الحصالة والكسر المباشر', body='حوّل الباقي تلقائيًا إلى حصالتك ضمن تجربة ادخار يومية بسيطة ومرئية.', order=2)
-                cfg['records'][2].update(title='خدمات في لمسة', value=6, unit='تجارب', source='محتوى توضيحي لرحلة Easy في المعرض', display='number')
-                cfg['records'][3].update(title='أي خدمة في Easy تريد تجربتها أولًا؟', options=['الخصوصية والرقم البديل','الحصالة والكسر المباشر','بطاقات Wi-Fi','حسابات الأطفال','الدفع والتحويل'])
+                cfg['records'][2].update(title='خدمات في لمسة', value=8, unit='تجارب', source='محتوى توضيحي لرحلة Easy في المعرض', display='number')
+                cfg['records'][3].update(title='أي خدمة في Easy تريد تجربتها أولًا؟', options=['الخصوصية والرقم البديل','الحصالة والكسر المباشر','بطاقات Wi-Fi','حسابات الأطفال','الدفع والتحويل','الذهب','التداول والاستثمار'])
                 cfg['records'][6].update(title='ما الذي يصنع التجربة الأسهل بالنسبة لك؟', options=['سرعة التنفيذ','وضوح الخطوات','الأمان والخصوصية','تنوع الخدمات'])
                 cfg['records'][7].update(title='جرّب مسار Easy', body='اختر الخدمة التي تهمك ثم صوّت وقيّم التجربة مباشرة.')
                 cfg['records'].extend([
@@ -82,6 +82,8 @@ def seed_demo_data(engine, credentials_path=None, count=10):
                     {'kind':'service','code':'service-4','title':'حسابات الأطفال','body':'مساحة عائلية لإدارة حسابات الأطفال ومتابعتها بصورة أبسط وأكثر وضوحًا.','order':4},
                     {'kind':'service','code':'service-5','title':'الدفع والتحويل','body':'مدفوعات وتحويلات مصممة للوصول إلى الإجراء المطلوب بأقل خطوات ممكنة.','order':5},
                     {'kind':'service','code':'service-6','title':'تقاريرك وسجلّك','body':'عرض أوضح للحركة والتفاصيل لمساعدة المستخدم على الفهم والمتابعة من نفس التطبيق.','order':6},
+                    {'kind':'service','code':'service-7','title':'الذهب','body':'مسار استكشاف لتجربة خدمات الذهب ضمن واجهة Easy وبنفس منطق البساطة والوضوح.','order':7},
+                    {'kind':'service','code':'service-8','title':'التداول والاستثمار','body':'مسار عرض للتداول والاستثمار يوضح كيف تنتقل من الاستكشاف إلى متابعة الفرص من نفس التجربة.','order':8},
                 ])
             elif i == 10:
                 cfg.update(title='RTS', subtitle='من الحلول إلى المنصات إلى الأنظمة البيئية الرقمية.', description='RTS تعرض تجربة تقنية حيّة للتحول الرقمي والتكنولوجيا المالية وبوابات الدفع والتحصيل والمنصات المتكاملة، مع مؤشرات وتفاعل مباشر بدل موقع تعريفي جامد.', template='rts_tech', primary='#0B5CFF', secondary='#071D49', accent='#00C2FF', background='#F4F8FF', cover='')
