@@ -83,6 +83,7 @@ jobs:
           path: |
             qa/browser-components.json
             qa/browser-smoke.json
+            qa/browser-platform-diagnostic.json
             qa/windows11-browser-offline-indexeddb.json
             qa/windows12-guest-browser.json
             qa/guest-browser-server.log
@@ -124,6 +125,7 @@ jobs:
           path: |
             qa/browser-components.json
             qa/browser-smoke.json
+            qa/browser-platform-diagnostic.json
             qa/windows11-browser-offline-indexeddb.json
             qa/windows12-guest-browser.json
             qa/guest-browser-server.log
