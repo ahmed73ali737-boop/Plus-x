@@ -115,7 +115,7 @@ def test_guest_csv_export_is_scoped_and_spreadsheet_safe(tmp_path):
     row=next(x for x in rows if x['guest_number']==guest['guest_number'])
     assert row['name'].startswith("'=")
     assert row['organization'].startswith("'+")
-    assert row['phone']=='+967777343434'
+    assert row['phone']=="'+967777343434"
 
 
 def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
