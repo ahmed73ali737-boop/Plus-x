@@ -254,7 +254,14 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             for item in items:
                 try:
                     result=record_checkin(c,event_id,text(item.get("guest_number"),32,True),item,scanner_id=device["id"],source="device")
-                    receipts.append({"scan_id":result["scan_id"],"status":result["status"],"guest_number":result["guest"]["guest_number"]})
+                    receipts.append({
+                        "scan_id":result["scan_id"],
+                        "status":result["status"],
+                        "guest_number":result["guest"]["guest_number"],
+                        "direction":result.get("direction"),
+                        "checkpoint":result.get("checkpoint"),
+                        "presence":result.get("presence"),
+                    })
                 except Exception as exc:
                     receipts.append({"scan_id":item.get("scan_id"),"status":"rejected","error":getattr(exc,"detail",str(exc))})
         return {"receipts":receipts}
