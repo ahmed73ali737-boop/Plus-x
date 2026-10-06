@@ -390,6 +390,17 @@ def test_non_operator_event_device_cannot_access_guest_gate_data(tmp_path):
     assert validation.status_code==403 and validation.json()['detail']=='DEVICE_ROLE_FORBIDDEN'
 
 
+def test_non_operator_event_device_cannot_use_guest_gate_api(tmp_path):
+    app,c=boot(tmp_path)
+    login(c,app)
+    display=c.post('/api/admin/sites/event-demo/devices',json={'name':'Lobby Display','device_type':'display'})
+    assert display.status_code==200
+    token=display.json()['device_token']
+    c.headers.pop('X-CSRF',None);c.headers.pop('Origin',None)
+    r=c.get('/api/device/events/event-demo/guest-manifest',headers={'X-PulseX-Device-Token':token})
+    assert r.status_code==403 and r.json()['detail']=='DEVICE_GATE_PERMISSION'
+
+
 def test_device_for_an_agency_cannot_download_event_guest_manifest(tmp_path):
     app,c=boot(tmp_path)
     login(c,app)
