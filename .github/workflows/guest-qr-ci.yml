@@ -11,7 +11,7 @@ permissions:
 jobs:
   guest-identity-and-offline-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +31,7 @@ jobs:
           node --check web/guest.mjs
           node --check web/app.mjs
           node --check web/public.mjs
+          node --check web/exhibition.mjs
           node --check web/offline.mjs
           node --check web/admin.mjs
           node --check web/sw.js
@@ -46,6 +47,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run guest browser journey
         run: python tests/browser_guest_flow.py
+      - name: Run exhibition brand journeys
+        run: python tests/browser_exhibition_sites.py
       - name: Upload guest journey evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,6 +59,14 @@ jobs:
             qa/guest-capacity-smoke.json
             qa/openapi.generated.json
             qa/guest-browser-server.log
+            qa/exhibition-brands.json
+            qa/exhibition-browser-server.log
+            qa/tharawat-exhibition.png
+            qa/easy-exhibition.png
+            qa/rts-exhibition-360.png
+            qa/tharawat-exhibition-mobile.png
+            qa/easy-exhibition-mobile.png
+            qa/rts-exhibition-mobile.png
             qa/guest-pass.png
             qa/guest-admin-directory.png
             qa/rts-live.png
