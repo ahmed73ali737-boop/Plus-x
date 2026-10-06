@@ -186,11 +186,11 @@ async function guestsTab(){
     ),
     h('div',{class:'guest-admin-hero card'},
       h('div',{},h('span',{class:'eyebrow'},'GUEST IDENTITY · OFFLINE READY'),h('h2',{},'رقم واحد وQR واحد لكل هاتف'),h('p',{class:'muted'},'توحيد صيغة الهاتف يمنع تكرار التسجيل. QR لا يحتوي رقم الهاتف، والماسح يستطيع استخدام سجل زوار مجهز مسبقًا دون اتصال.')),
-      h('div',{class:'actions'},h('a',{class:'btn',href:'/e/'+current.slug+'/scan',target:'_blank',rel:'noopener'},'فتح ماسح QR'),h('a',{class:'btn secondary',href:'/e/'+current.slug+'/guest',target:'_blank',rel:'noopener'},'فتح تسجيل الزائر'))
+      h('div',{class:'actions'},h('a',{class:'btn',href:'/e/'+current.slug+'/scan',target:'_blank',rel:'noopener'},'فتح ماسح QR'),h('a',{class:'btn secondary',href:'/e/'+current.slug+'/guest',target:'_blank',rel:'noopener'},'فتح تسجيل الزائر'),h('a',{class:'btn secondary',href:'/api/admin/events/'+current.id+'/guests/export'},'تصدير CSV'))
     )
   );
 
-  const country=field('رمز الدولة','tel','+967',{maxlength:6,inputmode:'tel'}),phone=field('رقم الهاتف','tel','',{required:true,inputmode:'tel',autocomplete:'tel'}),name=field('اسم الزائر — اختياري'),org=field('الجهة — اختياري'),job=field('المسمى — اختياري'),consent=check('تم أخذ موافقة الزائر على استخدام الهاتف لإنشاء هوية فريدة ومنع التكرار.',false);
+  const country=field('رمز الدولة','tel','+967',{maxlength:6,inputmode:'tel',dir:'ltr'}),phone=field('رقم الهاتف','tel','',{required:true,inputmode:'tel',autocomplete:'tel',dir:'ltr'}),name=field('اسم الزائر — اختياري'),org=field('الجهة — اختياري'),job=field('المسمى — اختياري'),consent=check('تم أخذ موافقة الزائر على استخدام الهاتف لإنشاء هوية فريدة ومنع التكرار.',false);
   host.append(h('section',{class:'card form-card guest-admin-register'},h('h3',{},'تسجيل زائر من لوحة المنظم'),h('p',{class:'muted'},'إذا كان الهاتف مسجلًا مسبقًا فسيُفتح نفس رقم الزائر بدل إنشاء سجل جديد.'),h('div',{class:'phone-grid'},country.node,phone.node),name.node,org.node,job.node,consent.node,button('تسجيل / استرجاع الزائر',async()=>{if(!consent.input.checked)throw new Error('GUEST_CONSENT_REQUIRED');const g=await api('/api/admin/events/'+current.id+'/guests',{country_code:country.input.value,phone:phone.input.value,name:name.input.value,organization:org.input.value,job_title:job.input.value,consent:true});toast(g.created?'تم إنشاء بطاقة زائر جديدة.':'تم العثور على نفس الزائر دون تكرار.');await renderTab();})));
 
   const search=field('بحث في الزوار','search','',{placeholder:'الاسم، الهاتف، الجهة أو رقم الزائر'}),list=h('div',{class:'guest-admin-grid'});
@@ -205,7 +205,7 @@ async function guestsTab(){
     list.append(...filtered.map(guestCard));
   }
   search.input.addEventListener('input',draw);draw();
-  host.append(h('section',{class:'guest-directory'},h('div',{class:'between'},h('div',{},h('h2',{},'دليل الزوار'),h('p',{class:'muted'},'البيانات الكاملة ظاهرة للمنظم والطرفية المرتبطة فقط؛ صفحة الزائر العامة لا تكشف الهاتف.')),h('span',{class:'tag'},guests.length+' زائر')),search.node,list));
+  host.append(h('section',{class:'guest-directory'},h('div',{class:'between'},h('div',{},h('h2',{},'دليل الزوار'),h('p',{class:'muted'},'البيانات الكاملة ظاهرة للمنظم فقط؛ طرفية البوابة تحصل الحد الأدنى اللازم للمسح، وصفحة الزائر العامة لا تكشف الهاتف.')),h('span',{class:'tag'},guests.length+' زائر')),search.node,list));
 
   const history=h('div',{class:'record-list'});
   for(const x of checkins.slice(0,100)){const g=guests.find(v=>v.id===x.guest_id);history.append(h('div',{class:'record-line'},h('span',{class:'tag'},x.direction==='exit'?'خروج':'دخول'),h('strong',{},g?.name||x.guest_number),h('code',{},x.guest_number),h('span',{},x.checkpoint),h('small',{class:'muted'},x.scanned_at)));}
