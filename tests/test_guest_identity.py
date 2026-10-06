@@ -86,6 +86,7 @@ def test_guest_number_qr_and_public_view_do_not_expose_phone(tmp_path):
     body=public.json()
     assert body['guest_number']==guest['guest_number']
     assert 'phone' not in body and 'name' not in body
+    assert 'guest_type' not in body and 'registered_at' not in body
     qr=c.get(f"/api/public/events/{slug}/guests/{guest['guest_number']}/qr")
     assert qr.status_code==200 and qr.headers['content-type']=='image/png' and len(qr.content)>100
 
