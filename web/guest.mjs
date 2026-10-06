@@ -61,11 +61,12 @@ async function syncGuestRegistrations(slug){
     for(const receipt of out.receipts||[]){
       const item=pending.find(x=>x.body.client_id===receipt.client_id);if(!item)continue;
       if(receipt.status==='accepted'){
-        await put('guest_receipts',{id:item.id,...receipt,at:new Date().toISOString()});
+        const {pass_token:receiptPassToken,...safeReceipt}=receipt;
+        await put('guest_receipts',{id:item.id,...safeReceipt,at:new Date().toISOString()});
         await del('guest_outbox',item.id);
         const local=item.local_id?await get('guests',item.local_id):null;
         const canonicalId=guestKey(slug,receipt.guest_number);
-        const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,pass_token:receipt.pass_token||local?.pass_token||item.body.pass_token||'',status:'registered',synced:true,provisional:false,verification_required:false,created:receipt.created,updated_at:new Date().toISOString()};
+        const canonical={...(local||{}),id:canonicalId,slug,guest_number:receipt.guest_number,pass_token:receiptPassToken||local?.pass_token||item.body.pass_token||'',status:'registered',synced:true,provisional:false,verification_required:false,created:receipt.created,updated_at:new Date().toISOString()};
         delete canonical.phone;
         await put('guests',canonical);await cacheQr(slug,canonical);
         if(local&&item.local_id!==canonicalId)await put('guests',{...local,id:item.local_id,phone:'',pass_token:'',status:'reconciled',redirect_to:canonicalId,synced:true,provisional:false,updated_at:new Date().toISOString()});
