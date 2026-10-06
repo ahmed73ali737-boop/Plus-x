@@ -204,11 +204,11 @@ def test_gate_validate_and_anti_passback(tmp_path):
     validated_inside=c.get(f"/api/device/events/event-demo/guests/{guest['guest_number']}/validate",headers=headers).json()
     assert validated_inside['status']=='valid' and validated_inside['presence']=='inside'
 
-    exit1={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'Gate A'}]}
+    exit1={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'main'}]}
     left=c.post('/api/device/events/event-demo/guest-checkins',json=exit1,headers=headers).json()['receipts'][0]
     assert left['status']=='accepted' and left['presence']=='outside'
 
-    exit2={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'Gate B'}]}
+    exit2={'items':[{'scan_id':str(uuid.uuid4()),'guest_number':guest['guest_number'],'direction':'exit','checkpoint':'main'}]}
     repeated_exit=c.post('/api/device/events/event-demo/guest-checkins',json=exit2,headers=headers).json()['receipts'][0]
     assert repeated_exit['status']=='already_outside' and repeated_exit['presence']=='outside'
 
