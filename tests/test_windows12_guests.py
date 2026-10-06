@@ -152,6 +152,26 @@ def test_device_checkin_is_idempotent_and_persists_once(tmp_path):
         assert len(rows)==1
 
 
+def test_guest_type_is_admin_controlled(tmp_path):
+    app,c=boot(tmp_path)
+    public=c.post('/api/public/events/demo/guests/register',json={
+        'phone':'777464646','country_code':'+967','consent':True,'guest_type':'vip'
+    })
+    assert public.status_code==200
+    login(c,app)
+    listed=c.get('/api/admin/events/event-demo/guests').json()['guests']
+    guest=next(x for x in listed if x['guest_number']==public.json()['guest_number'])
+    assert guest['guest_type']=='visitor'
+
+    admin=c.post('/api/admin/events/event-demo/guests',json={
+        'phone':'777474747','country_code':'+967','consent':True,'guest_type':'vip','name':'VIP Guest'
+    })
+    assert admin.status_code==200 and admin.json()['guest_type']=='vip'
+    listed=c.get('/api/admin/events/event-demo/guests').json()['guests']
+    vip=next(x for x in listed if x['guest_number']==admin.json()['guest_number'])
+    assert vip['guest_type']=='vip'
+
+
 def test_gate_validate_and_anti_passback(tmp_path):
     app,c=boot(tmp_path)
     guest=register(c,'777454545')
