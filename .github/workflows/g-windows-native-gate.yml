@@ -1,0 +1,49 @@
+name: PulseX - G Windows Native Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pulsex-windows-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) {
+            python -m pip install -r requirements.txt
+          } else {
+            throw 'requirements.txt is required by this gate'
+          }
+
+      - name: Run Windows-native pytest gate
+        shell: pwsh
+        run: python -m pytest -q
+
+      - name: Evidence boundary
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output 'This workflow proves only the Windows-hosted Python test gate executed.'
+          Write-Output 'PostgreSQL/RLS, native offline/IndexedDB/Service Worker, two-device recovery, load/pentest and field UAT remain separate gates.'
