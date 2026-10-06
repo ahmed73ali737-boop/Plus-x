@@ -91,6 +91,7 @@ async function registerGuestOfflineFirst(slug,values){
   if(mapping?.redirect_to){const canonical=await get('guests',mapping.redirect_to);if(canonical)return canonical;}
   let existing=mapping?.provisional_id?await get('guests',mapping.provisional_id):null;
   if(existing?.redirect_to){const canonical=await get('guests',existing.redirect_to);if(canonical)return canonical;}
+  if(existing?.verification_required||existing?.status==='verification_required')return existing;
   const provisionalNumber=existing?.guest_number||newProvisionalNumber();
   const id=existing?.id||guestKey(slug,provisionalNumber);
   const pass_token=existing?.pass_token||newPassToken();
@@ -253,7 +254,7 @@ export async function scanPage(slug){
   const input=field('امسح QR أو ابحث بالاسم / الجهة / رقم الزائر','text','',{placeholder:'QR أو G-... أو اسم الزائر',autocomplete:'off'});
   const mode=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
   const checkpoint=selectField('نقطة الوصول',[], '');
-  const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
+  const result=h('div',{class:'scan-result empty',role:'status','aria-live':'polite','aria-atomic':'true'},'بانتظار المسح');
   let currentGuest=null;
 
   function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:60,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
