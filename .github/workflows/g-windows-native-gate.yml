@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONUTF8: '1'
+
 concurrency:
   group: pulsex-windows-native-${{ github.ref }}
   cancel-in-progress: true
