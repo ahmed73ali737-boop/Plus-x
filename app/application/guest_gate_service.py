@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 import json
 from datetime import datetime, timezone
 
@@ -18,8 +19,8 @@ TERMINAL_SCAN_STATUSES={"accepted","duplicate","already_inside","already_outside
 
 
 def _event(conn,event_or_id) -> dict:
-    if isinstance(event_or_id,dict):
-        return event_or_id
+    if isinstance(event_or_id,Mapping):
+        return dict(event_or_id)
     event=conn.execute(select(sites).where(sites.c.id==event_or_id)).mappings().first()
     if not event or event["kind"]!="event":
         fail("EVENT_REQUIRED",404)
