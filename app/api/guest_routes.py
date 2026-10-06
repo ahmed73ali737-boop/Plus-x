@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import io
+import re
 
 import qrcode
 from fastapi import Request
@@ -112,6 +114,46 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             if event["kind"]!="event":
                 fail("EVENT_REQUIRED",404)
             return {"guests":list_event_guests(c,event_id)}
+
+    @app.get("/api/admin/events/{event_id}/guests/export")
+    def admin_export_guests(event_id: str, request: Request):
+        with engine.connect() as c:
+            u,_=identify(request,c)
+            event=require_scope(c,u,event_id)
+            if event["kind"]!="event":
+                fail("EVENT_REQUIRED",404)
+            guest_rows=list_event_guests(c,event_id)
+            scans=list(c.execute(
+                select(guest_checkins)
+                .where(guest_checkins.c.event_id==event_id)
+                .order_by(guest_checkins.c.scanned_at.asc())
+            ).mappings())
+        stats={}
+        for scan in scans:
+            item=stats.setdefault(scan["guest_id"],{"entries":0,"exits":0,"first_entry":"","last_entry":""})
+            if scan["direction"]=="entry":
+                item["entries"]+=1
+                item["first_entry"]=item["first_entry"] or scan["scanned_at"]
+                item["last_entry"]=scan["scanned_at"]
+            else:
+                item["exits"]+=1
+        def safe(value):
+            value=str(value or "")
+            if re.match(r"^[\s\x00-\x1f]*[=+@-]",value):
+                value="'"+value
+            return value
+        buff=io.StringIO()
+        writer=csv.writer(buff)
+        columns=["guest_number","name","phone","organization","job_title","status","guest_type","registered_at","entries","exits","first_entry","last_entry"]
+        writer.writerow(columns)
+        for guest in guest_rows:
+            st=stats.get(guest["id"],{"entries":0,"exits":0,"first_entry":"","last_entry":""})
+            writer.writerow([safe(guest.get(k)) for k in columns[:8]]+[st["entries"],st["exits"],st["first_entry"],st["last_entry"]])
+        return Response(
+            "\ufeff"+buff.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":f'attachment; filename="pulsex-guests-{event_id}.csv"'},
+        )
 
     @app.post("/api/admin/events/{event_id}/guests")
     def admin_register_guest(event_id: str, body: dict, request: Request):
