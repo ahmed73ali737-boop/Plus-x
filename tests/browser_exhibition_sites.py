@@ -100,11 +100,11 @@ try:
         assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
         assert page.locator(".expo-tharawat-stage,.expo-rts-stage").count() == 0
         assert_no_overflow(page)
+        page.screenshot(path=str(ROOT / "qa/easy-exhibition.png"), full_page=True)
+        mark("easy_distinct_living_wallet_surface")
         page.goto(URL + "/e/demo/p/agency-09#services")
         page.get_by_text("تقاريرك وسجلّك", exact=True).wait_for()
         mark("easy_full_exhibition_service_content")
-        page.screenshot(path=str(ROOT / "qa/easy-exhibition.png"), full_page=True)
-        mark("easy_distinct_living_wallet_surface")
 
         # RTS must expose a technical system map and capability rail.
         page.goto(URL + "/e/demo/p/agency-10")
@@ -118,14 +118,14 @@ try:
         assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
         assert page.locator(".expo-tharawat-stage,.expo-easy-stage").count() == 0
         assert_no_overflow(page)
+        page.screenshot(path=str(ROOT / "qa/rts-exhibition-360.png"), full_page=True)
+        mark("rts_distinct_command_center_surface")
         page.goto(URL + "/e/demo/p/agency-10#services")
         page.get_by_text("Accounting & Sales Systems", exact=True).wait_for()
         page.get_by_text("Lending, Requests & Billing", exact=True).wait_for()
         page.get_by_text("Humanitarian & Donations Platforms", exact=True).wait_for()
         page.get_by_text("Exchange & Financial Products", exact=True).wait_for()
         mark("rts_full_capability_content")
-        page.screenshot(path=str(ROOT / "qa/rts-exhibition-360.png"), full_page=True)
-        mark("rts_distinct_command_center_surface")
 
         # Mobile layout for all three surfaces must stay inside the viewport.
         mobile_context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, locale="ar-YE")
