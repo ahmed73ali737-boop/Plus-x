@@ -376,6 +376,20 @@ def test_public_guest_registration_requires_consent_and_valid_phone(tmp_path):
     assert bad_phone.status_code==422 and bad_phone.json()['detail']=='PHONE_INVALID'
 
 
+def test_non_operator_event_device_cannot_access_guest_gate_data(tmp_path):
+    app,c=boot(tmp_path)
+    login(c,app)
+    display=c.post('/api/admin/sites/event-demo/devices',json={'name':'Lobby Display','device_type':'display'})
+    assert display.status_code==200,display.text
+    token=display.json()['device_token']
+    c.headers.pop('X-CSRF',None);c.headers.pop('Origin',None)
+    headers={'X-PulseX-Device-Token':token}
+    assert c.get('/api/device/events/event-demo/guest-manifest',headers=headers).status_code==403
+    guest=register(c,'777414141')
+    validation=c.get(f"/api/device/events/event-demo/guests/{guest['guest_number']}/validate",headers=headers)
+    assert validation.status_code==403 and validation.json()['detail']=='DEVICE_ROLE_FORBIDDEN'
+
+
 def test_device_for_an_agency_cannot_download_event_guest_manifest(tmp_path):
     app,c=boot(tmp_path)
     login(c,app)
