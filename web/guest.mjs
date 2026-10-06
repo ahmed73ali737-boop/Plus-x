@@ -130,11 +130,21 @@ async function renderPass(page,slug,g){
     host.append(h('section',{class:'guest-empty card'},h('h1',{},'تعذر العثور على بطاقة الزائر'),h('p',{class:'muted'},'سجّل برقم هاتفك أو جهّز هذه البطاقة على الجهاز قبل العمل دون اتصال.'),h('a',{class:'btn',href:'/e/'+slug+'/guest'},'إنشاء / استرجاع البطاقة')));
     return;
   }
+  if(g.verification_required||g.status==='verification_required'){
+    host.append(h('section',{class:'guest-empty card guest-verification-required'},
+      h('span',{class:'eyebrow'},'GUEST PASS · PROTECTED'),
+      h('h1',{},'البطاقة موجودة بالفعل'),
+      h('p',{class:'lead'},'هذا الهاتف مسجل في الفعالية، لكن هذا الجهاز لا يملك إثبات البطاقة السابقة. لن نعرض QR أو رقم الزائر اعتمادًا على معرفة رقم الهاتف فقط.'),
+      h('p',{class:'notice'},'افتح البطاقة من الجهاز الذي أنشأها أول مرة، أو راجع الاستقبال/المنظم للتحقق واستعادة البطاقة.'),
+      h('div',{class:'actions'},h('a',{class:'btn secondary',href:'/e/'+slug},'العودة إلى الفعالية'),h('a',{class:'btn',href:'/e/'+slug+'/guest'},'محاولة رقم آخر'))
+    ));
+    return;
+  }
   if(navigator.onLine&&!g.qr_data_url&&!g.provisional)g=await cacheQr(slug,g);
   if(g.provisional){
-    const onReconnect=()=>reconcileGuestPass(slug,g);
-    window.addEventListener('online',onReconnect,{once:true});
-    if(navigator.onLine)await reconcileGuestPass(slug,g);
+    const reconcileAndRender=async()=>{if(await reconcileGuestPass(slug,g))return;const latest=await get('guests',guestKey(slug,g.guest_number));if(latest?.verification_required||latest?.status==='verification_required')await renderPass(page,slug,latest);};
+    window.addEventListener('online',reconcileAndRender,{once:true});
+    if(navigator.onLine){await reconcileAndRender();if(!document.body.contains(host))return;}
   }
   host.append(h('section',{class:'guest-pass-wrap'},
     h('div',{class:'guest-pass'},
@@ -144,7 +154,7 @@ async function renderPass(page,slug,g){
       h('div',{class:'guest-number'},h('span',{},g.provisional?'رقم محلي مؤقت':'رقم الزائر'),h('strong',{},g.guest_number)),
       g.qr_data_url?h('img',{src:g.qr_data_url,alt:'QR '+g.guest_number,class:'guest-qr'}):h('div',{class:'qr-pending'},h('strong',{},g.provisional?'بانتظار خادم الفعالية لإنشاء QR النهائي':'QR ينتظر المزامنة'),h('small',{},g.provisional?'هذا الرقم المحلي لا يكشف هاتفك ولا يُستخدم كبطاقة دخول نهائية. عند الاتصال بخادم الفعالية سيستبدل برقم QR آمن.':'عند الوصول لخادم الفعالية سيظهر QR تلقائيًا.')),
       h('div',{class:'guest-meta'},g.organization?h('span',{},g.organization):null,g.job_title?h('span',{},g.job_title):null),
-      h('div',{class:'guest-pass-actions'},h('a',{class:'btn secondary',href:'/e/'+slug},'موقع الفعالية'),g.provisional?null:button('طباعة البطاقة',()=>window.print(),'btn secondary'),button('تحديث البطاقة',async()=>{if(await reconcileGuestPass(slug,g))return;location.reload();},'btn'))
+      h('div',{class:'guest-pass-actions'},h('a',{class:'btn secondary',href:'/e/'+slug},'موقع الفعالية'),g.provisional?null:button('طباعة البطاقة',()=>window.print(),'btn secondary'),button('تحديث البطاقة',async()=>{if(await reconcileGuestPass(slug,g))return;const latest=await get('guests',guestKey(slug,g.guest_number));if(latest?.verification_required||latest?.status==='verification_required'){await renderPass(page,slug,latest);return;}location.reload();},'btn'))
     ),
     h('aside',{class:'guest-help'},h('h2',{},'كيف تستخدمها؟'),h('ol',{},h('li',{},'احتفظ بهذه البطاقة على هاتفك.'),h('li',{},'عند البوابة اعرض QR أو رقم الزائر.'),h('li',{},'يمكن للماسح التحقق من البطاقة حتى عند انقطاع الإنترنت إذا تم تجهيز سجل الزوار مسبقًا.')),h('p',{class:'notice'},'رقم الهاتف هو مفتاح منع التكرار. لا نضع رقم الهاتف داخل QR.'))
   ));
@@ -171,9 +181,9 @@ export async function guestPage(slug,number=''){
   const job=field('المسمى الوظيفي — اختياري','text','',{maxlength:160});
   const consent=check('أوافق على استخدام رقم الهاتف لإنشاء هوية زائر فريدة ومنع التسجيل المكرر.');
   const form=h('form',{class:'guest-register-card card',onsubmit:async e=>{e.preventDefault();if(!consent.input.checked){toast('الموافقة مطلوبة لإنشاء بطاقة مرتبطة بالهاتف.',true);return;}const submit=e.currentTarget.querySelector('button[type=submit]');submit.disabled=true;try{const g=await registerGuestOfflineFirst(slug,{country_code:country.input.value,phone:phone.input.value,name:name.input.value.trim(),organization:org.input.value.trim(),job_title:job.input.value.trim()});history.replaceState({},'', '/e/'+slug+'/guest/'+g.guest_number);await renderPass(page,slug,g);}catch(err){toast(err.message||String(err),true);submit.disabled=false;}}},
-    h('span',{class:'eyebrow'},'ONE PHONE · ONE GUEST'),h('h1',{},'بطاقتك للفعالية'),h('p',{class:'lead'},'أدخل رقم هاتفك مرة واحدة. إذا كنت مسجّلًا سابقًا، سنفتح نفس رقم الزائر بدل إنشاء سجل ثانٍ.'),
+    h('span',{class:'eyebrow'},'ONE PHONE · ONE GUEST'),h('h1',{},'بطاقتك للفعالية'),h('p',{class:'lead'},'أدخل رقم هاتفك مرة واحدة. لن ننشئ سجلًا ثانيًا للهاتف نفسه؛ وعلى جهازك الأصلي ستفتح بطاقتك نفسها، بينما جهاز جديد يحتاج إثبات البطاقة أو مساعدة المنظم.'),
     h('div',{class:'phone-grid'},country.node,phone.node),name.node,org.node,job.node,consent.node,
-    h('p',{class:'muted small'},navigator.onLine?'سيتم التحقق من عدم التكرار الآن.':'أنت دون اتصال: سيُنشأ نفس رقم الزائر المحدد من الهاتف، ثم تتم المزامنة عند عودة الاتصال.'),
+    h('p',{class:'muted small'},navigator.onLine?'سيتم التحقق من عدم التكرار وإثبات ملكية البطاقة على هذا الجهاز.':'أنت دون اتصال: سنحفظ طلبًا محليًا مؤقتًا، ولا يصدر QR نهائي إلا بعد المصالحة مع خادم الفعالية.'),
     h('button',{type:'submit',class:'btn guest-submit'},'إنشاء / فتح بطاقة الزائر'));
   host.append(form,h('section',{class:'guest-side'},h('div',{class:'guest-orbit'},h('span',{},'QR'),h('small',{},'SCAN · ENTER · ENGAGE')),h('h2',{},'الدخول أسرع. التجربة تستمر.'),h('p',{},'البطاقة تعمل مع المسح عند البوابة، وربط التفاعلات، والاستبيانات، والتصويت، والمتابعة داخل الفعالية.')));
   root.append(host);
