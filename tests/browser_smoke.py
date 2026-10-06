@@ -54,6 +54,7 @@ try:
 
     creds = json.loads((TEMP / "accounts.json").read_text(encoding="utf-8"))
     checks, errors = [], []
+    console_messages, failed_requests = [], []
 
     def mark(name):
         checks.append(name)
@@ -80,6 +81,8 @@ try:
                 "expected": expected,
                 "body_text": target.locator("body").inner_text()[:3000],
                 "page_errors": list(errors),
+                "console_messages": list(console_messages),
+                "failed_requests": list(failed_requests),
             }
             (ROOT / "qa/browser-platform-diagnostic.json").write_text(
                 json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -97,6 +100,8 @@ try:
         context = browser.new_context(viewport={"width": 1440, "height": 1000}, locale="ar-YE")
         page = context.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: console_messages.append({"type": m.type, "text": m.text}))
+        page.on("requestfailed", lambda r: failed_requests.append({"url": r.url, "failure": r.failure}))
 
         page.goto(URL)
         wait_semantic_heading(page, "#events h2", "الفعاليات الجارية والقادمة")
@@ -187,6 +192,8 @@ try:
         "passed": len(checks),
         "checks": checks,
         "page_errors": errors,
+        "console_messages": console_messages,
+        "failed_requests": failed_requests,
         "backend": "SQLite",
         "real_local_http": True,
         "native_browser_network_tested": True,
@@ -215,6 +222,8 @@ except Exception as exc:
         "passed_before_failure": len(locals().get("checks", [])),
         "checks": locals().get("checks", []),
         "page_errors": failure_errors,
+        "console_messages": locals().get("console_messages", []),
+        "failed_requests": locals().get("failed_requests", []),
         "failure_state": failure_state,
         "not_passed": True,
     }
