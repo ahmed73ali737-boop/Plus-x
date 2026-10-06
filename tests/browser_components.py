@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 app=create_app('sqlite:///:memory:',origin='http://testserver',seed_demo=True);client=TestClient(app)
 account=app.state.seed_credentials[2];auth=client.post('/api/auth/login',json={'email':account['email'],'password':account['password']}).json()
 routes={'/api/auth/me':auth,'/api/admin/sites':client.get('/api/admin/sites').json(),'/api/admin/sites/agency-01':client.get('/api/admin/sites/agency-01').json(),'/api/admin/sites/agency-01/metrics':client.get('/api/admin/sites/agency-01/metrics').json(),'/api/admin/sites/agency-01/preview':client.get('/api/admin/sites/agency-01/preview').json()}
-for slug in ('platform','demo','agency-01','agency-08','agency-09','agency-10'):
+for slug in ('platform','demo','agency-01','tharawat','easy','rts'):
     routes['/api/public/site/'+slug]=client.get('/api/public/site/'+slug).json()
     routes['/api/public/site/'+slug+'/results']=client.get('/api/public/site/'+slug+'/results').json()
 def replace_media(x):
@@ -51,9 +51,9 @@ with sync_playwright() as p:
     page.evaluate("PXPublic.publicPage('platform')");page.get_by_role('heading',name='الفعاليات الجارية والقادمة').wait_for();checks.append('platform_directory_component');page.screenshot(path=str(ROOT/'qa/platform-desktop.png'),full_page=True)
     page.evaluate("PXPublic.publicPage('agency-01')");page.get_by_role('heading',name='الجهة التجريبية 01',exact=True,level=1).wait_for();assert page.locator('[data-section]').count()==10;checks.append('agency_ten_sections_component');page.screenshot(path=str(ROOT/'qa/agency-desktop.png'),full_page=True)
     for slug,template,selector,title,check_name in [
-        ('agency-08','tharawat_finance','.expo-tharawat-stage','ثروات','tharawat_exhibition_component'),
-        ('agency-09','easy_finance','.expo-easy-stage','Easy','easy_exhibition_component'),
-        ('agency-10','rts_tech','.expo-rts-stage','RTS','rts_exhibition_component'),
+        ('tharawat','tharawat_finance','.expo-tharawat-stage','ثروات','tharawat_exhibition_component'),
+        ('easy','easy_finance','.expo-easy-stage','Easy','easy_exhibition_component'),
+        ('rts','rts_tech','.expo-rts-stage','RTS','rts_exhibition_component'),
     ]:
         setup(exhibition+public)
         page.evaluate(f"PXPublic.publicPage('{slug}')")
