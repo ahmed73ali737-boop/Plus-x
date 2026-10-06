@@ -244,8 +244,8 @@ export async function scanPage(slug){
   }
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
   const direction=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
-  const laneType=selectField('مسار الزوار',[['all','كل الأنواع'],['visitor','زائر'],['vip','VIP'],['speaker','متحدث'],['staff','طاقم'],['media','إعلام'],['exhibitor','عارض']],'all');
-  const checkpoint=field('نقطة المسح','text','main',{maxlength:80,placeholder:'main / Gate A / VIP'});
+  const access=manifest.access_control||{anti_passback:true,allow_reentry:true,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};
+  const checkpoint=selectField('نقطة الوصول',(access.checkpoints||[]).filter(x=>x.enabled!==false).map(x=>[x.key,x.label||x.key]),(access.checkpoints||[]).find(x=>x.enabled!==false)?.key||'main');
   const result=h('div',{class:'scan-result empty'},'بانتظار المسح');
   async function refreshSync(notify=false){
     const out=await syncCheckins(page.id,token);
@@ -253,26 +253,39 @@ export async function scanPage(slug){
     if(notify)toast(out.pending?'ما زالت '+out.pending+' حركة محفوظة محليًا.':'تمت مزامنة حركات الدخول.');
     return out;
   }
+  async function localAccessDecision(g,checkpointKey){
+    const policy=manifest.access_control||access;const rule=(policy.checkpoints||[]).find(x=>x.key===checkpointKey);
+    if(!rule)return{ok:false,reason:'نقطة الوصول غير موجودة في سياسة الفعالية.'};
+    if(rule.enabled===false)return{ok:false,reason:'نقطة الوصول موقوفة.'};
+    const now=Date.now(),start=rule.start?Date.parse(rule.start):null,end=rule.end?Date.parse(rule.end):null;
+    if((start&&now<start)||(end&&now>=end))return{ok:false,reason:'نقطة الوصول خارج نافذة الوقت المسموح.'};
+    const allowed=rule.allowed_guest_types||[];
+    if(allowed.length&&!allowed.includes(g.guest_type||'visitor'))return{ok:false,reason:'نوع الزائر غير مسموح في نقطة الوصول هذه.'};
+    return{ok:true,policy,rule};
+  }
   async function show(number){
     number=parseGuestNumber(number);if(!number){result.replaceChildren(h('p',{},'رمز غير معروف'));return;}
     let g=(manifest.guests||[]).find(x=>x.guest_number===number);
     if(!g&&navigator.onLine&&token){manifest=await loadManifest(page.id,token);g=(manifest.guests||[]).find(x=>x.guest_number===number);}
     if(!g){result.replaceChildren(h('h3',{},number),h('p',{class:'warning'},'الزائر غير موجود في السجل المحلي. حدّث السجل عند توفر الاتصال.'));return;}
-    const lane=laneType.input.value;
-    if(lane!=='all'&&(g.guest_type||'visitor')!==lane){result.replaceChildren(h('h3',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},'هذه البطاقة لا تطابق مسار الزوار المحدد لهذه البوابة.'));return;}
+    const point=checkpoint.input.value||'main';const decision=await localAccessDecision(g,point);
+    if(!decision.ok){result.replaceChildren(h('h3',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},decision.reason));return;}
     const mode=direction.input.value;
     if(mode==='validate'){
-      result.replaceChildren(h('span',{class:'tag status-current'},'صالح للفعالية'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+((await get('gate_presence',gatePresenceKey(page.id,g.guest_number)))?.state||g.presence||'outside')));
+      let presence=((await get('gate_presence',gatePresenceKey(page.id,g.guest_number)))?.state||g.presence||'outside'),valid=true,reason='';
+      if(navigator.onLine&&token){try{const vr=await fetch('/api/device/events/'+encodeURIComponent(page.id)+'/guests/'+encodeURIComponent(g.guest_number)+'/validate?checkpoint='+encodeURIComponent(point),{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});const vd=await vr.json();valid=vr.ok&&vd.status==='valid';presence=vd.presence||presence;reason=vd.reason||vd.error||'';}catch{}}
+      result.replaceChildren(h('span',{class:'tag '+(valid?'status-current':'warning')},valid?'صالح لنقطة الوصول':'غير مسموح'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+presence+(reason?' · '+reason:'')));
       return;
     }
     const check=button(mode==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{
       const localKey=gatePresenceKey(page.id,g.guest_number);
       const local=await get('gate_presence',localKey)||{state:g.presence||'outside'};
-      if(mode==='entry'&&local.state==='inside'){toast('الزائر مسجل داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);return;}
-      if(mode==='exit'&&local.state!=='inside'){toast('الزائر غير مسجل داخل الفعالية حاليًا.',true);return;}
-      const scan_id=crypto.randomUUID();const point=checkpoint.input.value.trim()||'main';
+      if(decision.policy.anti_passback!==false&&mode==='entry'&&local.state==='inside'){toast('الزائر مسجل داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);return;}
+      if(decision.policy.anti_passback!==false&&mode==='exit'&&local.state!=='inside'){toast('الزائر غير مسجل داخل الفعالية حاليًا.',true);return;}
+      if(mode==='entry'&&decision.policy.allow_reentry===false&&local.last_direction==='exit'){toast('سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',true);return;}
+      const scan_id=crypto.randomUUID();const point=checkpoint.input.value||'main';
       await put('checkin_outbox',{id:scan_id,event_id:page.id,status:'pending',payload:{scan_id,guest_number:g.guest_number,direction:mode,checkpoint:point,client_time:new Date().toISOString()}});
-      await put('gate_presence',{id:localKey,event_id:page.id,guest_number:g.guest_number,state:mode==='entry'?'inside':'outside',updated_at:new Date().toISOString(),source:'local-pending'});
+      await put('gate_presence',{id:localKey,event_id:page.id,guest_number:g.guest_number,state:mode==='entry'?'inside':'outside',last_direction:mode,last_checkpoint:point,updated_at:new Date().toISOString(),source:'local-pending'});
       const out=await refreshSync(false);const label=mode==='exit'?'الخروج':'الدخول';const receipt=await get('checkin_receipts',scan_id);
       if(receipt?.status==='already_inside'){toast('لم تُسجل حركة جديدة: الزائر داخل الفعالية بالفعل.',true);return;}
       if(receipt?.status==='already_outside'){toast('لم تُسجل حركة جديدة: الزائر خارج الفعالية بالفعل.',true);return;}
@@ -280,7 +293,7 @@ export async function scanPage(slug){
     },'btn');
     result.replaceChildren(h('span',{class:'tag'},g.status||'registered'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),check);
   }
-  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,laneType.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
+  const tools=h('div',{class:'scanner-tools'},input.node,direction.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
   host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,h('div',{class:'between preflight-head'},h('h3',{},'جاهزية البوابة'),button('إعادة الفحص',refreshPreflight,'text-btn')),preflight,tools,cameraBox,result));
