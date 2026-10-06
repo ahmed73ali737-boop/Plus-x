@@ -1,5 +1,5 @@
 import {h,root,api,field,selectField,check,button,toast,brand} from './ui.mjs';
-import {bundle,get,put,del,all,activate} from './offline.mjs';
+import {bundle,get,put,del,all,status as offlineStatus,activate} from './offline.mjs';
 
 function cleanLocalPhone(raw,countryCode='+967'){
   const digitMap={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
@@ -220,6 +220,20 @@ export async function scanPage(slug){
   root.replaceChildren(guestHeader(page,slug));const host=h('main',{class:'scanner-shell'});root.append(host);
   const status=h('p',{class:'muted small'},token?(navigator.onLine?'الجهاز مرتبط · السجل محدث':'الجهاز مرتبط · سجل محفوظ دون اتصال'):'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.');
   const syncState=h('span',{class:'tag'},'المزامنة: جاهزة');
+  const preflight=h('div',{class:'scanner-preflight'});
+  async function refreshPreflight(){
+    const local=await offlineStatus();const cached=await get('guest_manifests',page.id);let persisted=false;try{persisted=await navigator.storage?.persisted?.()||false;}catch{}
+    const checks=[
+      ['الربط',token?'جاهز':'غير مربوط',!!token],
+      ['سجل الزوار',(manifest.guests||[]).length+' زائر',(manifest.guests||[]).length>0],
+      ['الطابور',local.pending?local.pending+' معلّق':'0 معلّق',local.pending===0],
+      ['المرفوض',local.rejected?local.rejected+' يحتاج مراجعة':'0',local.rejected===0],
+      ['التخزين',persisted?'مستمر':'قد يفرغه المتصفح',persisted],
+      ['الكاميرا','BarcodeDetector'in window?'مدعومة':'ماسح/إدخال يدوي',true],
+      ['الشبكة',navigator.onLine?'متصل':'Offline',true],
+    ];
+    preflight.replaceChildren(...checks.map(([label,value,ok])=>h('div',{class:'preflight-chip'+(ok?' ready':' warning')},h('small',{},label),h('strong',{},value))),cached?.cached_at?h('small',{class:'muted preflight-time'},'آخر تجهيز: '+new Date(cached.cached_at).toLocaleString('ar-YE')):null);
+  }
   const input=field('امسح QR أو أدخل رقم الزائر','text','',{placeholder:'G-1234-ABCD-5678-EF90',autocomplete:'off'});
   const direction=selectField('وضع المسح',[['entry','دخول'],['exit','خروج'],['validate','تحقق فقط']],'entry');
   const laneType=selectField('مسار الزوار',[['all','كل الأنواع'],['visitor','زائر'],['vip','VIP'],['speaker','متحدث'],['staff','طاقم'],['media','إعلام'],['exhibitor','عارض']],'all');
@@ -261,8 +275,9 @@ export async function scanPage(slug){
   const tools=h('div',{class:'scanner-tools'},input.node,direction.node,laneType.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر');},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   const video=h('video',{class:'scanner-video',autoplay:true,playsinline:true,muted:true});
   const cameraBox=h('section',{class:'scanner-camera'},video,h('div',{class:'scan-frame'}));
-  host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,tools,cameraBox,result));
-  const retry=()=>refreshSync(false);
+  host.append(h('section',{class:'scanner-panel'},h('span',{class:'eyebrow'},'OFFLINE GATE SCANNER'),h('h1',{},'مسح بطاقة الزائر'),status,h('div',{class:'between preflight-head'},h('h3',{},'جاهزية البوابة'),button('إعادة الفحص',refreshPreflight,'text-btn')),preflight,tools,cameraBox,result));
+  await refreshPreflight();
+  const retry=async()=>{const out=await refreshSync(false);await refreshPreflight();return out;};
   const reconnect=()=>setTimeout(async()=>{manifest=await loadManifest(page.id,token);await retry();status.textContent=token?'الجهاز مرتبط · تمت مزامنة السجل والطابور':'اربط الجهاز أولًا من لوحة الإدارة ثم جهّز سجل الزوار.';},350);
   const retryTimer=setInterval(()=>{if(navigator.onLine)retry();},3000);
   window.addEventListener('online',reconnect);
