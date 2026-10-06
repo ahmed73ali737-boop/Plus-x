@@ -173,5 +173,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build production image
         run: docker build -f ops/Dockerfile -t pulsex-ci .
-      - name: Verify runtime imports inside image
-        run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; print('container-runtime-import-ok')"
+      - name: Verify runtime imports and migration assets inside image
+        run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; from tools.migrate_postgres import MIGRATIONS; assert all(p.is_file() for p in MIGRATIONS); print('container-runtime-and-migrations-ok')"
