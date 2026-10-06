@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from app.db import make_engine, metadata
-from tools.migrate_postgres import apply_migrations, execute_script
+from tools.migrate_postgres import MIGRATIONS, apply_migrations, execute_script
 from app.server import create_app
 
 url=os.environ.get('PX_POSTGRES_TEST_URL','')
