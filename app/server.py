@@ -5,7 +5,7 @@ Delivery endpoints delegate security, access, publishing and collection rules to
 Build identity is centralized in app.core.build_info.
 """
 from __future__ import annotations
-import base64, copy, hashlib, io, json, os, re, secrets, uuid
+import base64, copy, hashlib, io, json, mimetypes, os, re, secrets, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
@@ -34,6 +34,10 @@ from .application.public_service import build_public_bundle, build_public_poll_r
 from .api.guest_routes import install_guest_routes
 
 ROOT=Path(__file__).resolve().parent.parent
+# Do not inherit OS-specific MIME registry drift for browser module assets.
+# Chromium refuses ES modules unless .mjs is served with a JavaScript MIME type.
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
     engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
