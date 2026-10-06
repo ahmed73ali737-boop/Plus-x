@@ -1,0 +1,77 @@
+{
+  "product": "PulseX — Live Experience & Insights Platform",
+  "release": "v1.0.0",
+  "track": "Exhibition 360",
+  "release_type": "final_software_release",
+  "baseline_main_sha": "b2af516d84c73d7b5fe8bdea8c20c1f98ce8b01c",
+  "scope": {
+    "experience_platform": true,
+    "organization_brand_event_hierarchy": true,
+    "public_event_and_participant_sites": true,
+    "tharawat_live_site": true,
+    "easy_live_site": true,
+    "rts_live_site": true,
+    "guest_phone_deduplication": true,
+    "guest_number_and_qr_pass": true,
+    "gate_scanner_entry_exit_validate": true,
+    "anti_passback": true,
+    "offline_registration": true,
+    "offline_checkin_and_sync": true,
+    "kiosk_tablet_mobile_qr": true,
+    "surveys_branching_validation": true,
+    "polls_live_results": true,
+    "ratings_notes_leads_consent": true,
+    "excel_csv_import": true,
+    "analytics_reports_exports": true,
+    "admin_organizer_roles": true,
+    "api": true,
+    "python_sdk": true,
+    "javascript_sdk": true,
+    "postgresql_migrations": true,
+    "docker_compose": true,
+    "health_readiness": true,
+    "security_hardening": true
+  },
+  "required_release_gates": [
+    "PulseX CI on release PR head",
+    "guest-qr-ci on release PR head"
+  ],
+  "prior_exact_candidate_evidence": [
+    {
+      "workflow": "PulseX CI",
+      "run_id": 37425282781,
+      "candidate_sha": "29422416a40a824ac0b933b8bc6f2f3bc6e93cdd",
+      "status": "passed"
+    },
+    {
+      "workflow": "guest-qr-ci",
+      "run_id": 37425281740,
+      "candidate_sha": "29422416a40a824ac0b933b8bc6f2f3bc6e93cdd",
+      "status": "passed"
+    },
+    {
+      "workflow": "PulseX CI",
+      "run_id": 37425281791,
+      "candidate_sha": "29422416a40a824ac0b933b8bc6f2f3bc6e93cdd",
+      "status": "passed"
+    }
+  ],
+  "separate_native_evidence": {
+    "windows_native_run": 37408352398,
+    "postgresql_native_run": 37408352414,
+    "note": "Evidence from the governed native-gate branch; final release PR is revalidated by the unified CI on its own head."
+  },
+  "field_deployment_signoff_required": [
+    "physical camera/scanner UAT",
+    "physical multi-device outage/recovery",
+    "venue LAN/edge validation",
+    "five-day offline soak",
+    "real TLS/domain deployment",
+    "production-like load/saturation with SLO metrics",
+    "independent DAST/pentest",
+    "production backup restore/PITR/retention",
+    "signed business/field UAT"
+  ],
+  "release_policy": "Publish GitHub Release only after the release PR passes required automated gates and is merged to main.",
+  "truth_boundary": "Final software deliverable and automated-testable scope can be released; physical/production acceptance is a separate sign-off and must not be claimed without evidence."
+}
