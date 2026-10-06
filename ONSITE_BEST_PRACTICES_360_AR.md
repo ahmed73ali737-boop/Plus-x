@@ -12,9 +12,14 @@
 - Swoogo Go Onsite — offline event/session check-in مع sync بعد الاتصال.
   https://swoogo.events/mobile/go-onsite/
 - Whova — kiosk/self check-in، on-demand badge printing، attendee category filters، session/self check-in.
+- pretix / pretixSCAN — device authentication، offline local database + resync، independent check-in lists، entry/exit redemption، failed-scan statistics، replay nonce/idempotency.
   https://whova.com/blog/kiosk-check-in-badge-printing/
   https://whova.com/blog/onsite-badge-printing/
   https://whova.com/blog/attendee-check-in-filters/
+  https://docs.pretix.eu/guides/pretixscan/android/
+  https://docs.pretix.eu/dev/api/resources/checkin.html
+  https://docs.pretix.eu/dev/api/resources/checkinlists.html
+  https://docs.pretix.eu/dev/api/deviceauth.html
 
 ## Adopted / Implemented
 
@@ -33,6 +38,7 @@
 | Five-day-compatible freshness | default 7200 min, configurable up to 10080 | Matches exhibition requirement without blocking operation |
 | Device preflight | pairing/manifest/version/queue/storage/camera/network | Prevents discovering setup gaps at the door |
 | Least-privilege device role | guest gate APIs require `operator` | Displays/tablets cannot retrieve attendee manifest |
+| Failed-scan audit | denied/anti-passback scans written to scoped audit | Gives support/operations an explanation trail |
 | Manual/walk-in registration | organizer guest registration | Handles onsite exceptions |
 | Badge on demand | print-ready final Guest Pass | Immediate value without printer-vendor lock-in |
 | Secure badge/pass recovery | per-event possession secret hash | Phone number is dedupe key, not authentication |
@@ -97,3 +103,9 @@ Hosted CI can prove API/browser/IndexedDB/PostgreSQL/container behavior. It cann
 - independent penetration test.
 
 Those remain signed field/deployment gates rather than being mislabeled as automated PASS.
+
+### Offline decisions after policy changes
+pretix supports a deliberate “force” concept when uploading scans that already happened offline. PulseX does **not** copy this blindly. Current PulseX behavior validates against the cached policy on the device and revalidates when connected; a server rejection remains visible for review. Automatically forcing an old offline decision into the canonical presence state is deferred until we add a reconciliation model that can preserve physical history without corrupting multi-gate presence.
+
+### Independent check-in lists / access domains
+pretix check-in lists are independent, which is useful for festival stages, restaurants, or sessions where one person may be valid once per list. PulseX checkpoints currently represent multiple entrances/access lanes of the **same event presence domain**, so anti-passback is global for the event. If we later add rooms/sessions with independent attendance, that should become an `AccessDomain / CheckInList` model above checkpoints rather than weakening event anti-passback.
