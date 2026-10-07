@@ -38,9 +38,12 @@ def install_security_middleware(app, public_origin: str) -> None:
             if request_origin and request_origin != public_origin:
                 return JSONResponse({'detail': 'ORIGIN_FORBIDDEN'}, 403)
 
-        if request.url.path.startswith('/api/'):
+        # Routing/security decisions must use the ASGI scope path, not a URL
+        # reconstructed from the untrusted Host header.
+        scope_path = request.scope.get('path') or ''
+        if scope_path.startswith('/api/'):
             ip = request.client.host if request.client else 'unknown'
-            bucket = 'auth' if request.url.path.startswith('/api/auth/login') else 'guest' if request.url.path.startswith('/api/public/events/') and '/guests' in request.url.path else 'api'
+            bucket = 'auth' if scope_path.startswith('/api/auth/login') else 'guest' if scope_path.startswith('/api/public/events/') and '/guests' in scope_path else 'api'
             key = (ip, bucket)
             queue = limits[key]
             current = time.monotonic()
@@ -66,7 +69,7 @@ def install_security_middleware(app, public_origin: str) -> None:
         )
         if secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        if request.url.path.startswith('/api/'):
+        if scope_path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-PulseX-API-Version'] = '1'
         return response
