@@ -6,7 +6,7 @@ from sqlalchemy import inspect, text as sql_text
 
 from ...core.build_info import APP_VERSION, BUILD_LABEL, API_VERSION
 from ...db import metadata
-from tools.migrate_postgres import MIGRATIONS
+from ...core.migrations import postgres_migration_status
 
 
 def create_health_router(engine) -> APIRouter:
@@ -57,21 +57,33 @@ def create_health_router(engine) -> APIRouter:
                 details["critical_columns_current"] = True
 
                 if engine.dialect.name == "postgresql":
-                    applied = set(
-                        connection.execute(
-                            sql_text("SELECT migration_id FROM px_schema_migrations")
-                        ).scalars()
-                    )
-                    expected = {path.name for path in MIGRATIONS}
-                    missing_migrations = sorted(expected - applied)
-                    if missing_migrations:
+                    migration = postgres_migration_status(connection)
+                    details.update(migration)
+                    if not migration["schema_migrations_current"]:
+                        problems = []
+                        if migration["migration_missing"]:
+                            problems.append(
+                                "missing=" + ",".join(migration["migration_missing"])
+                            )
+                        if migration["migration_checksum_mismatch"]:
+                            problems.append(
+                                "checksum=" + ",".join(
+                                    migration["migration_checksum_mismatch"]
+                                )
+                            )
                         raise RuntimeError(
-                            "SCHEMA_MIGRATIONS_MISSING:" + ",".join(missing_migrations)
+                            "SCHEMA_MIGRATIONS_NOT_CURRENT:" + ";".join(problems)
                         )
-                    details["schema_migrations_current"] = True
-                    details["migration_count"] = len(expected)
                 else:
-                    details["schema_migrations_current"] = "not_applicable_local_sqlite"
+                    details.update(
+                        {
+                            "schema_migrations_current": "not_applicable_local_sqlite",
+                            "migration_count": 0,
+                            "migration_expected": 0,
+                            "migration_missing": [],
+                            "migration_checksum_mismatch": [],
+                        }
+                    )
 
             return {"status": "ready", **details}
         except Exception as exc:
