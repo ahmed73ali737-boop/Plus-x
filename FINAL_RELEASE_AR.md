@@ -1,4 +1,4 @@
-# PulseX Exhibition 360 — Final Release v1.0.0
+# PulseX Exhibition 360 — Final Release v1.1.0
 
 ## 1. تعريف هذا المخرج
 هذا الإصدار هو **المخرج البرمجي الموحد النهائي** لنطاق المعرض الذي تم بناؤه فوق آخر baseline، وليس مشروعًا جديدًا أو إعادة بداية.
@@ -19,11 +19,12 @@
 - API + Python SDK + JavaScript SDK.
 - PostgreSQL migrations + Docker/Compose + health/readiness.
 - مواقع معرض حية ومستقلة لـ **ثروات، Easy، RTS** مع محرك بيانات وتفاعل مشترك.
+- Public Experience v2: استبيانات موجهة للعلامة، تقييمات نجومية، تصويت حي، إعلانات معلنة بوضوح، وتجارب متجاوبة Web/Mobile-QR/Kiosk مع reduced-motion وfocus-visible.
 
 ## 2. ما الذي يُسلَّم
-GitHub Release `v1.0.0` ينشئ تلقائيًا:
-- `PulseX-Exhibition-v1.0.0.zip`
-- `PulseX-Exhibition-v1.0.0.tar.gz`
+GitHub Release `v1.1.0` ينشئ تلقائيًا:
+- `PulseX-Exhibition-v1.1.0.zip`
+- `PulseX-Exhibition-v1.1.0.tar.gz`
 - `SHA256SUMS.txt`
 
 وتمثل الحزمة snapshot كاملة لنفس commit المنشور في Release.
@@ -65,4 +66,4 @@ GitHub Release `v1.0.0` ينشئ تلقائيًا:
 - Production readiness: `PRODUCTION_READINESS_AR.md`
 
 ## 7. قاعدة الإصدار
-لا يُنشر `v1.0.0` يدويًا من فرع جانبي. Workflow الإصدار ينشره من `main` بعد دمج فرع الإصدار الذي اجتاز الاختبارات.
+لا يُنشر `v1.1.0` يدويًا من فرع جانبي. Workflow الإصدار ينشره من `main` بعد دمج فرع الإصدار الذي اجتاز الاختبارات.
