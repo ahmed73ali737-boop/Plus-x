@@ -31,6 +31,27 @@
       ]
     },
     {
+      "id": "AUDIT-HISTORICAL-ORPHAN-GUESTS",
+      "status": "regression_required",
+      "invariant": "Historical guest rows with no registration/check-in/presence can be identified without mutation and deleted only with an explicit expected-count guard.",
+      "checks": [
+        {
+          "path": "tools/cleanup_orphan_guests.py",
+          "markers": [
+            "status\": \"dry_run",
+            "EXPECTED_COUNT_REQUIRED",
+            "EXPECTED_COUNT_MISMATCH"
+          ]
+        },
+        {
+          "path": "tests/test_guest_cleanup.py",
+          "markers": [
+            "test_orphan_guest_cleanup_is_dry_run_by_default_and_guarded_on_apply"
+          ]
+        }
+      ]
+    },
+    {
       "id": "AUDIT-MALFORMED-HOST",
       "status": "regression_required",
       "invariant": "Malformed Host must not bypass auth rate limiting or remove API no-store headers.",
@@ -218,6 +239,12 @@
       "id": "CROSS-BROWSER-WCAG",
       "status": "manual_open",
       "invariant": "Chromium success does not imply Safari/Firefox/Edge or full WCAG/screen-reader acceptance.",
+      "checks": []
+    },
+    {
+      "id": "BACKUP-RESTORE-RETENTION",
+      "status": "manual_open",
+      "invariant": "Production backup encryption, retention and restore/PITR evidence with approved RPO/RTO remain open until exercised on the production-equivalent PostgreSQL environment.",
       "checks": []
     }
   ]
