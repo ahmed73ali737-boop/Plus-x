@@ -2,6 +2,8 @@ name: PulseX CI
 
 on:
   pull_request:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +32,8 @@ jobs:
           pip install -r requirements.txt -r requirements-qa.txt
       - name: Compile Python
         run: python -m compileall -q app tests tools run.py
+      - name: Audit Python dependencies
+        run: python -m pip_audit -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
       - name: Run pytest suite
         run: python -m pytest -q
       - name: Run local HTTP acceptance
@@ -83,12 +87,20 @@ jobs:
         run: python -m playwright install chromium
       - name: Run Windows Chromium component suite
         run: python tests/browser_components.py
+      - name: Run Windows updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run Windows updated legacy UX contract
+        run: python tests/ux_contract_w08.py
       - name: Run Windows real HTTP browser end-to-end
         run: python tests/browser_smoke.py
       - name: Run Windows exhibition brand journeys
         run: python tests/browser_exhibition_sites.py
       - name: Run Windows guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run Windows full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
       - name: Run Windows IndexedDB offline component
         run: python tests/browser_offline_indexeddb.py
       - name: Upload Windows browser QA artifacts
@@ -104,6 +116,11 @@ jobs:
             qa/exhibition-browser-server.log
             qa/windows11-browser-offline-indexeddb.json
             qa/windows12-guest-browser.json
+            qa/browser-question-roundtrip.json
+            qa/browser-question-roundtrip.png
+            qa/browser-question-roundtrip-server.log
+            qa/browser-control-contract.json
+            qa/browser-control-contract-server.log
             qa/guest-browser-server.log
             qa/browser-server.log
             qa/*.png
@@ -125,12 +142,20 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run read-only Chromium component suite
         run: python tests/browser_components.py
+      - name: Run updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run updated legacy UX contract
+        run: python tests/ux_contract_w08.py
       - name: Run real HTTP browser end-to-end flow
         run: python tests/browser_smoke.py
       - name: Run exhibition brand journeys
         run: python tests/browser_exhibition_sites.py
       - name: Run guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
       - name: Run IndexedDB offline queue component
         if: always()
         run: python tests/browser_offline_indexeddb.py

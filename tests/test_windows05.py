@@ -17,7 +17,7 @@ if str(ROOT / 'sdk/python') not in sys.path:
 from app.application.access import active_window
 from app.core.security import hash_password, verify_password
 from app.server import create_app
-from app.core.build_info import BUILD_LABEL
+from app.core.build_info import APP_VERSION, BUILD_LABEL
 from pulsex_sdk import PulseXClient
 
 
@@ -81,7 +81,7 @@ def test_python_sdk_against_real_local_http_shape(tmp_path, monkeypatch):
 def test_openapi_contains_hardening_health_paths(tmp_path):
     app = create_app(f"sqlite:///{tmp_path/'schema.sqlite3'}", seed_demo=False)
     schema = app.openapi()
-    assert schema['info']['version'] == '0.9.0'
+    assert schema['info']['version'] == APP_VERSION
     assert '/api/health/ready' in schema['paths']
     assert '/api/admin/organizations' in schema['paths']
 

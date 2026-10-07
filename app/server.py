@@ -32,6 +32,7 @@ from .application.device_service import create_device, list_devices, update_devi
 from .application.access_request_service import list_requests, set_request_status
 from .application.public_service import build_public_bundle, build_public_poll_results
 from .api.guest_routes import install_guest_routes
+from tools.production_gate import assert_production_ready
 
 ROOT=Path(__file__).resolve().parent.parent
 # Do not inherit OS-specific MIME registry drift for browser module assets.
@@ -40,6 +41,14 @@ mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
+    production_mode=(
+        os.environ.get('PULSEX_ENV','').strip().lower()=='production'
+        or os.environ.get('REQUIRE_POSTGRES','false').lower()=='true'
+    )
+    if production_mode:
+        # Enforce release conditions inside the application factory as well as
+        # deployment scripts, so direct uvicorn/run.py starts cannot bypass them.
+        assert_production_ready()
     engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
     app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None)
     app.state.engine=engine;app.state.seed_credentials=seed(engine,credentials_path) if seed_demo else []
@@ -53,7 +62,8 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
 
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
-        if u.get('must_change_password') and req.url.path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
+        path=req.scope.get('path') or '/'
+        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 

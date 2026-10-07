@@ -3,6 +3,7 @@ import os
 import pytest
 
 from tools import production_gate
+from app.server import create_app
 
 
 def production_env(monkeypatch):
@@ -39,3 +40,11 @@ def test_production_gate_accepts_independent_guest_identity_secret(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         production_gate.main()
     assert exc.value.code==0
+
+
+def test_application_factory_enforces_production_gate(monkeypatch):
+    production_env(monkeypatch)
+    monkeypatch.setenv("PULSEX_ENV","production")
+    monkeypatch.delenv("GUEST_ID_SECRET",raising=False)
+    with pytest.raises(RuntimeError, match="PRODUCTION_GATE_FAILED:.*guest_identity_secret_configured"):
+        create_app("sqlite:///:memory:", origin="http://testserver", seed_demo=False)

@@ -24,8 +24,9 @@ common='const UI=(()=>{'+ui+';return {h,root,api,field,selectField,check,button,
 icons='const Icons=(()=>{'+module('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+module('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
 questions='const Questions=(()=>{const{h,field,selectField}=UI;'+module('questions.mjs')+';return{question,visible};})();'
+exhibition='const Exhibition=(()=>{'+module('exhibition.mjs')+';return{exhibitionExperience};})();'
 public=module('public.mjs').replace('new URLSearchParams(location.search)', "new URLSearchParams(window._query||'')")
-public='const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const bundle=async slug=>await api("/api/public/site/"+slug);const enqueue=async item=>(await api("/api/collect",{items:[item]})).receipts[0];const prepare=async()=>{throw Error("Native offline test unavailable in harness")};const backup=prepare;const sync=async()=>{};const activate=()=>{};const status=async()=>({pending:0,rejected:0,items:[]});'+public+';return{publicPage,welcome,renderRoute};})();window.PXPublic=Public;'
+public='const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const{exhibitionExperience}=Exhibition;const bundle=async slug=>await api("/api/public/site/"+slug);const enqueue=async item=>(await api("/api/collect",{items:[item]})).receipts[0];const prepare=async()=>{throw Error("Native offline test unavailable in harness")};const backup=prepare;const sync=async()=>{};const activate=()=>{};const status=async()=>({pending:0,rejected:0,items:[]});'+public+';return{publicPage,welcome,renderRoute};})();window.PXPublic=Public;'
 admin='const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error("Not a native storage test")};'+module('admin.mjs')+';return{adminPage};})();window.PXAdmin=Admin;'
 media={}
 for file in (ROOT/'web/media').glob('*'):
@@ -51,7 +52,7 @@ with sync_playwright() as p:
         page.add_style_tag(content=(ROOT/'web/style.css').read_text(encoding='utf-8'))
         page.add_style_tag(content=(ROOT/'web/design.css').read_text(encoding='utf-8'))
         page.evaluate('''arg=>{window._media=arg.media;window._query=arg.query;window.crypto.randomUUID=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]%16;return(c==='x'?r:(r&3|8)).toString(16)});for(const name of ['localStorage','sessionStorage']){const values={};Object.defineProperty(window,name,{configurable:true,value:{getItem:k=>values[k]||null,setItem:(k,v)=>{values[k]=v},removeItem:k=>delete values[k]}});}window.fetch=async(url,options={})=>{const r=await window.pxBridge({url:String(url),method:options.method||'GET',headers:options.headers||{},body:options.body});return{ok:r.ok,status:r.status,json:async()=>r.body};};}''',{'media':media,'query':query})
-        page.add_script_tag(content='(()=>{'+common+icons+catalog+questions+(public if mode=='public' else admin)+'})()')
+        page.add_script_tag(content='(()=>{'+common+icons+catalog+questions+exhibition+(public if mode=='public' else admin)+'})()')
     try:
         setup('public');page.evaluate("PXPublic.publicPage('platform')")
         page.get_by_role('heading',name='الفعاليات الجارية والقادمة').wait_for();page.get_by_role('button',name='طلب اشتراك / حساب',exact=True).wait_for()

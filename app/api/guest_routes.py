@@ -86,25 +86,27 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             for item in items:
                 client_id=item.get("client_id") if isinstance(item,dict) else None
                 try:
-                    # Each offline item gets its own savepoint. A rejected item must
-                    # roll back every write while accepted siblings remain committed.
+                    # Each offline item owns a savepoint. If this item is rejected,
+                    # rolling back the savepoint removes *all* of its writes while
+                    # allowing accepted siblings in the same batch to commit.
                     with c.begin_nested():
                         guest=register_guest(c,event,item)
-                    if guest["verified"]:
-                        receipts.append({
-                            "client_id":client_id,
-                            "status":"accepted",
-                            "guest_number":guest["guest_number"],
-                            "created":guest["created"],
-                            "pass_token":guest.get("pass_token"),
-                            "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
-                        })
-                    else:
-                        receipts.append({
-                            "client_id":client_id,
-                            "status":"verification_required",
-                            "verification_required":True,
-                        })
+                        if guest["verified"]:
+                            receipt={
+                                "client_id":client_id,
+                                "status":"accepted",
+                                "guest_number":guest["guest_number"],
+                                "created":guest["created"],
+                                "pass_token":guest.get("pass_token"),
+                                "qr_url":guest_qr_payload(event["slug"],guest["guest_number"],public_origin),
+                            }
+                        else:
+                            receipt={
+                                "client_id":client_id,
+                                "status":"verification_required",
+                                "verification_required":True,
+                            }
+                    receipts.append(receipt)
                 except Exception as exc:
                     detail=getattr(exc,"detail",str(exc))
                     receipts.append({"client_id":client_id,"status":"rejected","error":detail})
