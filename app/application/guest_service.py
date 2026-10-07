@@ -79,6 +79,16 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
     if body.get("consent") is not True and not boolean(body.get("consent",False)):
         fail("GUEST_CONSENT_REQUIRED")
     phone=normalize_phone(body.get("phone"),body.get("country_code") or "+967")
+    # Validate every request field that can reject registration before the first DB write.
+    # This keeps direct registration atomic and also makes rejected sync items side-effect free.
+    supplied_pass_token=text(body.get("pass_token"),200)
+    if supplied_pass_token and len(supplied_pass_token)<32:
+        fail("PASS_TOKEN_INVALID")
+    requested_type=text(body.get("guest_type") or "visitor",40).lower()
+    configured_types={x.get("key") for x in (event.get("draft") or {}).get("access_control",{}).get("guest_types",[]) if isinstance(x,dict)}
+    guest_type=requested_type if allow_guest_type else "visitor"
+    if configured_types and guest_type not in configured_types:
+        fail("GUEST_TYPE_INVALID")
     p_hash=phone_hash(phone)
     g_number=guest_number_for_phone(phone)
     guest=conn.execute(
@@ -145,15 +155,7 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
     ).mappings().first()
     event_registration_created=False
     issued_pass_token=None
-    supplied_pass_token=text(body.get("pass_token"),200)
-    if supplied_pass_token and len(supplied_pass_token)<32:
-        fail("PASS_TOKEN_INVALID")
     verified=False
-    requested_type=text(body.get("guest_type") or "visitor",40).lower()
-    configured_types={x.get("key") for x in (event.get("draft") or {}).get("access_control",{}).get("guest_types",[]) if isinstance(x,dict)}
-    guest_type=requested_type if allow_guest_type else "visitor"
-    if configured_types and guest_type not in configured_types:
-        fail("GUEST_TYPE_INVALID")
     if not reg:
         issued_pass_token=supplied_pass_token or new_session_token()
         candidate_reg={
