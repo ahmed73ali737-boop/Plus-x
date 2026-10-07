@@ -507,7 +507,34 @@ def test_rejected_guest_sync_has_no_side_effects_and_mixed_batch_commits_only_va
 def test_malformed_host_cannot_bypass_auth_rate_limit_or_api_no_store(tmp_path):
     app,_=boot(tmp_path)
     malformed=TestClient(app,headers={'Host':'testserver/other'})
-    responses=[malformed.post('/api/auth/login',json={'email':'nobody@example.test','password':'wrong-password'}) for _ in range(21)]
-    assert responses[-1].status_code==429
+    responses=[
+        malformed.post(
+            '/api/auth/login',
+            json={'email':'nobody@example.test','password':'wrong-password'},
+        )
+        for _ in range(21)
+    ]
+    # The hardened application rejects malformed authority before any route-
+    # specific decision. Repeating it must never turn into an auth bypass.
+    assert all(r.status_code==400 for r in responses)
+    assert all(r.json()['detail']=='HOST_INVALID' for r in responses)
+    assert all(r.headers.get('Cache-Control')=='no-store' for r in responses)
+
     probe=malformed.get('/api/health')
+    assert probe.status_code==400
     assert probe.headers.get('Cache-Control')=='no-store'
+
+    # A normal Host still exercises the auth bucket and reaches 429 at the
+    # configured threshold, proving Host rejection did not accidentally
+    # disable the intended rate limiter.
+    normal=TestClient(app)
+    ordinary=[
+        normal.post(
+            '/api/auth/login',
+            json={'email':'nobody@example.test','password':'wrong-password'},
+        )
+        for _ in range(21)
+    ]
+    assert [r.status_code for r in ordinary[:20]]==[401]*20
+    assert ordinary[20].status_code==429
+    assert ordinary[20].headers.get('Cache-Control')=='no-store'
