@@ -53,7 +53,8 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
 
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
-        if u.get('must_change_password') and req.url.path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
+        path=req.scope.get('path') or '/'
+        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
