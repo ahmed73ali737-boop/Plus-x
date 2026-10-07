@@ -93,6 +93,8 @@ jobs:
         run: python tests/browser_guest_flow.py
       - name: Run Windows full question control roundtrip
         run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
       - name: Run Windows IndexedDB offline component
         run: python tests/browser_offline_indexeddb.py
       - name: Upload Windows browser QA artifacts
@@ -111,6 +113,8 @@ jobs:
             qa/browser-question-roundtrip.json
             qa/browser-question-roundtrip.png
             qa/browser-question-roundtrip-server.log
+            qa/browser-control-contract.json
+            qa/browser-control-contract-server.log
             qa/guest-browser-server.log
             qa/browser-server.log
             qa/*.png
@@ -140,6 +144,8 @@ jobs:
         run: python tests/browser_guest_flow.py
       - name: Run full question control roundtrip
         run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
       - name: Run IndexedDB offline queue component
         if: always()
         run: python tests/browser_offline_indexeddb.py
