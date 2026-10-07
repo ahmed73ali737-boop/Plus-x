@@ -119,11 +119,11 @@ body[data-template=tharawat_finance] .section-heading h2:after{content:"";displa
 .survey-controls .btn{min-height:46px;min-width:118px}
 
 .rating-cta-experience{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:28px;padding:clamp(26px,4vw,46px);border-radius:30px;background:linear-gradient(135deg,color-mix(in srgb,var(--experience-deep) 96%,#000),color-mix(in srgb,var(--experience-accent) 55%,var(--experience-deep)));color:#fff;border:0;box-shadow:0 30px 80px -55px var(--experience-deep)}
-.rating-cta-experience::before{content:"";position:absolute;inset:-50% auto auto -8%;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,#ffffff20,transparent 70%)}
+.rating-cta-experience::before{content:"";position:absolute;inset:-50% auto auto -8%;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,#ffffff20,transparent 70%);pointer-events:none}
 .rating-cta-copy{position:relative;z-index:1}.rating-cta-experience h3,.rating-cta-experience p{color:#fff}.rating-cta-experience h3{font-size:clamp(24px,3vw,38px);margin:7px 0}.rating-cta-experience p{max-width:650px;opacity:.78}
 .rating-kicker{display:inline-flex;font:800 9px/1.2 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb,var(--experience-accent) 58%,#fff)}
 .rating-cta-visual{direction:ltr;display:flex;gap:4px;font-size:clamp(24px,3vw,38px);color:#ffd875;filter:drop-shadow(0 8px 18px #0003);animation:pxRatingGlow 3.5s ease-in-out infinite}
-.rating-open-btn{min-width:150px;background:#fff!important;color:var(--experience-deep)!important;border-color:#fff!important}
+.rating-open-btn{position:relative;z-index:2;min-width:150px;background:#fff!important;color:var(--experience-deep)!important;border-color:#fff!important}
 .rating-experience{display:grid;gap:6px;min-width:min(620px,78vw)}
 .rating-experience-head{padding:4px 0 14px}.rating-experience-head h3{font-size:24px;margin:7px 0}.rating-experience-head p{margin:0}
 .rating-criterion{padding:16px 0;border-bottom:1px solid var(--line)}
