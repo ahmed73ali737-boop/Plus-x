@@ -5,6 +5,7 @@ import json
 import os
 from contextlib import closing
 from pathlib import Path
+from app.core.build_info import runtime_identity
 import sqlite3
 import tempfile
 import zipfile
@@ -33,7 +34,7 @@ def backup() -> Path:
             if media.exists():
                 for p in media.rglob('*'):
                     if p.is_file():archive.write(p,str(p.relative_to(ROOT)).replace('\\','/'))
-            archive.writestr('BACKUP-INFO.json',json.dumps({'build':'windows-04','database':'SQLite','contains_sensitive_data':True,'generated_credentials_included':False,'restore':'Stop application; keep an extra copy of current data; extract this data folder only. Never extract over a live database.'},indent=2))
+            archive.writestr('BACKUP-INFO.json',json.dumps({**runtime_identity(),'database':'SQLite','contains_sensitive_data':True,'generated_credentials_included':False,'restore':'Stop application; keep an extra copy of current data; extract this data folder only. Never extract over a live database.'},indent=2))
     return out
 if __name__=='__main__':
     try: print('Backup created (sensitive): '+str(backup()))
