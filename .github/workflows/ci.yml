@@ -87,6 +87,10 @@ jobs:
         run: python -m playwright install chromium
       - name: Run Windows Chromium component suite
         run: python tests/browser_components.py
+      - name: Run Windows updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run Windows updated legacy UX contract
+        run: python tests/ux_contract_w08.py
       - name: Run Windows real HTTP browser end-to-end
         run: python tests/browser_smoke.py
       - name: Run Windows exhibition brand journeys
@@ -138,6 +142,10 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run read-only Chromium component suite
         run: python tests/browser_components.py
+      - name: Run updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run updated legacy UX contract
+        run: python tests/ux_contract_w08.py
       - name: Run real HTTP browser end-to-end flow
         run: python tests/browser_smoke.py
       - name: Run exhibition brand journeys
