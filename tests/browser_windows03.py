@@ -99,7 +99,22 @@ with sync_playwright() as p:
         page.get_by_role('link',name='كل الأقسام',exact=True).click()
         for width in [360,390,768,1440]:
             page.set_viewport_size({'width':width,'height':900})
-            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'overflow {width}'
+            overflow=page.evaluate("""() => {
+                const inner=innerWidth, scroll=document.documentElement.scrollWidth;
+                const offenders=[...document.querySelectorAll('body *')].map(el=>{
+                    const r=el.getBoundingClientRect();
+                    return {
+                        tag:el.tagName.toLowerCase(),
+                        id:el.id||'',
+                        cls:String(el.className||'').slice(0,180),
+                        left:Math.round(r.left*10)/10,
+                        right:Math.round(r.right*10)/10,
+                        width:Math.round(r.width*10)/10,
+                    };
+                }).filter(x=>x.right>inner+1||x.left<-1).slice(0,30);
+                return {inner,scroll,offenders};
+            }""")
+            assert overflow['scroll']<=overflow['inner']+1,{'width':width,**overflow}
             mark(f'responsive_home_width_{width}')
             if width==390:
                 page.evaluate('scrollTo(0,0)');page.wait_for_timeout(7500)
