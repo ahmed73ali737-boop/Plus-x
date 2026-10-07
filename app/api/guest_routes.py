@@ -86,7 +86,10 @@ def install_guest_routes(app, engine, public_origin: str, identify, site_row, lo
             for item in items:
                 client_id=item.get("client_id") if isinstance(item,dict) else None
                 try:
-                    guest=register_guest(c,event,item)
+                    # Each offline item gets its own savepoint. A rejected item must
+                    # roll back every write while accepted siblings remain committed.
+                    with c.begin_nested():
+                        guest=register_guest(c,event,item)
                     if guest["verified"]:
                         receipts.append({
                             "client_id":client_id,
