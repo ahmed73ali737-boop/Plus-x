@@ -91,6 +91,8 @@ jobs:
         run: python tests/browser_exhibition_sites.py
       - name: Run Windows guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run Windows full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
       - name: Run Windows IndexedDB offline component
         run: python tests/browser_offline_indexeddb.py
       - name: Upload Windows browser QA artifacts
@@ -106,6 +108,9 @@ jobs:
             qa/exhibition-browser-server.log
             qa/windows11-browser-offline-indexeddb.json
             qa/windows12-guest-browser.json
+            qa/browser-question-roundtrip.json
+            qa/browser-question-roundtrip.png
+            qa/browser-question-roundtrip-server.log
             qa/guest-browser-server.log
             qa/browser-server.log
             qa/*.png
@@ -133,6 +138,8 @@ jobs:
         run: python tests/browser_exhibition_sites.py
       - name: Run guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
       - name: Run IndexedDB offline queue component
         if: always()
         run: python tests/browser_offline_indexeddb.py
