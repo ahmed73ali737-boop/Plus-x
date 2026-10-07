@@ -41,6 +41,9 @@ def ok(name,cond=True):
     assert cond,name; checks.append(name)
 
 ok('postgres_dialect',app.state.engine.dialect.name=='postgresql')
+ready=c.get('/api/health/ready')
+ok('postgres_readiness_http_200',ready.status_code==200)
+ok('postgres_readiness_migrations_current',ready.json().get('schema_migrations_current') is True and ready.json().get('migration_count')==len(MIGRATIONS))
 ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
 ok('migration_runner_007_applied','007_event_guest_pass_number.sql' in migration_result['applied'])
 ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==6)
