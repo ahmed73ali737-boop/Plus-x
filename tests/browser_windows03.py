@@ -92,7 +92,7 @@ with sync_playwright() as p:
         page.locator('#ratings a.btn').click()
         page.get_by_role('button',name='ابدأ التقييم',exact=True).click()
         page.get_by_role('button',name=re.compile(r'^5 من 5')).first.click()
-        page.get_by_label('الملاحظة — اختيارية',exact=True).fill('ملاحظة اختبار للنسخة الجديدة')
+        page.get_by_label('ملاحظة — اختيارية',exact=True).fill('ملاحظة اختبار للنسخة الجديدة')
         page.get_by_role('button',name='إرسال التقييم',exact=True).click()
         page.wait_for_function("document.querySelectorAll('dialog').length===0")
         mark('general_rating_submission_bridge')
