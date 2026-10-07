@@ -44,7 +44,7 @@
         {
           "path": "app/api/middleware.py",
           "markers": [
-            "request.scope.get('path')",
+            "request.scope.get(\"path\")",
             "Cache-Control"
           ]
         }
