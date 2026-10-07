@@ -465,3 +465,49 @@ def test_scanner_route_allows_same_origin_camera_policy(tmp_path):
     assert r.status_code==200
     assert 'camera=(self)' in r.headers.get('Permissions-Policy','')
     assert 'microphone=()' in r.headers.get('Permissions-Policy','')
+
+
+def test_invalid_pass_token_registration_has_no_side_effects(tmp_path):
+    app,c=boot(tmp_path)
+    from sqlalchemy import func, select
+    from app.db import guests, event_guests
+    r=c.post('/api/public/events/demo/guests/register',json={
+        'phone':'777919191','country_code':'+967','consent':True,'pass_token':'short'
+    })
+    assert r.status_code==422 and r.json()['detail']=='PASS_TOKEN_INVALID'
+    with app.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(guests)).scalar_one()==0
+        assert conn.execute(select(func.count()).select_from(event_guests)).scalar_one()==0
+
+
+def test_rejected_guest_sync_has_no_side_effects_and_mixed_batch_commits_only_valid(tmp_path):
+    app,c=boot(tmp_path)
+    from sqlalchemy import func, select
+    from app.db import guests, event_guests
+    rejected=c.post('/api/public/events/demo/guests/sync',json={'items':[{
+        'client_id':'bad-only','phone':'777929292','country_code':'+967','consent':True,'pass_token':'short'
+    }]})
+    assert rejected.status_code==200
+    assert rejected.json()['receipts'][0]['status']=='rejected'
+    with app.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(guests)).scalar_one()==0
+        assert conn.execute(select(func.count()).select_from(event_guests)).scalar_one()==0
+
+    mixed=c.post('/api/public/events/demo/guests/sync',json={'items':[
+        {'client_id':'good','phone':'777939393','country_code':'+967','consent':True},
+        {'client_id':'bad','phone':'777949494','country_code':'+967','consent':True,'pass_token':'short'},
+    ]})
+    assert mixed.status_code==200
+    assert [x['status'] for x in mixed.json()['receipts']]==['accepted','rejected']
+    with app.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(guests)).scalar_one()==1
+        assert conn.execute(select(func.count()).select_from(event_guests)).scalar_one()==1
+
+
+def test_malformed_host_cannot_bypass_auth_rate_limit_or_api_no_store(tmp_path):
+    app,_=boot(tmp_path)
+    malformed=TestClient(app,headers={'Host':'testserver/other'})
+    responses=[malformed.post('/api/auth/login',json={'email':'nobody@example.test','password':'wrong-password'}) for _ in range(21)]
+    assert responses[-1].status_code==429
+    probe=malformed.get('/api/health')
+    assert probe.headers.get('Cache-Control')=='no-store'
