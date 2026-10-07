@@ -8,7 +8,6 @@ on:
       - FINAL_RELEASE.json
       - FINAL_RELEASE_AR.md
       - EXHIBITION_CI_EVIDENCE_20261006.md
-      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:
@@ -94,12 +93,11 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           TITLE="PulseX Exhibition Final Release v${VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
-            gh release edit "$TAG" --title "$TITLE" --notes-file FINAL_RELEASE_AR.md --latest
-          else
-            gh release create "$TAG" dist/* \
-              --target "$GITHUB_SHA" \
-              --title "$TITLE" \
-              --notes-file FINAL_RELEASE_AR.md \
-              --latest
+            echo "Release $TAG already exists. VERSION must be bumped; published release artifacts are immutable."
+            exit 1
           fi
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes-file FINAL_RELEASE_AR.md \
+            --latest
