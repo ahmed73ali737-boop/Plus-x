@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.server import create_app
-from app.core.build_info import BUILD_LABEL
+from app.core.build_info import APP_VERSION, BUILD_LABEL
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -29,7 +29,7 @@ def login(c,app,index=0):
 def test_windows07_version_and_device_schema(client):
     h=client.get('/api/health').json()
     assert h['build']==BUILD_LABEL
-    assert client.app.openapi()['info']['version']=='0.9.0'
+    assert client.app.openapi()['info']['version']==APP_VERSION
     paths=client.app.openapi()['paths']
     assert '/api/admin/sites/{sid}/devices' in paths
     assert '/api/device/heartbeat' in paths

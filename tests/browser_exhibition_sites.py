@@ -107,6 +107,10 @@ try:
         page.get_by_text("بطاقات Wi‑Fi", exact=True).first.wait_for()
         page.get_by_text("حسابات الأطفال", exact=True).first.wait_for()
         page.get_by_role("link", name="بطاقة الزائر", exact=True).first.wait_for()
+        assert page.locator("body").get_attribute("data-surface") == "web"
+        page.locator(".advert").first.wait_for()
+        assert page.locator(".advert .ad-label").first.inner_text().strip() == "إعلان"
+        mark("easy_advertising_spotlight_is_disclosed_and_rendered")
         assert page.get_by_text("دخول الإدارة", exact=True).count() == 0
         assert page.locator(".expo-tharawat-stage,.expo-rts-stage").count() == 0
         assert_no_overflow(page)
@@ -119,11 +123,25 @@ try:
         mark("easy_full_exhibition_service_content")
 
         page.goto(URL + "/e/demo/p/easy#section/questions")
+        page.locator(".survey-experience").wait_for()
         page.locator('fieldset[data-code="q-interest"] input').first.check()
         page.locator('fieldset[data-code="q-rate"] button').last.click()
         page.locator('form[data-form="main"]').get_by_role("button", name="إرسال الاستبيان", exact=True).click()
         page.get_by_text("شكرًا لك، تم استلام إجاباتك.", exact=True).wait_for()
         mark("easy_exhibition_survey_persisted")
+        mark("easy_survey_experience_surface_rendered")
+
+        page.goto(URL + "/e/demo/p/easy#section/ratings")
+        page.locator(".rating-cta-experience").wait_for()
+        page.get_by_role("button", name="ابدأ التقييم", exact=True).click()
+        dialog = page.locator("dialog")
+        dialog.locator(".star-choice").last.click()
+        dialog.get_by_text("استثنائي", exact=True).wait_for()
+        star_box = dialog.locator(".star-choice").last.bounding_box()
+        assert star_box and star_box["width"] >= 44 and star_box["height"] >= 44, star_box
+        dialog.get_by_role("button", name="إرسال التقييم", exact=True).click()
+        dialog.wait_for(state="detached")
+        mark("easy_rating_experience_roundtrip")
 
         # RTS must expose a technical system map and capability rail.
         page.goto(URL + "/e/demo/p/rts")
@@ -147,10 +165,13 @@ try:
         mark("rts_full_capability_content")
 
         page.goto(URL + "/e/demo/p/rts#section/polls")
+        page.locator(".poll-experience").wait_for()
         page.locator('fieldset[data-code="p-first"] input').first.check()
         page.get_by_role("button", name="إرسال التصويت", exact=True).click()
         page.locator('[data-results="p-first"] strong').first.wait_for()
+        page.locator(".live-results").wait_for()
         mark("rts_live_poll_result_roundtrip")
+        mark("rts_poll_experience_surface_rendered")
 
         # Mobile layout for all three surfaces must stay inside the viewport.
         mobile_context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, locale="ar-YE")
@@ -167,7 +188,24 @@ try:
             assert_no_overflow(mobile)
             mobile.screenshot(path=str(ROOT / f"qa/{name}-exhibition-mobile.png"), full_page=False)
             mark(f"{name}_mobile_no_horizontal_overflow")
+        mobile.goto(URL + "/e/demo/p/easy?source=qr#section/questions")
+        mobile.locator(".survey-experience").wait_for()
+        assert mobile.locator("body").get_attribute("data-surface") == "mobile-qr"
+        assert_no_overflow(mobile)
+        mark("mobile_qr_surface_uses_public_experience_mode")
+
         mobile_context.close()
+
+        kiosk_context = browser.new_context(viewport={"width": 1280, "height": 800}, locale="ar-YE")
+        kiosk_page = kiosk_context.new_page()
+        kiosk_page.goto(URL + "/e/demo/p/easy?kiosk=1#section/questions")
+        kiosk_page.locator(".survey-experience").wait_for()
+        dismiss_welcome(kiosk_page)
+        assert kiosk_page.locator("body").get_attribute("data-surface") == "kiosk"
+        kiosk_choice = kiosk_page.locator(".survey-experience .choice").first.bounding_box()
+        assert kiosk_choice and kiosk_choice["height"] >= 54, kiosk_choice
+        mark("kiosk_surface_uses_large_touch_targets")
+        kiosk_context.close()
 
         # Regression for the Windows failure: local cache persistence must never
         # gate the first network render. Simulate an IndexedDB open that never settles.

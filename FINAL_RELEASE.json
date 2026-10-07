@@ -1,9 +1,9 @@
 {
   "product": "PulseX — Live Experience & Insights Platform",
-  "release": "v1.0.0",
-  "track": "Exhibition 360",
+  "release": "v1.1.0",
+  "track": "Exhibition 360 / Public Experience v2",
   "release_type": "final_software_release",
-  "baseline_main_sha": "b2af516d84c73d7b5fe8bdea8c20c1f98ce8b01c",
+  "baseline_main_sha": "ba3bbb58777c17d555f04ccadfc9db466f2758b4",
   "scope": {
     "experience_platform": true,
     "organization_brand_event_hierarchy": true,
@@ -30,7 +30,11 @@
     "postgresql_migrations": true,
     "docker_compose": true,
     "health_readiness": true,
-    "security_hardening": true
+    "security_hardening": true,
+    "public_experience_v2": true,
+    "branded_surveys_ratings_live_polls_ads": true,
+    "responsive_web_mobile_qr_kiosk": true,
+    "accessibility_reduced_motion_focus_visible": true
   },
   "required_release_gates": [
     "PulseX CI on release PR head",
@@ -72,6 +76,6 @@
     "production backup restore/PITR/retention",
     "signed business/field UAT"
   ],
-  "release_policy": "Publish GitHub Release only after the release PR passes required automated gates and is merged to main.",
-  "truth_boundary": "Final software deliverable and automated-testable scope can be released; physical/production acceptance is a separate sign-off and must not be claimed without evidence."
+  "release_policy": "Publish GitHub Release v1.1.0 only after the main-bound release PR passes PulseX CI and guest-qr-ci on the exact release head and is merged to main.",
+  "truth_boundary": "Final software release v1.1.0 may be published after exact-head automated gates; physical/production acceptance remains a separate sign-off and must not be claimed without external evidence."
 }

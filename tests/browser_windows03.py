@@ -24,8 +24,9 @@ common='const UI=(()=>{'+ui+';return {h,root,api,field,selectField,check,button,
 icons='const Icons=(()=>{'+module('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+module('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
 questions='const Questions=(()=>{const{h,field,selectField}=UI;'+module('questions.mjs')+';return{question,visible};})();'
+exhibition='const Exhibition=(()=>{'+module('exhibition.mjs')+';return{exhibitionExperience};})();'
 public=module('public.mjs').replace('new URLSearchParams(location.search)', "new URLSearchParams(window._query||'')")
-public='const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const bundle=async slug=>await api("/api/public/site/"+slug);const enqueue=async item=>(await api("/api/collect",{items:[item]})).receipts[0];const prepare=async()=>{throw Error("Native offline test unavailable in harness")};const backup=prepare;const sync=async()=>{};const activate=()=>{};const status=async()=>({pending:0,rejected:0,items:[]});'+public+';return{publicPage,welcome,renderRoute};})();window.PXPublic=Public;'
+public='const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const{exhibitionExperience}=Exhibition;const bundle=async slug=>await api("/api/public/site/"+slug);const enqueue=async item=>(await api("/api/collect",{items:[item]})).receipts[0];const prepare=async()=>{throw Error("Native offline test unavailable in harness")};const backup=prepare;const sync=async()=>{};const activate=()=>{};const status=async()=>({pending:0,rejected:0,items:[]});'+public+';return{publicPage,welcome,renderRoute};})();window.PXPublic=Public;'
 admin='const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error("Not a native storage test")};'+module('admin.mjs')+';return{adminPage};})();window.PXAdmin=Admin;'
 media={}
 for file in (ROOT/'web/media').glob('*'):
@@ -51,7 +52,7 @@ with sync_playwright() as p:
         page.add_style_tag(content=(ROOT/'web/style.css').read_text(encoding='utf-8'))
         page.add_style_tag(content=(ROOT/'web/design.css').read_text(encoding='utf-8'))
         page.evaluate('''arg=>{window._media=arg.media;window._query=arg.query;window.crypto.randomUUID=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]%16;return(c==='x'?r:(r&3|8)).toString(16)});for(const name of ['localStorage','sessionStorage']){const values={};Object.defineProperty(window,name,{configurable:true,value:{getItem:k=>values[k]||null,setItem:(k,v)=>{values[k]=v},removeItem:k=>delete values[k]}});}window.fetch=async(url,options={})=>{const r=await window.pxBridge({url:String(url),method:options.method||'GET',headers:options.headers||{},body:options.body});return{ok:r.ok,status:r.status,json:async()=>r.body};};}''',{'media':media,'query':query})
-        page.add_script_tag(content='(()=>{'+common+icons+catalog+questions+(public if mode=='public' else admin)+'})()')
+        page.add_script_tag(content='(()=>{'+common+icons+catalog+questions+exhibition+(public if mode=='public' else admin)+'})()')
     try:
         setup('public');page.evaluate("PXPublic.publicPage('platform')")
         page.get_by_role('heading',name='الفعاليات الجارية والقادمة').wait_for();page.get_by_role('button',name='طلب اشتراك / حساب',exact=True).wait_for()
@@ -78,7 +79,7 @@ with sync_playwright() as p:
         page.locator('fieldset[data-code="q-interest"] input').first.check()
         page.locator('fieldset[data-code="q-rate"] button').last.click()
         page.locator('form[data-form="main"]').get_by_role('button',name='إرسال الاستبيان',exact=True).click()
-        page.get_by_text('تم استلام الإجابات',exact=True).wait_for()
+        page.get_by_text('شكرًا لك، تم استلام إجاباتك.',exact=True).wait_for()
         mark('survey_ui_to_real_http_and_database_bridge')
         page.screenshot(path=str(ROOT/'qa/survey-desktop.png'),full_page=True)
         page.get_by_role('link',name='الرئيسية',exact=True).first.click()
@@ -89,16 +90,31 @@ with sync_playwright() as p:
         mark('vote_and_results_via_real_http_bridge')
         page.get_by_role('link',name='الرئيسية',exact=True).first.click()
         page.locator('#ratings a.btn').click()
-        page.get_by_role('button',name='قيّم الزيارة',exact=True).click()
-        page.get_by_role('button',name='5 من 5',exact=True).first.click()
-        page.get_by_label('الملاحظة — اختيارية',exact=True).fill('ملاحظة اختبار للنسخة الجديدة')
-        page.get_by_role('button',name='إرسال التقييم والملاحظة',exact=True).click()
+        page.get_by_role('button',name='ابدأ التقييم',exact=True).click()
+        page.get_by_role('button',name=re.compile(r'^5 من 5')).first.click()
+        page.get_by_label('ملاحظة — اختيارية',exact=True).fill('ملاحظة اختبار للنسخة الجديدة')
+        page.get_by_role('button',name='إرسال التقييم',exact=True).click()
         page.wait_for_function("document.querySelectorAll('dialog').length===0")
         mark('general_rating_submission_bridge')
         page.get_by_role('link',name='كل الأقسام',exact=True).click()
         for width in [360,390,768,1440]:
             page.set_viewport_size({'width':width,'height':900})
-            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'overflow {width}'
+            overflow=page.evaluate("""() => {
+                const inner=innerWidth, scroll=document.documentElement.scrollWidth;
+                const offenders=[...document.querySelectorAll('body *')].map(el=>{
+                    const r=el.getBoundingClientRect();
+                    return {
+                        tag:el.tagName.toLowerCase(),
+                        id:el.id||'',
+                        cls:String(el.className||'').slice(0,180),
+                        left:Math.round(r.left*10)/10,
+                        right:Math.round(r.right*10)/10,
+                        width:Math.round(r.width*10)/10,
+                    };
+                }).filter(x=>x.right>inner+1||x.left<-1).slice(0,30);
+                return {inner,scroll,offenders};
+            }""")
+            assert overflow['scroll']<=overflow['inner']+1,{'width':width,**overflow}
             mark(f'responsive_home_width_{width}')
             if width==390:
                 page.evaluate('scrollTo(0,0)');page.wait_for_timeout(7500)
@@ -111,8 +127,21 @@ with sync_playwright() as p:
         page.get_by_label('كلمة المرور',exact=True).fill(account['password'])
         page.get_by_role('button',name='تسجيل الدخول',exact=True).click()
         page.get_by_role('heading',level=1,name='نظرة عامة').wait_for()
-        assert page.locator('.admin-main .grid .card').count()==10
-        mark('admin_login_and_ten_functional_shortcuts_bridge')
+        shortcut_titles=page.locator('.admin-main .grid .card h3').all_inner_texts()
+        assert shortcut_titles==[
+            'أدخل أسئلتك',
+            'استيراد Excel / CSV',
+            'الفعالية والخدمات',
+            'التصويت والمشاركة',
+            'التقييم والملاحظات',
+            'الإعلانات والعروض',
+            'الحقائق والأرقام',
+            'هوية صفحتك',
+            'أقسام الموقع',
+            'المعاينة قبل النشر',
+            'النتائج والتقارير',
+        ], shortcut_titles
+        mark('admin_login_and_functional_shortcuts_bridge')
         qr=base64.b64encode(client.get('/api/admin/sites/agency-01/qr').content).decode();page.evaluate('data=>{const i=document.querySelector("img.qr");if(i)i.src="data:image/png;base64,"+data}',qr);page.screenshot(path=str(ROOT/'qa/admin-overview.png'),full_page=True)
         page.get_by_role('button',name='إدخال الأسئلة',exact=True).click()
         page.get_by_role('button',name='+ سؤال واحد',exact=True).first.click()

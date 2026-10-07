@@ -143,6 +143,7 @@ try:
         # physical camera hardware is intentionally reported separately.
         page.goto(URL+"/e/demo/scan")
         page.get_by_role("heading",name="بوابة الدخول والتحقق",exact=True).wait_for()
+        assert page.locator("body").get_attribute("data-surface") == "gate"
         page.get_by_role("heading",name="جاهزية البوابة",exact=True).wait_for()
         page.get_by_text("سجل الزوار",exact=True).wait_for()
         mark("gate_preflight_visible")
@@ -163,10 +164,16 @@ try:
         page.get_by_label("وضع المسح",exact=True).select_option("validate")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
         page.get_by_text("صالح للدخول",exact=True).wait_for()
+        assert "success" in (page.locator(".scan-result").get_attribute("class") or "")
         mark("validate_only_does_not_check_in")
+        mark("gate_success_state_is_visually_explicit")
 
         page.get_by_label("وضع المسح",exact=True).select_option("entry")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
+        gate_action=page.get_by_role("button",name="تسجيل دخول",exact=True)
+        gate_box=gate_action.bounding_box()
+        assert gate_box and gate_box["height"] >= 54, gate_box
+        mark("gate_primary_action_is_large_touch_target")
 
         # Offline scan/check-in from the already prepared local manifest.
         context.set_offline(True)

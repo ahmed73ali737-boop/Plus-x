@@ -1,3 +1,4 @@
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.core.build_info import APP_NAME, APP_VERSION, BUILD_LABEL, API_VERSION, runtime_identity
@@ -11,6 +12,7 @@ def test_runtime_identity_is_single_source_of_truth(tmp_path):
         "build": BUILD_LABEL,
         "api_version": API_VERSION,
     }
+    assert APP_VERSION == (Path(__file__).resolve().parents[1] / "VERSION").read_text(encoding="utf-8").strip()
 
     app = create_app(
         "sqlite:///" + str(tmp_path / "build-info.sqlite"),
@@ -31,5 +33,8 @@ def test_runtime_identity_is_single_source_of_truth(tmp_path):
     assert health.json()["api_version"] == API_VERSION
     assert live.json()["build"] == BUILD_LABEL
     assert ready.json()["build"] == BUILD_LABEL
+    assert ready.json()["version"] == APP_VERSION
+    assert ready.json()["schema_tables_current"] is True
+    assert ready.json()["critical_columns_current"] is True
     assert app.title == APP_NAME
     assert app.version == APP_VERSION

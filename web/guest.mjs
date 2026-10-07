@@ -243,7 +243,7 @@ async function syncCheckins(eventId,token){
   try{return await checkinSyncing;}finally{checkinSyncing=null;}
 }
 export async function scanPage(slug){
-  const page=await bundle(slug);applyTheme(page);document.title='ماسح الزوار | '+page.config.title;activate();
+  const page=await bundle(slug);applyTheme(page);document.body.dataset.surface='gate';document.title='ماسح الزوار | '+page.config.title;activate();
   const auth=(await get('bundles','device-auth'))?.data||{};const token=auth.token||'';
   let manifest=await loadManifest(page.id,token);
   root.replaceChildren(guestHeader(page,slug));const host=h('main',{class:'scanner-shell'});root.append(host);

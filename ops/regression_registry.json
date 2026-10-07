@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "updated": "2026-10-07",
+  "policy": "Every confirmed defect must remain covered by a regression check. A green result at one layer never closes another layer.",
+  "cases": [
+    {
+      "id": "AUDIT-GUEST-ATOMIC-DIRECT",
+      "status": "regression_required",
+      "invariant": "A rejected direct guest registration must leave zero guest/event-registration side effects.",
+      "checks": [
+        {
+          "path": "tests/test_windows12_guests.py",
+          "markers": [
+            "test_invalid_pass_token_registration_has_no_side_effects",
+            "PASS_TOKEN_INVALID"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-GUEST-ATOMIC-SYNC",
+      "status": "regression_required",
+      "invariant": "Rejected sync items must roll back fully; mixed batches commit accepted items only.",
+      "checks": [
+        {
+          "path": "tests/test_windows12_guests.py",
+          "markers": [
+            "test_rejected_guest_sync_has_no_side_effects_and_mixed_batch_commits_only_valid"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-HISTORICAL-ORPHAN-GUESTS",
+      "status": "regression_required",
+      "invariant": "Historical guest rows with no registration/check-in/presence can be identified without mutation and deleted only with an explicit expected-count guard.",
+      "checks": [
+        {
+          "path": "tools/cleanup_orphan_guests.py",
+          "markers": [
+            "status\": \"dry_run",
+            "EXPECTED_COUNT_REQUIRED",
+            "EXPECTED_COUNT_MISMATCH"
+          ]
+        },
+        {
+          "path": "tests/test_guest_cleanup.py",
+          "markers": [
+            "test_orphan_guest_cleanup_is_dry_run_by_default_and_guarded_on_apply"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-MALFORMED-HOST",
+      "status": "regression_required",
+      "invariant": "Malformed Host must not bypass auth rate limiting or remove API no-store headers.",
+      "checks": [
+        {
+          "path": "tests/test_windows12_guests.py",
+          "markers": [
+            "test_malformed_host_cannot_bypass_auth_rate_limit_or_api_no_store"
+          ]
+        },
+        {
+          "path": "app/api/middleware.py",
+          "markers": [
+            "request.scope.get(\"path\")",
+            "Cache-Control"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-MIGRATION-007",
+      "status": "regression_required",
+      "invariant": "Migration 007 must be in the canonical migration chain and applied idempotently.",
+      "checks": [
+        {
+          "path": "app/core/migrations.py",
+          "markers": [
+            "007_event_guest_pass_number.sql"
+          ]
+        },
+        {
+          "path": "tests/postgres_native_acceptance.py",
+          "markers": [
+            "migration_runner_007_applied",
+            "migration_runner_idempotent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-POSTGRES-READINESS",
+      "status": "regression_required",
+      "invariant": "PostgreSQL readiness must prove required tables, critical columns and exact migration checksums.",
+      "checks": [
+        {
+          "path": "app/api/routers/health.py",
+          "markers": [
+            "postgres_migration_status",
+            "schema_migrations_current"
+          ]
+        },
+        {
+          "path": "tests/postgres_native_acceptance.py",
+          "markers": [
+            "postgres_readiness_migrations_current"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-QUESTION-24-ROUNDTRIP",
+      "status": "regression_required",
+      "invariant": "All 24 question types must complete browser input -> submit -> server persistence roundtrip.",
+      "checks": [
+        {
+          "path": "tests/browser_question_roundtrip.py",
+          "markers": [
+            "question_types\": 24",
+            "server_persisted_all_answers"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "markers": [
+            "browser_question_roundtrip.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-LEGACY-UI-BRIDGE",
+      "status": "regression_required",
+      "invariant": "Legacy bridge must follow the current public modules and current interaction labels; stale harness failures are not ignored.",
+      "checks": [
+        {
+          "path": "tests/run_ui_bridge.py",
+          "markers": [
+            "browser_windows03.py"
+          ]
+        },
+        {
+          "path": "tests/browser_windows03.py",
+          "markers": [
+            "ابدأ التقييم",
+            "إرسال التقييم"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "AUDIT-UX-CONTRACT-W08",
+      "status": "regression_required",
+      "invariant": "UX contract checks semantic controls rather than obsolete literal copy.",
+      "checks": [
+        {
+          "path": "tests/ux_contract_w08.py",
+          "markers": [
+            "question_type_dynamic",
+            "rating_star_ui",
+            "survey_metadata_public"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PUBLIC-EXPERIENCE-SURFACES",
+      "status": "regression_required",
+      "invariant": "Survey, rating, poll and disclosed advertising experiences must render and function on real HTTP browser journeys.",
+      "checks": [
+        {
+          "path": "tests/browser_exhibition_sites.py",
+          "markers": [
+            "easy_survey_experience_surface_rendered",
+            "easy_rating_experience_roundtrip",
+            "rts_poll_experience_surface_rendered",
+            "easy_advertising_spotlight_is_disclosed_and_rendered"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TERMINAL-GATE-EXPERIENCE",
+      "status": "regression_required",
+      "invariant": "Gate terminal must expose explicit success state and large primary touch action while preserving scan/check-in behavior.",
+      "checks": [
+        {
+          "path": "tests/browser_guest_flow.py",
+          "markers": [
+            "gate_success_state_is_visually_explicit",
+            "gate_primary_action_is_large_touch_target"
+          ]
+        },
+        {
+          "path": "web/guest.mjs",
+          "markers": [
+            "dataset.surface='gate'"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SECURITY-DEPENDENCIES",
+      "status": "regression_required",
+      "invariant": "Runtime and QA dependency vulnerabilities are checked in CI and vulnerable historical pins are not reintroduced.",
+      "checks": [
+        {
+          "path": "requirements.txt",
+          "markers": [
+            "fastapi==0.142.2",
+            "starlette==1.7.0"
+          ]
+        },
+        {
+          "path": "requirements-qa.txt",
+          "markers": [
+            "pytest==9.1.1",
+            "pip-audit"
+          ]
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "markers": [
+            "pip_audit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FIELD-HARDWARE-UAT",
+      "status": "manual_open",
+      "invariant": "Physical camera, two real gates, exhibition network/HTTPS, long outage and multi-day operation cannot be claimed verified without field evidence.",
+      "checks": []
+    },
+    {
+      "id": "CROSS-BROWSER-WCAG",
+      "status": "manual_open",
+      "invariant": "Chromium success does not imply Safari/Firefox/Edge or full WCAG/screen-reader acceptance.",
+      "checks": []
+    },
+    {
+      "id": "BACKUP-RESTORE-RETENTION",
+      "status": "manual_open",
+      "invariant": "Production backup encryption, retention and restore/PITR evidence with approved RPO/RTO remain open until exercised on the production-equivalent PostgreSQL environment.",
+      "checks": []
+    }
+  ]
+}
