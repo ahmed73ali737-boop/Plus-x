@@ -158,6 +158,37 @@ try:
     # Directly-created buttons outside the UI.button helper must either have
     # an onclick binding or be submit buttons; this also covers controls that
     # only appear inside modals and are not safe to click destructively in QA.
+    # Extract the complete props object instead of stopping at the first "}".
+    # Template strings such as \`${i} of 5\` contain braces and previously
+    # caused false "raw-button-without-handler" failures before an onclick key.
+    def js_props_object(source, start):
+        open_brace = source.find("{", start)
+        if open_brace < 0:
+            raise AssertionError("button props object not found")
+        depth = 0
+        quote = None
+        escaped = False
+        for index in range(open_brace, len(source)):
+            ch = source[index]
+            if quote is not None:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == quote:
+                    quote = None
+                continue
+            if ch in ("'", '"', "`"):
+                quote = ch
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[start:index + 1], index + 1
+        raise AssertionError("unterminated button props object")
+
     for source_name in ("admin.mjs", "public.mjs", "questions.mjs", "ui.mjs"):
         source = (ROOT / "web" / source_name).read_text(encoding="utf-8")
         cursor = 0
@@ -165,11 +196,9 @@ try:
             cursor = source.find("h('button',{", cursor)
             if cursor < 0:
                 break
-            end = source.find("}", cursor)
-            snippet = source[cursor:end + 1]
+            snippet, cursor = js_props_object(source, cursor)
             if "onclick:" not in snippet and "type:'submit'" not in snippet:
                 failures.append({"source": source_name, "kind": "raw-button-without-handler", "snippet": snippet[:300]})
-            cursor = end + 1
 
     assert not page_errors, page_errors
     assert not failures, failures
