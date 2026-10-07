@@ -16,6 +16,7 @@ MIGRATIONS=[
     ROOT/"ops/004_windows12_guest_identity.sql",
     ROOT/"ops/005_guest_presence.sql",
     ROOT/"ops/006_guest_pass_token.sql",
+    ROOT/"ops/007_event_guest_pass_number.sql",
 ]
 
 
