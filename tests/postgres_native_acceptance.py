@@ -31,8 +31,9 @@ migration_result=apply_migrations(engine)
 assert '004_windows12_guest_identity.sql' in migration_result['applied']
 assert '005_guest_presence.sql' in migration_result['applied']
 assert '006_guest_pass_token.sql' in migration_result['applied']
+assert '007_event_guest_pass_number.sql' in migration_result['applied']
 migration_repeat=apply_migrations(engine)
-assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==5
+assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==6
 app=create_app(url,origin='http://testserver',seed_demo=True)
 c=TestClient(app)
 checks=[]
@@ -40,8 +41,12 @@ def ok(name,cond=True):
     assert cond,name; checks.append(name)
 
 ok('postgres_dialect',app.state.engine.dialect.name=='postgresql')
+ready=c.get('/api/health/ready')
+ok('postgres_readiness_http_200',ready.status_code==200)
+ok('postgres_readiness_migrations_current',ready.json().get('schema_migrations_current') is True and ready.json().get('migration_count')==len(MIGRATIONS))
 ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
-ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==5)
+ok('migration_runner_007_applied','007_event_guest_pass_number.sql' in migration_result['applied'])
+ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==6)
 with engine.connect() as con:
     ok('database_roundtrip',con.execute(text('select 1')).scalar_one()==1)
     tables=set(con.execute(text("select tablename from pg_tables where schemaname='public' and tablename like 'px_%'")).scalars())
@@ -57,6 +62,7 @@ with engine.connect() as con:
     ok('foreign_keys_present',con.execute(text("select count(*) from information_schema.table_constraints where constraint_type='FOREIGN KEY' and table_schema='public'")).scalar_one()>0)
     cols={row['column_name'] for row in con.execute(text("select column_name from information_schema.columns where table_schema='public' and table_name='px_event_guests'")).mappings()}
     ok('pass_token_hash_column_present','pass_token_hash' in cols)
+    ok('pass_number_column_present','pass_number' in cols)
 
 def concurrent_guest_register(i):
     phone='0777 909 090' if i%2==0 else '+967 777 909 090'
