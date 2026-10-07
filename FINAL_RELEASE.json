@@ -1,8 +1,8 @@
 {
   "product": "PulseX — Live Experience & Insights Platform",
-  "release": "v1.1.0",
+  "release": "v1.0.1",
   "track": "Exhibition 360 / Public Experience v2",
-  "release_type": "final_software_release",
+  "release_type": "final_delivery_software_release",
   "baseline_main_sha": "ba3bbb58777c17d555f04ccadfc9db466f2758b4",
   "scope": {
     "experience_platform": true,
@@ -76,6 +76,14 @@
     "production backup restore/PITR/retention",
     "signed business/field UAT"
   ],
-  "release_policy": "Publish GitHub Release v1.1.0 only after the main-bound release PR passes PulseX CI and guest-qr-ci on the exact release head and is merged to main.",
-  "truth_boundary": "Final software release v1.1.0 may be published after exact-head automated gates; physical/production acceptance remains a separate sign-off and must not be claimed without external evidence."
+  "release_policy": "Publish GitHub Release only after the v1.0.1 delivery PR passes PulseX CI and guest-qr-ci on its exact head and is merged to main.",
+  "truth_boundary": "Unified final delivery software package: code, UI, automated QA, validation/field/button guidance, roles, scenarios, operation and user guide. Physical venue/production acceptance remains separately signed evidence.",
+  "delivery_documents": [
+    "DELIVERY_GUIDE_AR.md",
+    "DELIVERY_ACCEPTANCE_CHECKLIST.md",
+    "FINAL_RELEASE_AR.md",
+    "EXHIBITION_360_CLOSURE_AR.md",
+    "GUEST_QR_360_COMPLETION_AR.md",
+    "WINDOWS_UAT_AR.md"
+  ]
 }
