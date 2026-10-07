@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import json
-from pathlib import Path
 
 from sqlalchemy import inspect, text
 
 from app.db import make_engine, metadata
 from app.domain import now
+from app.core.migrations import MIGRATION_PATHS, expected_migration_checksums
 
-ROOT=Path(__file__).resolve().parents[1]
-MIGRATIONS=[
-    ROOT/"ops/002_windows07_devices.sql",
-    ROOT/"ops/003_windows11_people_password.sql",
-    ROOT/"ops/004_windows12_guest_identity.sql",
-    ROOT/"ops/005_guest_presence.sql",
-    ROOT/"ops/006_guest_pass_token.sql",
-    ROOT/"ops/007_event_guest_pass_number.sql",
-]
+MIGRATIONS=list(MIGRATION_PATHS)
 
 
 def split_sql(script: str) -> list[str]:
@@ -95,8 +86,8 @@ def apply_migrations(engine) -> dict:
     skipped=[]
     for path in MIGRATIONS:
         source=path.read_text(encoding="utf-8")
-        checksum=hashlib.sha256(source.encode("utf-8")).hexdigest()
         migration_id=path.name
+        checksum=expected_migration_checksums()[migration_id]
         with engine.begin() as conn:
             row=conn.execute(
                 text("SELECT checksum FROM px_schema_migrations WHERE migration_id=:id"),
