@@ -64,8 +64,14 @@ jobs:
           version = pathlib.Path('VERSION').read_text(encoding='utf-8').strip()
           data = json.loads(pathlib.Path('FINAL_RELEASE.json').read_text(encoding='utf-8'))
           assert data['release'] == f'v{version}', (data['release'], version)
-          assert data['release_type'] == 'final_software_release'
-          assert pathlib.Path('FINAL_RELEASE_AR.md').is_file()
+          assert data['release_type'] == 'final_delivery_software_release'
+          notes = pathlib.Path('FINAL_RELEASE_AR.md').read_text(encoding='utf-8')
+          assert f'PulseX-Exhibition-v{version}.zip' in notes
+          assert f'PulseX-Exhibition-v{version}.tar.gz' in notes
+          assert data.get('audit_admission', {}).get('status') == 'verified', 'Audit defects remain open; publishing is blocked'
+          assert data['audit_admission']['commit'] == __import__('os').environ['GITHUB_SHA'], 'Audit evidence must match the publishing commit'
+          assert data['audit_admission'].get('open_defects') == [], 'Open audit defects cannot be admitted'
+          assert data['audit_admission'].get('evidence'), 'Audit evidence references are required'
           assert pathlib.Path('EXHIBITION_CI_EVIDENCE_20261006.md').is_file()
           print('final-release-manifest-ok', version)
           PY
@@ -101,3 +107,4 @@ jobs:
             --title "$TITLE" \
             --notes-file FINAL_RELEASE_AR.md \
             --latest
+
