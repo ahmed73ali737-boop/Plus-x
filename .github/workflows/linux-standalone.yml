@@ -1,0 +1,170 @@
+name: PulseX Ubuntu 24.04 Standalone Candidate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ['release/linux-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-standalone-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated Python environment
+        run: |
+          python3 -m tools.prepare_runtime --profile qa
+          .venv/bin/python -m tools.prepare_runtime --profile qa --check
+      - name: Syntax and QA suite
+        run: |
+          .venv/bin/python -m compileall -q app tools tests run.py
+          .venv/bin/python -m pytest -q
+          .venv/bin/python tests/native_acceptance.py
+          .venv/bin/python tests/security_hardening.py
+          .venv/bin/python tests/capacity_smoke.py
+          .venv/bin/python tests/exhibition_scale_smoke.py
+          node --check web/sw.js
+          for f in web/*.mjs sdk/javascript/*.mjs tests/*.mjs; do
+            [ -e "$f" ] && node --check "$f"
+          done
+          node tests/sdk_js_test.mjs
+          .venv/bin/python tests/sdk_native_smoke.py
+      - name: Check real headless runtime and SIGTERM
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PULSEX_ENV=test
+          export DATA_DIR="$(mktemp -d)"
+          export HOST=127.0.0.1 PORT=43257 PUBLIC_ORIGIN=http://127.0.0.1:43257
+          export SEED_DEMO=true WEB_WORKERS=1
+          ./Start-Linux.sh > linux-startup.log 2>&1 &
+          pid=$!
+          trap 'kill -TERM "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+          for i in {1..100}; do
+            if curl --fail --silent http://127.0.0.1:43257/api/health/live > /dev/null; then break; fi
+            sleep 0.25
+          done
+          curl --fail --silent http://127.0.0.1:43257/api/health/live > live.json
+          curl --fail --silent http://127.0.0.1:43257/api/health/ready > ready.json
+          curl --fail --silent http://127.0.0.1:43257/ > /dev/null
+          curl --fail --silent http://127.0.0.1:43257/admin > /dev/null
+          kill -TERM "$pid"
+          wait "$pid"
+          trap - EXIT
+          ! curl --max-time 1 --silent http://127.0.0.1:43257/api/health/live > /dev/null
+      - name: Chromium on Ubuntu 24.04
+        run: .venv/bin/python -m playwright install --with-deps chromium
+      - name: Real browser and offline journeys
+        run: |
+          .venv/bin/python tests/browser_smoke.py
+          .venv/bin/python tests/browser_exhibition_sites.py
+          .venv/bin/python tests/browser_guest_flow.py
+          .venv/bin/python tests/browser_question_roundtrip.py
+          .venv/bin/python tests/browser_control_contract.py
+          .venv/bin/python tests/browser_offline_indexeddb.py
+      - name: Upload Linux QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ubuntu2404-qa
+          path: |
+            qa/**/*.json
+            qa/**/*.png
+            linux-startup.log
+            live.json
+            ready.json
+          if-no-files-found: ignore
+
+  postgres-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pulsex_test
+          POSTGRES_USER: pulsex
+          POSTGRES_PASSWORD: pulsex_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pulsex -d pulsex_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PX_POSTGRES_TEST_URL: postgresql+psycopg://pulsex:pulsex_ci@127.0.0.1:5432/pulsex_test
+      PX_ALLOW_POSTGRES_TEST_RESET: 'YES'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare PostgreSQL QA runtime
+        run: |
+          python3 -m tools.prepare_runtime --profile qa-postgres
+          .venv/bin/python -m tools.prepare_runtime --profile qa-postgres --check
+      - name: Native PostgreSQL and capacity acceptance
+        run: |
+          .venv/bin/python tests/postgres_native_acceptance.py
+          .venv/bin/python tests/postgres_capacity_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-ubuntu2404-postgres-qa
+          path: |
+            qa/postgres-native-acceptance.json
+            qa/postgres-capacity-smoke.json
+          if-no-files-found: ignore
+
+  package:
+    runs-on: ubuntu-24.04
+    needs: [linux-qa, postgres-qa]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build standalone source ZIP/TAR from exact tested SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=zip --prefix=PulseX-Ubuntu24.04/ HEAD > dist/PulseX-Ubuntu24.04-Candidate.zip
+          git archive --format=tar --prefix=PulseX-Ubuntu24.04/ HEAD | gzip -n > dist/PulseX-Ubuntu24.04-Candidate.tar.gz
+          python3 - <<'PY'
+          import zipfile,tarfile,os
+          with zipfile.ZipFile('dist/PulseX-Ubuntu24.04-Candidate.zip') as z:
+              names=set(z.namelist())
+              required={'VERSION','Start-Linux.sh','tools/prepare_runtime.py',
+                        'run.py','app/server.py','web/sw.js',
+                        'templates/','ops/Dockerfile','SDK_API_AR.md'}
+              for name in required:
+                  assert any(n.startswith('PulseX-Ubuntu24.04/'+name) for n in names),name
+              assert not any('/.env' in name or '/.venv/' in name or
+                             '/first-run-accounts.json' in name or
+                             '/bootstrap-admin.json' in name for name in names)
+          with tarfile.open('dist/PulseX-Ubuntu24.04-Candidate.tar.gz','r:gz') as tar:
+              entry=tar.getmember('PulseX-Ubuntu24.04/Start-Linux.sh')
+              assert entry.mode & 0o111,oct(entry.mode)
+          PY
+          (cd dist && sha256sum *.zip *.tar.gz > SHA256SUMS.txt)
+          printf 'SOURCE_SHA=%s\n' "$GITHUB_SHA" > dist/BUILD_ID.txt
+      - name: Upload complete standalone source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PulseX-Ubuntu2404-Standalone-Candidate
+          path: dist/*
+          if-no-files-found: error
