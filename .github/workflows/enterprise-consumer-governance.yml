@@ -1,0 +1,17 @@
+name: Governed shared modules adoption
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-enterprise-contracts:
+    uses: ahmed73ali737-boop/G-Factory/.github/workflows/enterprise-consumer-gate.yml@01e1324e7c2195bf9f084338d62ecf7d54391888
+    with:
+      governance_ref: 01e1324e7c2195bf9f084338d62ecf7d54391888
+      system_key: pulsex
+      manifest_paths_json: '["enterprise-governance/adoptions/authorization.v1.json"]'
+    secrets:
+      GOVERNANCE_READ_TOKEN: ${{ secrets.GOVERNANCE_READ_TOKEN }}
