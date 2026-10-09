@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0",
+  "integration_id": "PX-AUTHZ-001",
+  "status": "PROPOSED",
+  "consumer": {
+    "system_key": "pulsex",
+    "repository": "ahmed73ali737-boop/Plus-x"
+  },
+  "source_capability": {
+    "capability_id": "G.Authorization",
+    "owner_repository": "ahmed73ali737-boop/G-Factory",
+    "reuse_manifest_ref": "ahmed73ali737-boop/G-Factory@999688b2e51dda3c64c542ee7911dc4c4d390978:REUSE-MANIFEST.json",
+    "version": "candidate.aa9d1986e9ef762438266b657c7b0d70586235cd"
+  },
+  "reuse_decision": "REUSE",
+  "decision_ref": "enterprise-governance/PORTFOLIO-ADOPTION-AR.md",
+  "integration_mode": "LIBRARY",
+  "contracts": {
+    "schema_refs": [
+      "enterprise-governance/contracts/authorization.v1.json"
+    ],
+    "compatibility_test_refs": [
+      "enterprise-governance/scenarios/authorization.v1.json"
+    ]
+  },
+  "security": {
+    "trusted_tenant_context": true,
+    "server_side_authorization": true,
+    "negative_test_refs": [
+      "enterprise-governance/scenarios/authorization.v1.json"
+    ],
+    "resource_scopes": [
+      "tenant/organization/event",
+      "private organizer routes only"
+    ]
+  },
+  "traceability": {
+    "actors": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "terminals": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "screens": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "inputs": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "validations": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "outputs": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "permissions": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "workflows": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "apis": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "events": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "data": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "notifications": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "reports": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "limits": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "currencies": {
+      "n_a_reason": "The generic protected authorization adapter does not own financial or currency calculations."
+    },
+    "fees": {
+      "n_a_reason": "The generic protected authorization adapter does not own financial or currency calculations."
+    },
+    "channels": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "audit": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "tests": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    },
+    "evidence": {
+      "refs": [
+        "enterprise-governance/traceability/authorization.v1.json"
+      ]
+    }
+  },
+  "dependencies": [],
+  "evidence": {
+    "state": "DESIGN",
+    "receipts": [],
+    "open_gates": [
+      "OIDC/provider not bound",
+      "guest/QR and offline scenario tests not run",
+      "CI runner and security/UAT pending"
+    ],
+    "production_ready": false
+  },
+  "human_gates": {
+    "architecture": "PENDING",
+    "security": "PENDING",
+    "production": "PENDING",
+    "external_cost": "NOT_REQUIRED"
+  }
+}
