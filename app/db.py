@@ -174,7 +174,16 @@ def make_engine(url=None):
     if url.startswith('sqlite'):
         @event.listens_for(engine,'connect')
         def configure(dbapi,_):
-            cur=dbapi.cursor();cur.execute('PRAGMA foreign_keys=ON');cur.execute('PRAGMA journal_mode=WAL');cur.close()
+            # SQLite/pysqlite SAVEPOINT otherwise may commit without an outer BEGIN.
+            # Start the real transaction at SQLAlchemy's begin boundary instead.
+            dbapi.isolation_level=None
+            cur=dbapi.cursor();cur.execute('PRAGMA foreign_keys=ON')
+            if parsed.database != ':memory:':
+                cur.execute('PRAGMA journal_mode=WAL')
+            cur.close()
+        @event.listens_for(engine,'begin')
+        def begin_sqlite_transaction(connection):
+            connection.exec_driver_sql('BEGIN')
     return engine
 
 # Supporting indexes for scaled administration and audit/event lookups.
