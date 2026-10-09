@@ -58,9 +58,15 @@ def test_invalid_port_worker_rejected(monkeypatch,field,value):
 
 def test_gate_uses_effective_factory_overrides_before_opening_database(monkeypatch):
     from app import server
-    from tests.test_production_gate import production_env
-    production_env(monkeypatch)
     monkeypatch.setenv("PULSEX_ENV","production")
+    monkeypatch.setenv("DATABASE_URL","postgresql+psycopg://user:pass@db:5432/pulsex")
+    monkeypatch.setenv("PUBLIC_ORIGIN","https://events.example.test")
+    monkeypatch.setenv("WEB_WORKERS","2")
+    monkeypatch.setenv("SEED_DEMO","false")
+    monkeypatch.setenv("BOOTSTRAP_ADMIN_EMAIL","admin@events.test")
+    for flag in ("PX_NATIVE_POSTGRES_ACCEPTED","PX_LOAD_ACCEPTED",
+                 "PX_SECURITY_ACCEPTED","PX_FIELD_OFFLINE_ACCEPTED"):
+        monkeypatch.setenv(flag,"true")
     monkeypatch.setenv("GUEST_ID_SECRET","a"*64)
     def must_not_touch_database(*_args,**_kwargs):
         raise AssertionError("DATABASE_TOUCHED_BEFORE_GATE")
