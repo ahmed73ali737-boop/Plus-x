@@ -8,6 +8,8 @@ from __future__ import annotations
 import base64, copy, hashlib, io, json, mimetypes, os, re, secrets, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from contextlib import asynccontextmanager
+from .core.settings import load_settings
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -40,20 +42,31 @@ ROOT=Path(__file__).resolve().parent.parent
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
-def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
-    production_mode=(
-        os.environ.get('PULSEX_ENV','').strip().lower()=='production'
-        or os.environ.get('REQUIRE_POSTGRES','false').lower()=='true'
-    )
-    if production_mode:
-        # Enforce release conditions inside the application factory as well as
-        # deployment scripts, so direct uvicorn/run.py starts cannot bypass them.
-        assert_production_ready()
-    engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
-    app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None)
-    app.state.engine=engine;app.state.seed_credentials=seed(engine,credentials_path) if seed_demo else []
-    public_origin=(origin or os.environ.get('PUBLIC_ORIGIN','http://127.0.0.1:4310')).rstrip('/')
-    media_dir=Path(os.environ.get('MEDIA_DIR',str(ROOT/'data/media')));media_dir.mkdir(parents=True,exist_ok=True)
+def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=None):
+    settings=load_settings(database_url=database_url,origin=origin,
+                           seed_demo=seed_demo,credentials_path=credentials_path)
+    if settings.production_mode:
+        # Evaluate effective factory arguments BEFORE constructing the database engine.
+        assert_production_ready(database_url=settings.database_url,origin=settings.public_origin,
+                                seed_demo=settings.seed_demo,workers=settings.workers)
+    engine=make_engine(settings.database_url)
+    if not settings.production_mode:
+        metadata.create_all(engine)
+        ensure_compat_schema(engine)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            engine.dispose()
+
+    app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None,
+                lifespan=lifespan)
+    app.state.engine=engine
+    app.state.seed_credentials=seed(engine,str(settings.credentials_path)) if settings.seed_demo else []
+    public_origin=settings.public_origin
+    media_dir=settings.media_dir;media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
 
     install_security_middleware(app, public_origin)
