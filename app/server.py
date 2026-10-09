@@ -64,7 +64,13 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None,
                 lifespan=lifespan)
     app.state.engine=engine
-    app.state.seed_credentials=seed(engine,str(settings.credentials_path)) if settings.seed_demo else []
+    # Explicit ASGI/QA factory calls historically seed in-memory only unless a
+    # credential file was requested. Never write a shared default file across
+    # independent test DBs; run.py passes the settings path explicitly.
+    seed_file=(str(settings.credentials_path) if
+               credentials_path is not None or os.environ.get("CREDENTIALS_PATH")
+               else None)
+    app.state.seed_credentials=seed(engine,seed_file) if settings.seed_demo else []
     public_origin=settings.public_origin
     media_dir=settings.media_dir;media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
