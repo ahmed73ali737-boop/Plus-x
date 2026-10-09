@@ -11,6 +11,7 @@ from pathlib import Path
 from sqlalchemy.engine import make_url
 from app.core.build_info import runtime_identity
 from app.core.settings import load_settings
+ROOT=Path(__file__).resolve().parents[1]  # Legacy local-backup root override; production uses resolved Settings.
 
 def backup() -> Path:
     config=load_settings()
@@ -18,6 +19,9 @@ def backup() -> Path:
     if db.get_backend_name()!="sqlite" or not db.database or db.database==":memory:":
         raise RuntimeError("SQLITE_LOCAL_BACKUP_ONLY_POSTGRESQL_NOT_SUPPORTED")
     source=Path(db.database)
+    if not os.environ.get("DATABASE_URL") and not os.environ.get("DATA_DIR"):
+        # Preserve old local tooling/tests that inject a separate workspace ROOT.
+        source=ROOT/"data/pulsex-pilot.sqlite3"
     if not source.is_file():
         raise RuntimeError("LOCAL_SQLITE_DATABASE_NOT_FOUND")
     destination=config.backup_dir
