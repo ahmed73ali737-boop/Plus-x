@@ -18,13 +18,13 @@ concurrency:
 
 jobs:
   python-core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
       - name: Install runtime and QA dependencies
         run: |
@@ -127,13 +127,13 @@ jobs:
           if-no-files-found: ignore
 
   browser-components:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
       - name: Install dependencies
         run: |
@@ -179,7 +179,7 @@ jobs:
           if-no-files-found: ignore
 
   postgres-native:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       postgres:
@@ -202,7 +202,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
       - name: Install PostgreSQL test dependencies
         run: |
@@ -223,7 +223,7 @@ jobs:
           if-no-files-found: ignore
 
   container-import:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
