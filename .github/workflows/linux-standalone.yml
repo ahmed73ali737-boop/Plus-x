@@ -131,9 +131,49 @@ jobs:
             qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
 
+  arm64-qa:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pulsex_test
+          POSTGRES_USER: pulsex
+          POSTGRES_PASSWORD: pulsex_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pulsex -d pulsex_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PX_POSTGRES_TEST_URL: postgresql+psycopg://pulsex:pulsex_ci@127.0.0.1:5432/pulsex_test
+      PX_ALLOW_POSTGRES_TEST_RESET: 'YES'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: ARM64 runtime and QA dependencies
+        run: |
+          python3 -m tools.prepare_runtime --profile postgres
+          .venv/bin/python -m tools.prepare_runtime --profile postgres --check
+          .venv/bin/python -m pip install pytest==9.1.1 httpx==0.28.1 'psutil>=7,<8'
+      - name: ARM64 backend, DB and source QA
+        run: |
+          .venv/bin/python -m pytest -q
+          .venv/bin/python tests/native_acceptance.py
+          .venv/bin/python tests/postgres_native_acceptance.py
+          .venv/bin/python tests/postgres_capacity_smoke.py
+      - name: Build and inspect native Linux ARM64 container
+        run: |
+          docker build --platform linux/arm64 -f ops/Dockerfile -t pulsex-arm64-ci .
+          docker run --rm --platform linux/arm64 --entrypoint python pulsex-arm64-ci -c "import platform; from app.core.build_info import runtime_identity; from tools.migrate_postgres import MIGRATIONS; assert platform.machine() in ('aarch64','arm64'); assert runtime_identity()['version']=='1.0.1'; assert all(p.is_file() for p in MIGRATIONS); print('arm64-runtime-ok')"
+
   package:
     runs-on: ubuntu-24.04
-    needs: [linux-qa, postgres-qa]
+    needs: [linux-qa, postgres-qa, arm64-qa]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
