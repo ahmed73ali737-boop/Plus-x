@@ -193,7 +193,9 @@ jobs:
                         'templates/','ops/Dockerfile','SDK_API_AR.md'}
               for name in required:
                   assert any(n.startswith('PulseX-Ubuntu24.04/'+name) for n in names),name
-              assert not any('/.env' in name or '/.venv/' in name or
+              assert not any(name.endswith('/.env') or
+                             ('/.env.' in name and not name.endswith('.example')) or
+                             '/.venv/' in name or
                              '/first-run-accounts.json' in name or
                              '/bootstrap-admin.json' in name for name in names)
           with tarfile.open('dist/PulseX-Ubuntu24.04-Candidate.tar.gz','r:gz') as tar:
