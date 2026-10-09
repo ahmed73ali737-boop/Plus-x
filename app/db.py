@@ -183,7 +183,11 @@ def make_engine(url=None):
             cur.close()
         @event.listens_for(engine,'begin')
         def begin_sqlite_transaction(connection):
-            connection.exec_driver_sql('BEGIN')
+            # SQLite dev/offline: preserve outer transaction for SAVEPOINT rollback.
+            # BEGIN IMMEDIATE obtains the writer reservation BEFORE validation
+            # reads, avoiding immediate SQLITE_BUSY_SNAPSHOT on concurrent
+            # read-then-write HTTP requests. PostgreSQL remains the production DB.
+            connection.exec_driver_sql('BEGIN IMMEDIATE')
     return engine
 
 # Supporting indexes for scaled administration and audit/event lookups.
