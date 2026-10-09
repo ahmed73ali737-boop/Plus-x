@@ -50,12 +50,16 @@ def main() -> None:
         help="Required with --apply; protects against deleting a changed set.",
     )
     args = parser.parse_args()
-    result = cleanup_orphan_guests(
-        make_engine(),
-        apply=args.apply,
-        expected_count=args.expected_count,
-    )
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    engine=make_engine()
+    try:
+        result = cleanup_orphan_guests(
+            engine,
+            apply=args.apply,
+            expected_count=args.expected_count,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    finally:
+        engine.dispose()
 
 
 if __name__ == "__main__":

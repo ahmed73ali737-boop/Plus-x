@@ -61,9 +61,9 @@ def open_when_ready(url: str) -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for _ in range(120):
         try:
-            with opener.open(url + '/api/health', timeout=1) as response:
+            with opener.open(url + '/api/health/live', timeout=1) as response:
                 data = json.load(response)
-            if data.get('build') == 'windows-04':
+            if data.get('status') == 'ok' and data.get('version'):
                 webbrowser.open(url)
                 return
         except Exception:
@@ -90,7 +90,7 @@ def main() -> int:
         raise RuntimeError(f'Port {port} is already in use. Close the existing instance or set PULSEX_PORT to another port. Nothing was killed.')
     url = f'http://127.0.0.1:{port}'
     env = {**os.environ, 'HOST':'127.0.0.1', 'PORT':str(port), 'PUBLIC_ORIGIN':url, 'PYTHONUTF8':'1'}
-    print('\nPulseX Windows 04 — supervised local trial\n'+url+'\nAdmin: '+url+'/admin\nAccounts: data/first-run-accounts.json\nKeep this window open. Press Ctrl+C to stop.\n', flush=True)
+    print('\nPulseX — supervised local trial\n'+url+'\nAdmin: '+url+'/admin\nAccounts: data/first-run-accounts.json\nKeep this window open. Press Ctrl+C to stop.\n', flush=True)
     if not args.no_browser:
         threading.Thread(target=open_when_ready, args=(url,), daemon=True).start()
     process = subprocess.Popen([str(PYTHON), str(ROOT/'run.py')], cwd=ROOT, env=env)

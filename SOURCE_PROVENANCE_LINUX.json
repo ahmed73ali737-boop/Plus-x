@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-10",
+  "product": "PulseX — Live Experience & Insights Platform",
+  "local_source": {
+    "path": "D:\\RTS\\Mr. Nashwan\\PluseX V1",
+    "commit": "8586c6cb257b995387ff7acb7608a7e3d3730305",
+    "availability": "NOT_AVAILABLE_IN_CONNECTED_GITHUB",
+    "tracked_files_reported": 568
+  },
+  "remote_source": {
+    "repository": "ahmed73ali737-boop/Plus-x",
+    "branch": "fix/audit-update1-release-admission-20261008",
+    "commit": "208ba752b7a4d349bb48acdd96a6a4d02baf3bde"
+  },
+  "candidate_branch": "release/linux-ubuntu2404-standalone-candidate-20261010",
+  "status": "independent_candidate_not_verified_final",
+  "platforms": [
+    "Ubuntu 24.04 x86_64 Python3.12",
+    "Ubuntu 24.04 ARM64 Python3.12 conditional native tests",
+    "Windows Python3.13 regression"
+  ],
+  "release_policy": "Do not claim source parity or production readiness until source reconciliation and acceptance evidence",
+  "historical_windows_metrics": "252/259 pytest, 27/32 functional groups, previous Windows31/31; not Ubuntu certification"
+}

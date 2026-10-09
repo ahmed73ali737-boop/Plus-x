@@ -1,0 +1,300 @@
+{
+  "date": "2026-10-08",
+  "source_sha256": "12460027e2023dce69acf9404083475197316bbd775e69c5c14e572f8675ec62",
+  "audited_commit": "7633742f431eff17533f38405c60320bd36cd398",
+  "inspected_pulsex_main": "e66369ac83e1ee17d52664147e0e874329207501",
+  "baseline_matches": false,
+  "defects": [
+    {
+      "id": "U1-01",
+      "title": "P1: بقاء زائر يتيم عند فشل متأخر في التسجيل المباشر",
+      "status": "open",
+      "closure": "نجاح حقن الفشل على SQLite و PostgreSQL، وبقاء الطلب الصحيح والإعادة والدفعة المختلطة صحيحة.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [app/application/guest_service.py](<D:/RTS/Mr. Nashwan/PluseX V1/app/application/guest_service.py>) |\n| الاختبار/طريقة الإثبات | `tests/test_update1_contracts.py::test_direct_registration_rolls_back_if_storage_fails_after_guest_insert` |\n| المتوقع | عند HTTP500 بعد فشل داخلي يجب أن تكون زيادتا جدول الزوار وتسجيلات الفعالية صفرًا. |\n| الفعلي | بعد حقن خطأ digest عقب إدخال الزائر: HTTP500، وعدد الصفوف (زائر=1، تسجيل فعالية=0) بدل(0، 0). |\n| نطاق الإثبات | SQLite مع TestClient وحقن فشل مضبوط؛ ليس ادعاء بأن كل تسجيل عادي يفشل. حالات الرمز القصير الأصلية نجحت. |\n| السبب | حدود المعاملة الخارجية ونقطة الحفظ تحتاج مراجعة على SQLite؛ احتمال تحرير savepoint قبل بداية معاملة خارجية فعلية تفسير هندسي يحتاج تحققًا. النتيجة المتبقية مؤكدة. |\n| الأثر | يبقى سجل غير مكتمل رغم فشل الطلب، ويصعّب إزالة التكرار والتعافي والتنظيف. |\n| الدليل | [qa/zms37-update1-2026-10-08/pytest-recheck/pytest/execution.log](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/pytest-recheck/pytest/execution.log>) |\n\n**كيفية الإصلاح:**\n\n1. راجع BEGIN الفعلي في SQLite قبل إدخال الزائر أو استخدام savepoint؛ لا تفترض أن engine.begin وحده يضمن التراجع بعد كل نقطة حفظ.\n2. وحّد وحدة المعاملة للتسجيل المباشر؛ احتفظ بتحقق المدخلات المبكر وعزل كل عنصر مزامنة.\n3. أضف فشلًا بعد إدخال الزائر وبعد تسجيل الفعالية وقبل الإقرار، وتحقق من صفر أثر للطلب الفاشل.\n4. افحص الزوار اليتامى القدامى بالمعاينة، وخذ نسخة قبل التنظيف؛ لا تجعل التنظيف بديلًا للذرّية.\n\n**شرط الإغلاق:** نجاح حقن الفشل على SQLite و PostgreSQL، وبقاء الطلب الصحيح والإعادة والدفعة المختلطة صحيحة."
+    },
+    {
+      "id": "U1-02",
+      "title": "P1: حارس الإنتاج يفحص البيئة ولا يفحص معاملات المصنع المستخدمة فعليًا",
+      "status": "open",
+      "closure": "تُرفض الحالات الثلاث قبل اتصال القاعدة، ويعمل الاستدعاء الآمن المقصود دون تعطيل التشغيل المحلي.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [app/server.py](<D:/RTS/Mr. Nashwan/PluseX V1/app/server.py>) |\n| الاختبار/طريقة الإثبات | `tests/test_production_gate.py::test_production_factory_checks_effective_arguments_before_database_access [3 حالات]` |\n| المتوقع | رفض SQLite أو Origin HTTP أو seed_demo=True قبل make_engine إذا كان وضع الإنتاج مفعلًا. |\n| الفعلي | ثلاث حالات تصل إلى تهيئة القاعدة رغم قيم بيئة تبدو مقبولة. تجربة مصنع مستقلة أنشأت SQLite و cookie_secure=False و 12 حسابًا تجريبيًا. |\n| نطاق الإثبات | استدعاء create_app بمعاملات صريحة؛ لا يثبت أن البدء المعتاد عبر Docker/run.py يختار هذه المعاملات المخالفة تلقائيًا. |\n| السبب | evaluate_production_config يقرأ os.environ، ثم يستخدم المصنع قيم database_url/origin/seed_demo مختلفة. |\n| الأثر | يمكن أن تُقبل بيئة إنتاج سليمة شكليًا مع تشغيل إعدادات غير آمنة من مسار برمجي مخصص. |\n| الدليل | [qa/zms37-update1-2026-10-08/analysis-snapshot.json](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/analysis-snapshot.json>) |\n\n**كيفية الإصلاح:**\n\n1. احسب الإعدادات النهائية مرة واحدة بعد دمج البيئة والمعاملات.\n2. مرر الإعدادات الفعلية نفسها إلى الحارس وإلى محرك القاعدة و middleware والتهيئة.\n3. امنع إنشاء المحرك أو بيانات demo قبل نجاح التحقق.\n4. ابق اختبارات المعاملات الثلاث واختبارات غياب/نموذج السر ومسار run.py/Docker.\n\n**شرط الإغلاق:** تُرفض الحالات الثلاث قبل اتصال القاعدة، ويعمل الاستدعاء الآمن المقصود دون تعطيل التشغيل المحلي."
+    },
+    {
+      "id": "U1-03",
+      "title": "P1: فقد توافق checksum الترحيلات مع تطبيع نهايات الأسطر التاريخي",
+      "status": "open",
+      "closure": "ينجح اختبار LF/CRLF؛ يُرفض تغير SQL حقيقي، وتنجح ترقية/إعادة تشغيل قاعدة PostgreSQL قديمة.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [app/core/migrations.py](<D:/RTS/Mr. Nashwan/PluseX V1/app/core/migrations.py>) |\n| الاختبار/طريقة الإثبات | `tests/test_migrate_postgres.py::test_migration_checksums_preserve_historical_text_normalization` |\n| المتوقع | ملف SQL مكافئ يختلف LF/CRLF فقط يجب ألا يرفض checksum تاريخيًا حُسب بعد تطبيع النص. |\n| الفعلي | القراءة السابقة read_text ثم hash كانت تطبع نهاية السطر؛ الحالية read_bytes تنتج hash آخر لنسخة CRLF المكافئة. |\n| نطاق الإثبات | اختبار توافق تاريخي مصطنع؛ ملفات SQL الحالية LF، ولم تُجرب ترقية PostgreSQL حي. لا يثبت أن كل قاعدة قديمة ستتأثر. |\n| السبب | تغير تعريف البايتات المحسوبة دون سياسة انتقال موثقة للـ checksums. |\n| الأثر | قد ترفض الجاهزية/إعادة الترحيل قاعدة محدثة سابقًا عند اختلاف نهايات الأسطر وحده. |\n| الدليل | [qa/zms37-update1-2026-10-08/pytest-recheck/pytest/results.xml](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/pytest-recheck/pytest/results.xml>) |\n\n**كيفية الإصلاح:**\n\n1. احتفظ بخوارزمية checksum التاريخية أو صمم انتقالًا يقبل فقط تمثيلات نصية مكافئة بعد تطبيع محدد.\n2. لا تتجاوز تطابق SQL المتغير فعليًا ولا تستبدل hashes السجل عشوائيًا.\n3. جهز قاعدة بترحيلات النسخة السابقة ثم اختبر الترقية والـ skip والجاهزية على LF و CRLF.\n4. وثق صيغة checksum والمراجعة التي غيرتها.\n\n**شرط الإغلاق:** ينجح اختبار LF/CRLF؛ يُرفض تغير SQL حقيقي، وتنجح ترقية/إعادة تشغيل قاعدة PostgreSQL قديمة."
+    },
+    {
+      "id": "U1-04",
+      "title": "P2: المشغل لا يفتح المتصفح للهوية الحالية",
+      "status": "open",
+      "closure": "نجاح اختبار فتح المتصفح الحالي، وفحص Start-Windows.cmd على تثبيت جديد ومسار بفراغات.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [tools/launcher.py](<D:/RTS/Mr. Nashwan/PluseX V1/tools/launcher.py>) |\n| الاختبار/طريقة الإثبات | `tests/test_windows03.py::test_launcher_opens_browser_for_current_runtime_identity` |\n| المتوقع | فتح عنوان الموقع عندما يعيد الخادم الصحة الحالية 1.0.1/source-v1.0.1. |\n| الفعلي | open_when_ready يشترط build=windows-04؛ انتهى الاختبار برسالة مهلة دون فتح المتصفح. |\n| نطاق الإثبات | اختبار دالة المشغل بردود صحة مضبوطة وبديل لفتح المتصفح؛ خادم HTTP نفسه يعمل ويمكن فتح عنوانه يدويًا. |\n| السبب | افتراض هوية إصدار قديم داخل المشغل، مع بقاء نص Windows04. |\n| الأثر | تجربة بدء مضللة ورسالة انتظار رغم صحة الخادم. |\n| الدليل | [qa/zms37-update1-2026-10-08/pytest-recheck/pytest/execution.log](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/pytest-recheck/pytest/execution.log>) |\n\n**كيفية الإصلاح:**\n\n1. استخدم runtime_identity أو عقد الصحة الحالي بدل ثابت windows-04.\n2. أضف انتظارًا محدودًا مع backoff عند الرد غير المطابق أيضًا.\n3. حدّث رسالة المشغل وأبق رفض قتل العمليات الأخرى/المنفذ المستخدم.\n\n**شرط الإغلاق:** نجاح اختبار فتح المتصفح الحالي، وفحص Start-Windows.cmd على تثبيت جديد ومسار بفراغات."
+    },
+    {
+      "id": "U1-05",
+      "title": "P2: وثيقة الإصدار وأسماء الأرشيفات لا تطابق VERSION",
+      "status": "open",
+      "closure": "نجاح اختبار أسماء الأرشيفات ومطابقة manifest؛ فحص الملفات المنتجة قبل نشرها.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [FINAL_RELEASE_AR.md](<D:/RTS/Mr. Nashwan/PluseX V1/FINAL_RELEASE_AR.md>) |\n| الاختبار/طريقة الإثبات | `tests/test_update1_metadata.py::test_release_document_asset_names_match_source_version` |\n| المتوقع | VERSION و manifest والملاحظات والوسوم والأرشيفات تشير إلى إصدار واحد. |\n| الفعلي | VERSION و FINAL_RELEASE.json=1.0.1؛ العنوان والوسم وأسماء ZIP/tar.gz في الوثيقة=1.1.0. |\n| نطاق الإثبات | فحص عقد الوثائق محليًا؛ لم يُنشر إصدار خلال الجولة. |\n| السبب | تحديث يدوي لمراجع إصدار متعددة دون توليد/تحقق موحد. |\n| الأثر | قد يستخدم المستلم ملفًا أو وسمًا مختلفًا عما يصفه دليل التسليم. |\n| الدليل | [qa/zms37-update1-2026-10-08/pytest-recheck/pytest/results.xml](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/pytest-recheck/pytest/results.xml>) |\n\n**كيفية الإصلاح:**\n\n1. قرر الإصدار المقصود واحفظه في VERSION.\n2. ولّد أو تحقق من أسماء الملفات والوسم والعناوين من VERSION.\n3. ضمّن رقم commit وهوية البناء في حزمة التسليم وربط الأدلة.\n\n**شرط الإغلاق:** نجاح اختبار أسماء الأرشيفات ومطابقة manifest؛ فحص الملفات المنتجة قبل نشرها."
+    },
+    {
+      "id": "U1-06",
+      "title": "P2: نبض جهاز المتصفح يعلن إصدارًا قديمًا",
+      "status": "open",
+      "closure": "نجاح فحص إصدار الجهاز مع بقاء جميع خطوات التسجيل والدخول والمزامنة السابقة ناجحة.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [web/offline.mjs](<D:/RTS/Mr. Nashwan/PluseX V1/web/offline.mjs>) |\n| الاختبار/طريقة الإثبات | `tests/browser_guest_flow.py — device_release_version` |\n| المتوقع | إصدار الجهاز المربوط يطابق الإصدار الحالي 1.0.1. |\n| الفعلي | بعد نجاح 22 خطوة زائر/بوابة بلا أخطاء صفحة، يعلن الجهاز app_version=0.9.0 بينما الخادم 1.0.1. |\n| نطاق الإثبات | Chromium و HTTP حقيقي و SQLite؛ لا كاميرا أو جهاز مادي. |\n| السبب | deviceHeartbeat يضع 0.9.0 داخل النص بدل هوية إصدار مشتركة. |\n| الأثر | لوحة الأجهزة لا تستطيع الاعتماد على النسخة المعلنة للتشخيص أو متابعة التحديث. |\n| الدليل | [qa/zms37-update1-2026-10-08/browser-recheck/browser_guest_gate/windows12-guest-browser.json](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/browser-recheck/browser_guest_gate/windows12-guest-browser.json>) |\n\n**كيفية الإصلاح:**\n\n1. مرر هوية التطبيق الحالية للواجهة من نقطة موثوقة واحدة.\n2. استخدمها في ربط الجهاز ونبضه؛ افصل نسخة التطبيق عن إصدار schema الطابور.\n3. تحقق بعد reload والعمل دون اتصال ثم reconnect وتحديث الحزمة.\n\n**شرط الإغلاق:** نجاح فحص إصدار الجهاز مع بقاء جميع خطوات التسجيل والدخول والمزامنة السابقة ناجحة."
+    },
+    {
+      "id": "U1-07",
+      "title": "P1: تحديث التطبيق قد يبقي واجهة قديمة في Service Worker",
+      "status": "open",
+      "closure": "اختبار cache الجديد يقرأ موارد حالية؛ ترقية حزمة فعلية لا تفقد أو تكرر تفاعلات معلقة.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [web/sw.js](<D:/RTS/Mr. Nashwan/PluseX V1/web/sw.js>) |\n| الاختبار/طريقة الإثبات | `tests/browser_shell_upgrade.py` |\n| المتوقع | بعد النشر والتحديث تُخدم public.mjs الحالية مع بقاء بيانات الطابور سليمة. |\n| الفعلي | sw.js لم يتغير عن النسخة المدققة و CACHE=px-shell-v20؛ بقي public.mjs السابق بعد registration.update و served_previous_release_fixture=true. |\n| نطاق الإثبات | Service Worker فعلي يتحكم في Chromium و HTTP محلي، لكن إدخال CacheStorage السابق تجهيز مصطنع؛ ليس اختبار ترقية ميداني متعدد الأيام. |\n| السبب | استراتيجية cache-first للموارد مع namespace ثابت وغلاف SW لا تتغير بايتاته رغم تغير الأصول. |\n| الأثر | قد يرى مستخدم قائم نسخة قديمة بينما الخادم أحدث؛ تختلط العقود والنسخ ويصعب تشخيص إصلاحات الإنتاج. |\n| الدليل | [qa/zms37-update1-2026-10-08/shell-upgrade-recheck/browser_shell_upgrade/browser-shell-upgrade.json](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/shell-upgrade-recheck/browser_shell_upgrade/browser-shell-upgrade.json>) |\n\n**كيفية الإصلاح:**\n\n1. اشتق cache namespace من الإصدار أو hashes الموارد أثناء البناء.\n2. راجع install/activate وحذف cache القديم؛ لا تحذف IndexedDB أو طابور الإرسال أثناء إصلاح غلاف الموارد.\n3. حدد سلوك اكتشاف تحديث/إشعار المستخدم وإعادة تحميل آمنة عند وجود بيانات غير مرسلة.\n4. اختبر نسخة منشورة سابقة حقيقية ثم تحديثًا عبر online/offline/reconnect، وحقق كل MJS/CSS ونسخ schema.\n\n**شرط الإغلاق:** اختبار cache الجديد يقرأ موارد حالية؛ ترقية حزمة فعلية لا تفقد أو تكرر تفاعلات معلقة."
+    },
+    {
+      "id": "U1-08",
+      "title": "P1 للتسليم: شرط manifest في سير النشر لا يقبل نوع الإصدار الحالي",
+      "status": "open",
+      "closure": "نجاح تحقق manifest المحلي ثم نجاح مرحلة GitHub على commit نفسه؛ لا تعطل شرط التحقق لمجرد تجاوز الفشل.",
+      "details": "| بند | التفاصيل |\n| --- | --- |\n| المصدر | [.github/workflows/release.yml](<D:/RTS/Mr. Nashwan/PluseX V1/.github/workflows/release.yml>) |\n| الاختبار/طريقة الإثبات | `إعادة تقييم محلية لشرط Validate final manifest` |\n| المتوقع | نوع manifest الحالي المقصود مقبول لدى بوابة النشر. |\n| الفعلي | الشرط ينتظر final_software_release؛ الملف يعلن final_delivery_software_release؛ تقييم الشرط محليًا=False. |\n| نطاق الإثبات | فحص جديد أثناء تجميع هذا التقرير؛ إعادة إنتاج شرط ثابت محليًا، لا تشغيل GitHub ولا إضافة حالة إلى عدد 259 السابق. |\n| السبب | FINAL_RELEASE.json غيّر release_type بينما assert في release.yml بقي على القيمة السابقة. |\n| الأثر | حتى إذا نجح CI ستفشل مرحلة التحقق قبل بناء الأرشيف؛ مسار التسليم غير متوافق مع بياناته الحالية. |\n| الدليل | [qa/zms37-update1-2026-10-08/audit-consolidation-checks.json](<D:/RTS/Mr. Nashwan/PluseX V1/qa/zms37-update1-2026-10-08/audit-consolidation-checks.json>) |\n\n**كيفية الإصلاح:**\n\n1. حدد قيمة release_type المقصودة وحدّث العقد بين manifest وسير النشر بصورة واحدة.\n2. أضف اختبارًا محليًا يعيد منطق Validate final manifest في CI، بما يشمل الإصدار والنوع والوثائق.\n3. راجع سياسة guest-qr-ci المذكورة في manifest مقابل البوابات المطلوبة فعليًا؛ لا تفترض أن انتظار PulseX CI وحده يثبت تشغيل كل سير منفصل.\n4. بعد الإصلاح شغل بوابات نفس commit ثم مرحلة إنشاء الأرشيف/checksums دون نشر إلى حين اكتمال القبول.\n\n**شرط الإغلاق:** نجاح تحقق manifest المحلي ثم نجاح مرحلة GitHub على commit نفسه؛ لا تعطل شرط التحقق لمجرد تجاوز الفشل."
+    }
+  ],
+  "open_scenarios": [
+    {
+      "id": "G01",
+      "scenario": "قاعدة PostgreSQL حية",
+      "reported_status": "محجوب",
+      "reason": "لا URL قاعدة اختبار مخصصة/تفويض reset",
+      "required_test": "ترقية schema قديمة 002–007 وإعادة skip/checksum وشروط FK",
+      "closure": "قاعدة اختبار منفصلة؛ تقرير native وشواهد النسخة"
+    },
+    {
+      "id": "G02",
+      "scenario": "تزامن الهاتف ونفس البطاقة من بوابتين",
+      "reported_status": "محجوب",
+      "reason": "SQLite المحلي لا يعد بديلًا",
+      "required_test": "16 طلب هاتف متوازٍ وصيغ متعددة؛ دخول متزامن ودون فقد",
+      "closure": "PostgreSQL وعدة عملاء؛ إيصالات وأعداد صفوف وثابت presence"
+    },
+    {
+      "id": "G03",
+      "scenario": "Dockerbuild/import/migrationassets",
+      "reported_status": "لم ينفذ",
+      "reason": "Dockerengine غير متاح",
+      "required_test": "بناء الصورة و health و schema ومنع إعدادات demo",
+      "closure": "صورة قابلة لإعادة البناء وسجل hash وتشغيل فعلي"
+    },
+    {
+      "id": "G04",
+      "scenario": "Linux/WindowsCI لنفس HEAD",
+      "reported_status": "لم ينفذ بعيدًا",
+      "reason": "فحص ملفات workflow محليًا",
+      "required_test": "كل بوابات النسخة وحفظ JUnit/JSON والفشل",
+      "closure": "runID و commit مطابق وبوابات مطلوبة متحققة"
+    },
+    {
+      "id": "G05",
+      "scenario": "نشر HTTPS ونطاق و proxy",
+      "reported_status": "لم ينفذ",
+      "reason": "لا بيئة نشر معتمدة",
+      "required_test": "TLS/cookies/redirect/origin/host وثقة IP",
+      "closure": "نطاق اختبار مخصص مع إعدادات proxy موثقة"
+    },
+    {
+      "id": "G06",
+      "scenario": "كاميرا QR/USBscanner",
+      "reported_status": "لم ينفذ",
+      "reason": "لا عتاد",
+      "required_test": "أذونات رفض/قبول كاميرا؛ QR تالف/إضاءة/scan متكرر/يدوي",
+      "closure": "هاتف/قارئ فعلي ومشغلين"
+    },
+    {
+      "id": "G07",
+      "scenario": "شبكة المعرض وبوابتان أثناء انقطاع",
+      "reported_status": "لم ينفذ",
+      "reason": "لا LAN/edge/عتاد",
+      "required_test": "hardoutage؛ entry/exit والتعارض والعودة المتدرجة",
+      "closure": "فحص حضور نهائي وقوائم queued/rejected ودليل وقت"
+    },
+    {
+      "id": "G08",
+      "scenario": "خمسة أيام دون اتصال",
+      "reported_status": "لم ينفذ",
+      "reason": "يتطلب وقتًا وعتادًا",
+      "required_test": "إيقاف عملية/إعادة تشغيل وبطارية/عدة أيام/ساعات",
+      "closure": "soak مع مراقبة بقاء الطوابير ومنع الفقد والتكرار"
+    },
+    {
+      "id": "G09",
+      "scenario": "ترقية حزمة سابقة حقيقية وطابور معلق",
+      "reported_status": "جزئي/فشل غلاف",
+      "reason": "التجهيز التاريخي مصطنع",
+      "required_test": "حزمة قديمة فعليًا→تحديث online/offline→queueflush",
+      "closure": "موارد حالية وعقود schema متوافقة وكل إرسال مرة واحدة"
+    },
+    {
+      "id": "G10",
+      "scenario": "امتلاء/eviction/QuotaExceededIndexedDB",
+      "reported_status": "لم ينفذ",
+      "reason": "لم تغط التجهيزات",
+      "required_test": "quota والإذن persistent والفشل واستعادة الطابور",
+      "closure": "رسالة قابلة للفهم ومسار بديل دون فقد صامت"
+    },
+    {
+      "id": "G11",
+      "scenario": "تأليف كل 24 نوع بالإدارة",
+      "reported_status": "جزئي",
+      "reason": "ال fixture كوّنتبال API",
+      "required_test": "إنشاء وتعديل وحذف/تراجع وتصدير قالب ونشر لكل نوع",
+      "closure": "UI→HTTP→DB→publish→public→export"
+    },
+    {
+      "id": "G12",
+      "scenario": "سلبيات حدود الأسئلة والتفرعات",
+      "reported_status": "جزئي",
+      "reason": "عينات API لا كل التركيبات",
+      "required_test": "required/min/max/date/time/URL/matrix/allocation/quiz",
+      "closure": "رفض دقيق ورسم حالة وحفظ دون قيم جزئية"
+    },
+    {
+      "id": "G13",
+      "scenario": "جميع أفعال الإدارة والحوارات",
+      "reported_status": "جزئي",
+      "reason": "الجرد تسمية/ربطفقط",
+      "required_test": "loading/disable/doubleclick/cancel/authorization/failure",
+      "closure": "رحلات الأفعال الحرجة بكل دور وحفظ/reload/audit"
+    },
+    {
+      "id": "G14",
+      "scenario": "وسائطصور/فيديو كبيرة وتالفة",
+      "reported_status": "جزئي",
+      "reason": "رفع صورة محددة وفحص منع SVG",
+      "required_test": "mime/signature/size/cancel/play/offlinemedia/delete",
+      "closure": "رفع وعرض فعليان وشروط موارد/أمانواضحة"
+    },
+    {
+      "id": "G15",
+      "scenario": "صيغإعلان banner/visual/compact",
+      "reported_status": "جزئي",
+      "reason": "normalize يحذف display/format",
+      "required_test": "تحديد صيغ مسموحة ثم save/publish/render/disclosure",
+      "closure": "عقد تأليف واضح واختبار لكل صيغة مدعومة"
+    },
+    {
+      "id": "G16",
+      "scenario": "WCAG و keyboard/screenreader/contrast",
+      "reported_status": "جزئي",
+      "reason": "CSS والتسميات ليست تدقيقًا",
+      "required_test": "تركيزال dialogs/keyboard/reducedmotion/RTLerrors",
+      "closure": "قياس آلي وفحص قارئ شاشة ومستخدمين"
+    },
+    {
+      "id": "G17",
+      "scenario": "Firefox/Safari/Edge ومحمولفعلي",
+      "reported_status": "لم ينفذ",
+      "reason": "المنفذ Chromium",
+      "required_test": "forms/camera/SW/IndexedDB/downloads/RTL",
+      "closure": "مصفوفة متصفحات وأجهزة مع نتائج منفصلة"
+    },
+    {
+      "id": "G18",
+      "scenario": "SLO وحمل إنتاجي ممثل",
+      "reported_status": "لم ينفذ",
+      "reason": "عاملواحد SQLitelocalhost",
+      "required_test": "عدد جلسات ممثل/TLS/PG/workers/latency/resources",
+      "closure": "هدف p95/p99/errorrate معلن وقابل لإعادة القياس"
+    },
+    {
+      "id": "G19",
+      "scenario": "rate-limit موزعومصدر IP خلف proxy",
+      "reported_status": "لم ينفذ",
+      "reason": "عداد داخل ذاكرة العملية",
+      "required_test": "محاولات من نفس المصدر موزعة بين العمال/IPspoofing",
+      "closure": "رفض بالحد نفسه وجعل ترويسات الوكيل الموثوق محددة"
+    },
+    {
+      "id": "G20",
+      "scenario": "DAST/pentest مستقل",
+      "reported_status": "لم ينفذ",
+      "reason": "فحص 15 شرطً وتبعيات ليست pentest",
+      "required_test": "جلسات/نطاق/رفع/تصدير/أجهزة/API بالإذن",
+      "closure": "تقرير مستقل وإعادة تحقق من الإصلاحات"
+    },
+    {
+      "id": "G21",
+      "scenario": "استعادة/PITR/تلف/فقدوسائط",
+      "reported_status": "لم ينفذ",
+      "reason": "نسخة SQLite لا اعتماد PostgreSQL",
+      "required_test": "استعادة بنسخة منفصلة وفقد خادم/RPO/RTO",
+      "closure": "تمرين مؤرخ يشمل البيانات والوسائط والأذونات"
+    },
+    {
+      "id": "G22",
+      "scenario": "احتفاظ/حذف/سحب موافقة وواجهة الأجهزة",
+      "reported_status": "لم ينفذشاملًا",
+      "reason": "cleanuporphan ليست سياسة احتفاظ",
+      "required_test": "إنهاء فعالية/حذفشخص/إبطالرمز/مسح localcache",
+      "closure": "خطة بيانات مكتوبة واختبار عدم بقاء مرجع/نسخة غير مصرح"
+    },
+    {
+      "id": "G23",
+      "scenario": "إثبات ملكية الهاتف",
+      "reported_status": "قرارمنتج",
+      "reason": "الأول يعتمد تسجيلًالا OTP",
+      "required_test": "إن كانت البطاقة هوية مقيدة:OTP/دعوة/اعتماد ميداني",
+      "closure": "توثيق سياسة الهوية واختبار claims/recovery"
+    },
+    {
+      "id": "G24",
+      "scenario": "دورانسر GUEST_ID_SECRET",
+      "reported_status": "لم ينفذ",
+      "reason": "الهويات مرتبطة بمفتاح",
+      "required_test": "تغيير مفتاح مع بيانات قديمة وبطاقات قائمة",
+      "closure": "سياسة دوران متوافقة ومفاتيح محفوظة ومهاجرة"
+    },
+    {
+      "id": "G25",
+      "scenario": "تعطيل جهاز مفقود أو token منتهي",
+      "reported_status": "جزئي",
+      "reason": "تعطيل API مغطىلا كل offline",
+      "required_test": "revoke ثم offline/reconnect ومنع رمز قديم",
+      "closure": "تعطيل فعلي ومسح الجهاز وفق سياسة معلنة"
+    },
+    {
+      "id": "G26",
+      "scenario": "تعافي الأخطاء والأذونات في الاستيراد",
+      "reported_status": "جزئي",
+      "reason": "ملفات عينة فقط",
+      "required_test": "ملفمتلف/ضخم/encoding/previewstale/retry",
+      "closure": "لا اعتماد جزئي دون إعلان مع حفظ ذرّية المسودة"
+    },
+    {
+      "id": "G27",
+      "scenario": "analytics/export على بيانات كبيرة",
+      "reported_status": "جزئي",
+      "reason": "عينات محددة ومعالجة بالذاكرة",
+      "required_test": "عشرات آلاف النسخ/إجابات/scopedexport/stream",
+      "closure": "SQLprofiling وقيمصحيحةو SLO مستقر"
+    },
+    {
+      "id": "G28",
+      "scenario": "اختبار بوابة نوع manifest الجديد",
+      "reported_status": "فشلشرطمحلي",
+      "reason": "U1-08 غيرضمن 259",
+      "required_test": "نسخ manifests صحيحة/خاطئةوشروط workflow نفسها",
+      "closure": "اختبار مضاف مستقل ينجح بعد إصلاح العقد"
+    }
+  ],
+  "rules": [
+    "Do not close a defect without reproducing failure before the fix and recording passing evidence after it.",
+    "DOM inventory does not prove business action execution.",
+    "Verify DB/audit effects, retry, concurrency, roles, cancellation and restart.",
+    "Test upgrades from a real prior release with pending offline queues.",
+    "Evidence must name the same source commit, environment, scenario, expected and actual.",
+    "Blocked and unexecuted tests cannot pass.",
+    "Separate local, production and field acceptance."
+  ]
+}
