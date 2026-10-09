@@ -21,6 +21,7 @@ from .core.serialization import canonical_json as canon
 from .core.build_info import APP_NAME, APP_VERSION
 from .infrastructure.repository import fetch_one as row, get_site as site_row
 from .application.access import can_manage, require_scope, organization_visible
+from .application.shared_authorization import authorize_organizer_action
 from .application.audit_service import new_id as uid, write_audit as log
 from .application.publishing import publish_site_version as publish, get_site_version as get_version
 from .infrastructure.seed import seed_demo_data as seed
@@ -40,7 +41,13 @@ ROOT=Path(__file__).resolve().parent.parent
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
-def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
+def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None,
+               shared_authorizer=None):
+    shared_authorization_mode = os.environ.get("PULSEX_SHARED_AUTHORIZATION_MODE", "Off")
+    if shared_authorization_mode not in ("Off", "Enforce"):
+        raise RuntimeError("SHARED_AUTHORIZATION_MODE_INVALID")
+    if shared_authorization_mode == "Enforce" and shared_authorizer is None:
+        raise RuntimeError("SHARED_AUTHORIZATION_PROVIDER_REQUIRED")
     production_mode=(
         os.environ.get('PULSEX_ENV','').strip().lower()=='production'
         or os.environ.get('REQUIRE_POSTGRES','false').lower()=='true'
@@ -52,6 +59,7 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
     engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
     app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None)
     app.state.engine=engine;app.state.seed_credentials=seed(engine,credentials_path) if seed_demo else []
+    app.state.shared_organizer_authorizer = shared_authorizer
     public_origin=(origin or os.environ.get('PUBLIC_ORIGIN','http://127.0.0.1:4310')).rstrip('/')
     media_dir=Path(os.environ.get('MEDIA_DIR',str(ROOT/'data/media')));media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
@@ -204,6 +212,9 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
         cfg=normalize_config(body.get('config'))
         with engine.begin() as c:
             u,_=identify(request,c,True);s=require_scope(c,u,sid)
+            authorize_organizer_action(shared_authorization_mode,
+                                       app.state.shared_organizer_authorizer,
+                                       dict(u), dict(s), "event.configure")
             rev=body.get('draft_rev')
             if not isinstance(rev,int) or rev!=s['draft_rev']:fail('DRAFT_CHANGED_REFRESH_REQUIRED',409)
             result=c.execute(update(sites).where(sites.c.id==sid,sites.c.draft_rev==rev).values(draft=cfg,draft_rev=rev+1))
@@ -215,6 +226,9 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
     def publish_site(sid:str,body:dict,request:Request):
         with engine.begin() as c:
             u,_=identify(request,c,True);s=require_scope(c,u,sid)
+            authorize_organizer_action(shared_authorization_mode,
+                                       app.state.shared_organizer_authorizer,
+                                       dict(u), dict(s), "event.publish")
             if body.get('draft_rev')!=s['draft_rev']:fail('DRAFT_CHANGED_REFRESH_REQUIRED',409)
             version=publish(c,s,u)
         return {'published_version':version}
