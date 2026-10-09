@@ -8,9 +8,9 @@ permissions:
 
 jobs:
   shared-enterprise-contracts:
-    uses: ahmed73ali737-boop/G-Factory/.github/workflows/enterprise-consumer-gate.yml@01e1324e7c2195bf9f084338d62ecf7d54391888
+    uses: ahmed73ali737-boop/G-Factory/.github/workflows/enterprise-consumer-gate.yml@963a0c0ba5e10c2c10c73b1e9eea0293c063b6e5
     with:
-      governance_ref: 01e1324e7c2195bf9f084338d62ecf7d54391888
+      governance_ref: 963a0c0ba5e10c2c10c73b1e9eea0293c063b6e5
       system_key: pulsex
       manifest_paths_json: '["enterprise-governance/adoptions/authorization.v1.json"]'
     secrets:
