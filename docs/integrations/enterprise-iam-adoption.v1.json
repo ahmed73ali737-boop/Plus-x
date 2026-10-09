@@ -43,5 +43,15 @@
   "duplicationGuard": "Do NOT create a new global User/Party master from guest QR; do NOT treat IndexedDB offline manifest as a permanent IAM authority.",
   "firstIntegrationSlice": "Bind organizer/admin permission checks via OIDC/IAM, preserve guest UX and QR; perform actual device pairing/attestation and expiry at sync authorization boundary.",
   "testStatus": "NOT_EXECUTED",
-  "productionReady": false
+  "productionReady": false,
+  "rolloutSafety": {
+    "mode": "ORGANIZER_NONCRITICAL_SHADOW_GUEST_LOCAL",
+    "productDenyAlwaysFinal": true,
+    "securityApprovalRequired": true,
+    "preserveExistingDomainInvariants": true,
+    "noNewPermissionsBeforeSIT": true,
+    "shadowMaxDays": 7,
+    "targetStatus": "CONTRACT_ONLY_NOT_RUNTIME_ACTIVE",
+    "dependency": "G-Factory IAM PR #58; source cannot be considered deployed until native tests and package install"
+  }
 }
