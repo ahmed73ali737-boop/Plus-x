@@ -2,7 +2,7 @@ name: PulseX Ubuntu 24.04 Standalone Candidate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/linux-*']
   push:
     branches: ['release/linux-*']
   workflow_dispatch:
@@ -44,6 +44,8 @@ jobs:
           done
           node tests/sdk_js_test.mjs
           .venv/bin/python tests/sdk_native_smoke.py
+      - name: Test shutdown gate positive and negative cases
+        run: bash tests/linux_shutdown_contract.sh
       - name: Check real headless runtime and SIGTERM
         shell: bash
         run: |
@@ -63,10 +65,9 @@ jobs:
           curl --fail --silent http://127.0.0.1:43257/api/health/ready > ready.json
           curl --fail --silent http://127.0.0.1:43257/ > /dev/null
           curl --fail --silent http://127.0.0.1:43257/admin > /dev/null
-          kill -TERM "$pid"
-          wait "$pid"
+          source tools/ci_shutdown_gate.sh
+          pulsex_assert_sigterm_shutdown "$pid" http://127.0.0.1:43257/api/health/live
           trap - EXIT
-          ! curl --max-time 1 --silent http://127.0.0.1:43257/api/health/live > /dev/null
       - name: Chromium on Ubuntu 24.04
         run: .venv/bin/python -m playwright install --with-deps chromium
       - name: Real browser and offline journeys
