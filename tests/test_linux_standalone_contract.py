@@ -9,6 +9,7 @@ import sys
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.engine import make_url
 
 from app.core.files import create_private_file
 from app.core.paths import ROOT, resolve_database_url
@@ -29,10 +30,11 @@ def test_entrypoint_import_is_side_effect_free(tmp_path):
 
 def test_sqlite_file_is_resolved_independently_of_cwd(monkeypatch,tmp_path):
     monkeypatch.chdir(tmp_path)
-    assert resolve_database_url("sqlite:///./data/pulsex-pilot.sqlite3").startswith(
-        "sqlite:////")
-    assert str(ROOT/"data"/"pulsex-pilot.sqlite3") in resolve_database_url(
-        "sqlite:///./data/pulsex-pilot.sqlite3")
+    resolved = resolve_database_url("sqlite:///./data/pulsex-pilot.sqlite3")
+    parsed = make_url(resolved)
+    assert parsed.get_backend_name() == "sqlite"
+    assert Path(parsed.database).is_absolute()
+    assert Path(parsed.database).resolve() == (ROOT/"data"/"pulsex-pilot.sqlite3").resolve()
     assert resolve_database_url("sqlite:///:memory:")=="sqlite:///:memory:"
     url="postgresql+psycopg://user:password@db:5432/mydb"
     assert resolve_database_url(url)==url
