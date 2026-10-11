@@ -9,6 +9,7 @@ import base64, copy, hashlib, io, json, mimetypes, os, re, secrets, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from contextlib import asynccontextmanager
+from .infrastructure.g_observability import install_observability, FASTAPI_TELEMETRY
 from .core.settings import load_settings
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -62,7 +63,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             engine.dispose()
 
     app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None,
-                lifespan=lifespan)
+                lifespan=lifespan,telemetry=FASTAPI_TELEMETRY)
+    install_observability(app,"pulsex-api")
     app.state.engine=engine
     # Explicit ASGI/QA factory calls historically seed in-memory only unless a
     # credential file was requested. Never write a shared default file across
