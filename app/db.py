@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, Text, JSON, ForeignKey, UniqueConstraint, Index, event
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.engine import make_url
+from app.core.paths import resolve_database_url
 
 metadata=MetaData()
 sites=Table('px_sites',metadata,Column('id',String(64),primary_key=True),Column('parent_id',String(64),ForeignKey('px_sites.id')),Column('event_id',String(64)),Column('kind',String(20),nullable=False),Column('slug',String(80),unique=True,nullable=False),Column('draft',JSON,nullable=False),Column('draft_rev',Integer,nullable=False,default=1),Column('published_version',Integer,nullable=False,default=0))
@@ -158,9 +160,12 @@ Index('px_guest_presence_event_state',guest_presence.c.event_id,guest_presence.c
 audit=Table('px_audit',metadata,Column('id',String(64),primary_key=True),Column('user_id',String(64)),Column('site_id',String(64)),Column('action',String(80),nullable=False),Column('at',String(64),nullable=False),Column('details',JSON,nullable=False))
 
 def make_engine(url=None):
-    url=url or os.environ.get('DATABASE_URL','sqlite:///./data/pulsex-pilot.sqlite3')
-    if os.environ.get('REQUIRE_POSTGRES')=='true' and not url.startswith('postgresql+psycopg://'): raise RuntimeError('POSTGRES_REQUIRED')
-    if url.startswith('sqlite:///') and ':memory:' not in url: Path(url.removeprefix('sqlite:///')).parent.mkdir(parents=True,exist_ok=True)
+    url=resolve_database_url(url if url is not None else os.environ.get('DATABASE_URL','sqlite:///./data/pulsex-pilot.sqlite3'))
+    if os.environ.get('REQUIRE_POSTGRES','false').strip().lower() in ('1','true','yes','on') and not url.startswith('postgresql+psycopg://'):
+        raise RuntimeError('POSTGRES_REQUIRED')
+    parsed=make_url(url)
+    if parsed.get_backend_name()=='sqlite' and parsed.database and parsed.database!=':memory:' and parsed.query.get('uri','').lower()!='true':
+        Path(parsed.database).parent.mkdir(parents=True,exist_ok=True)
     kw={'pool_pre_ping':True}
     if url.startswith('sqlite'):
         kw['connect_args']={'check_same_thread':False,'timeout':30}
@@ -169,7 +174,20 @@ def make_engine(url=None):
     if url.startswith('sqlite'):
         @event.listens_for(engine,'connect')
         def configure(dbapi,_):
-            cur=dbapi.cursor();cur.execute('PRAGMA foreign_keys=ON');cur.execute('PRAGMA journal_mode=WAL');cur.close()
+            # SQLite/pysqlite SAVEPOINT otherwise may commit without an outer BEGIN.
+            # Start the real transaction at SQLAlchemy's begin boundary instead.
+            dbapi.isolation_level=None
+            cur=dbapi.cursor();cur.execute('PRAGMA foreign_keys=ON')
+            if parsed.database != ':memory:':
+                cur.execute('PRAGMA journal_mode=WAL')
+            cur.close()
+        @event.listens_for(engine,'begin')
+        def begin_sqlite_transaction(connection):
+            # SQLite dev/offline: preserve outer transaction for SAVEPOINT rollback.
+            # BEGIN IMMEDIATE obtains the writer reservation BEFORE validation
+            # reads, avoiding immediate SQLITE_BUSY_SNAPSHOT on concurrent
+            # read-then-write HTTP requests. PostgreSQL remains the production DB.
+            connection.exec_driver_sql('BEGIN IMMEDIATE')
     return engine
 
 # Supporting indexes for scaled administration and audit/event lookups.

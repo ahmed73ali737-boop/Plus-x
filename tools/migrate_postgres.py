@@ -112,8 +112,12 @@ def apply_migrations(engine) -> dict:
 
 
 def main():
-    result=apply_migrations(make_engine())
-    print(json.dumps(result,ensure_ascii=False))
+    engine=make_engine()
+    try:
+        result=apply_migrations(engine)
+        print(json.dumps(result,ensure_ascii=False))
+    finally:
+        engine.dispose()
 
 
 if __name__=="__main__":

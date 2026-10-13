@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   guest-identity-and-offline-contract:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -23,9 +23,12 @@ jobs:
       - name: Install runtime and focused QA dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest==9.0.2 httpx==0.28.1
+          pip install -r requirements.txt -r requirements-qa.txt
       - name: Compile Python
         run: python -m compileall -q app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Check JavaScript modules
         run: |
           node --check web/guest.mjs
@@ -43,7 +46,6 @@ jobs:
         run: python tools/generate_openapi.py --output qa/openapi.generated.json
       - name: Install Chromium guest-journey dependencies
         run: |
-          pip install playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Run guest browser journey
         run: python tests/browser_guest_flow.py
