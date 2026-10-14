@@ -1,7 +1,12 @@
 #!/bin/sh
 set -eu
-cd "$(dirname "$0")"
+CDPATH= cd -P "$(dirname "$0")"
+ROOT=$(pwd)
 umask 077
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-exec .venv/bin/python run.py
+export PYTHONUTF8=1
+export PYTHONUNBUFFERED=1
+if [ ! -x "$ROOT/.venv/bin/python" ]; then
+    echo "PulseX .venv missing. Execute: python3 -m tools.prepare_runtime --profile local" >&2
+    exit 2
+fi
+exec "$ROOT/.venv/bin/python" "$ROOT/run.py"

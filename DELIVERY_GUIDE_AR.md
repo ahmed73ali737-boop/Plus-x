@@ -1,6 +1,6 @@
 # PulseX Exhibition — دليل التسليم والتشغيل والاستخدام v1.0.1
 
-> هذه الوثيقة هي نقطة الدخول authoritative للحزمة. إذا تعارضت معها وثيقة Windows 09/10/11/12 قديمة، فهذه الوثيقة وحالة CI على نفس revision هما المرجع الأحدث.
+> هذه الوثيقة نقطة دخول لنطاق المعرض؛ تعليمات Linux المستقلة التفصيلية في `START_LINUX_AR.md`، وحالة القبول الفعلية في `docs/PULSEX_TWO_VERSION_REQUIREMENTS_REVIEW_20261013_AR.md` ونتائج CI على نفس SHA. لا تنقل حالة اختبار من فرع أو جهاز إلى آخر.
 
 ## 1. ماذا تحتوي الحزمة
 - التطبيق والواجهات العامة والإدارية.
@@ -27,11 +27,14 @@
 4. الإدارة: `http://127.0.0.1:4310/admin`.
 5. للحسابات التجريبية استخدم `Open-Accounts.cmd`.
 
-### Linux
+### Linux (Ubuntu 24.04، مرشح مستقل)
+تُجهَّز البيئة مرة واحدة على Linux قبل التشغيل؛ لا تنسخ `.venv` من Windows. من جذر الحزمة:
 ```bash
-chmod +x Start-Linux.sh
-./Start-Linux.sh
+python3 -m tools.prepare_runtime --profile local
+.venv/bin/python -m tools.prepare_runtime --profile local --check
+sh Start-Linux.sh
 ```
+`Start-Linux.sh` لا يثبت التبعيات أثناء بدء التطبيق. راجع `START_LINUX_AR.md` لاختبارات QA وإعدادات PostgreSQL. نجاح التشغيل المحلي لا يعني اعتماد الإنتاج.
 
 ### Production
 استخدم `compose.yaml` و`ops/Dockerfile` واقرأ `ops/DEPLOY_AR.md`.

@@ -1,14 +1,17 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
-cd "$(dirname "$0")"
-python -m pytest -q
-python tests/native_acceptance.py
-python tests/security_hardening.py
-python tests/ux_contract_w08.py
-python tests/capacity_smoke.py
-python tests/sdk_native_smoke.py
+CDPATH= cd -P "$(dirname "$0")"
+ROOT=$(pwd)
+PY="$ROOT/.venv/bin/python"
+[ -x "$PY" ] || { echo "Run: python3 -m tools.prepare_runtime --profile qa" >&2; exit 2; }
+"$PY" -m pytest -q
+"$PY" tests/native_acceptance.py
+"$PY" tests/security_hardening.py
+"$PY" tests/ux_contract_w08.py
+"$PY" tests/capacity_smoke.py
+"$PY" tests/sdk_native_smoke.py
 node --check sdk/javascript/index.mjs
 node tests/sdk_js_test.mjs
-python tests/run_ui_bridge.py
-python tests/browser_components.py
-echo "All available local hardening checks passed. Review QA_REPORT_AR.md for remaining external gates."
+"$PY" tests/run_ui_bridge.py
+"$PY" tests/browser_components.py
+echo "Local available hardening checks passed. PostgreSQL/field acceptance requires separate evidence."
