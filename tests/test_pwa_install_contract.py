@@ -33,6 +33,8 @@ def test_pwa_assets_are_precached_and_ios_has_touch_icon(client):
     assert 'apple-touch-icon' in html
     js=client.get('/sw.js')
     assert js.status_code==200
-    assert 'px-shell-v23' in js.text
-    for src in ('/assets/icon-192.png','/assets/icon-512.png'):
+    assert 'px-shell-v24' in js.text
+    for src in ('/assets/icon-192.png','/assets/icon-512.png',
+                '/assets/storyboard-core.mjs','/assets/storyboard.mjs',
+                '/assets/storyboard.css'):
         assert src in js.text

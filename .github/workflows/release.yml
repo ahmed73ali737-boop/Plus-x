@@ -45,6 +45,23 @@ jobs:
           test -n "$RUN_ID" || { echo "No PulseX CI push run found for $GITHUB_SHA"; exit 1; }
           gh run watch "$RUN_ID" --exit-status
 
+      - name: Require guest QR CI success for this exact commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID=""
+          for attempt in $(seq 1 30); do
+            RUN_ID="$(gh run list --workflow "guest-qr-ci" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
+            if [ -n "$RUN_ID" ]; then
+              break
+            fi
+            sleep 10
+          done
+          test -n "$RUN_ID" || { echo "No guest-qr-ci push run found for $GITHUB_SHA"; exit 1; }
+          gh run watch "$RUN_ID" --exit-status
+
       - name: Resolve release metadata
         id: meta
         shell: bash
