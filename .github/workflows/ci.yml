@@ -249,6 +249,7 @@ jobs:
           @'
           import hashlib
           import os
+          import subprocess
           import pathlib
           import zipfile
           archive = pathlib.Path("dist/PulseX-Windows-Candidate.zip")
@@ -266,7 +267,7 @@ jobs:
               f"{digest}  {archive.name}\n", encoding="utf-8")
           pathlib.Path("dist/BUILD_ID.txt").write_text(
               f"CHECKOUT_SHA={os.environ['GITHUB_SHA']}\n"
-              f"COMMIT_SHA={os.popen('git rev-parse HEAD').read().strip()}\n",
+              f"COMMIT_SHA={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n",
               encoding="utf-8")
           '@ | python -
       - name: Upload Windows test candidate
