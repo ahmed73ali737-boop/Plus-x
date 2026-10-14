@@ -231,3 +231,47 @@ jobs:
         run: docker build -f ops/Dockerfile -t pulsex-ci .
       - name: Verify runtime imports and migration assets inside image
         run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; from tools.migrate_postgres import MIGRATIONS; assert all(p.is_file() for p in MIGRATIONS); print('container-runtime-and-migrations-ok')"
+
+  package-windows-candidate:
+    runs-on: windows-latest
+    needs: [python-core, windows-core, browser-components, postgres-native, container-import]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Archive the exact CI checkout for Windows testing
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          git archive --format=zip --prefix=PulseX-Windows/ --output=dist/PulseX-Windows-Candidate.zip HEAD
+          @'
+          import hashlib
+          import os
+          import pathlib
+          import zipfile
+          archive = pathlib.Path("dist/PulseX-Windows-Candidate.zip")
+          with zipfile.ZipFile(archive) as z:
+              names = set(z.namelist())
+              required = ("Start-Windows.cmd", "tools/launcher.py", "requirements.txt",
+                          "run.py", "app/server.py", "web/sw.js", "START_WINDOWS_AR.html")
+              for path in required:
+                  assert "PulseX-Windows/" + path in names, path
+              assert not any("/.venv/" in name or name.endswith("/.env") or
+                             "/first-run-accounts.json" in name or
+                             "/bootstrap-admin.json" in name for name in names)
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path("dist/SHA256SUMS.txt").write_text(
+              f"{digest}  {archive.name}\n", encoding="utf-8")
+          pathlib.Path("dist/BUILD_ID.txt").write_text(
+              f"CHECKOUT_SHA={os.environ['GITHUB_SHA']}\n"
+              f"COMMIT_SHA={os.popen('git rev-parse HEAD').read().strip()}\n",
+              encoding="utf-8")
+          '@ | python -
+      - name: Upload Windows test candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: PulseX-Windows-Standalone-Candidate
+          path: dist/*
+          if-no-files-found: error
