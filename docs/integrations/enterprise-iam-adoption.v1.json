@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "status": "ADOPTION_CONTRACT_ONLY_NOT_RUNTIME_CONNECTED",
+  "source": {
+    "canonicalRepo": "ahmed73ali737-boop/G-Factory",
+    "canonicalBranch": "feature/unified-iam-granular-access-v1",
+    "compatibilityManifestUrl": "https://github.com/ahmed73ali737-boop/G-Factory/blob/feature/unified-iam-granular-access-v1/shared-platform/registry/iam-consumer-compatibility.v1.json"
+  },
+  "consumerRepo": "ahmed73ali737-boop/Plus-x",
+  "consumerSystemKey": "pulsex",
+  "ownerLocks": {
+    "authentication": "U-SEAS IAM",
+    "partiesAndKyc": "U-SEAS PartyCustomer",
+    "documents": "G.Content",
+    "authorization": "G.Authorization",
+    "workflow": "G.Workflow/G-015",
+    "devices": "G.Channels"
+  },
+  "identityMapping": "scoped organizer identity only for protected operations; anonymous participation uses event guest identifier, never raw phone in URL",
+  "domainGuard": "Organizer/event management requires scoped IAM and event-owner checks. Anonymous guest browsing, voting and registration remain governed by Event Policy, guest QR HMAC and anti-duplication; no mandatory KYC account.",
+  "localResourceTypes": [
+    "event",
+    "participation",
+    "experience",
+    "kiosk",
+    "vote"
+  ],
+  "capabilityExamples": [
+    "event.configure",
+    "guest.vote",
+    "offline.gate.sync"
+  ],
+  "rule": "authenticated operation = canonical IAM allow AND product domain allow; public/guest exceptions require explicit product policy with no privilege elevation",
+  "sourceFilesReviewed": [
+    "ROLE_AND_OFFLINE_FLOW_AR.md",
+    "README.md"
+  ],
+  "centralScenarioIds": [
+    "PX-001",
+    "PX-002",
+    "PX-003"
+  ],
+  "duplicationGuard": "Do NOT create a new global User/Party master from guest QR; do NOT treat IndexedDB offline manifest as a permanent IAM authority.",
+  "firstIntegrationSlice": "Bind organizer/admin permission checks via OIDC/IAM, preserve guest UX and QR; perform actual device pairing/attestation and expiry at sync authorization boundary.",
+  "testStatus": "NOT_EXECUTED",
+  "productionReady": false,
+  "rolloutSafety": {
+    "mode": "ORGANIZER_NONCRITICAL_SHADOW_GUEST_LOCAL",
+    "productDenyAlwaysFinal": true,
+    "securityApprovalRequired": true,
+    "preserveExistingDomainInvariants": true,
+    "noNewPermissionsBeforeSIT": true,
+    "shadowMaxDays": 7,
+    "targetStatus": "CONTRACT_ONLY_NOT_RUNTIME_ACTIVE",
+    "dependency": "G-Factory IAM PR #58; source cannot be considered deployed until native tests and package install"
+  }
+}

@@ -9,16 +9,21 @@ def enabled(name: str) -> bool:
     return os.environ.get(name, "false").lower() == "true"
 
 
-def evaluate_production_config() -> dict:
-    db = os.environ.get("DATABASE_URL", "")
-    origin = os.environ.get("PUBLIC_ORIGIN", "")
+def evaluate_production_config(*, database_url=None, origin=None, seed_demo=None, workers=None) -> dict:
+    db = database_url if database_url is not None else os.environ.get("DATABASE_URL", "")
+    origin = origin if origin is not None else os.environ.get("PUBLIC_ORIGIN", "")
     guest_secret = os.environ.get("GUEST_ID_SECRET", "")
     bootstrap_email = os.environ.get("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
-    workers = int(os.environ.get("WEB_WORKERS", "1") or 1)
+    if workers is None:
+        try:
+            workers = int(os.environ.get("WEB_WORKERS", "1") or 1)
+        except ValueError:
+            workers = 0
+    demo_enabled = enabled("SEED_DEMO") if seed_demo is None else seed_demo
     checks = {
         "postgresql_required": db.startswith("postgresql+psycopg://"),
         "https_public_origin": urlparse(origin).scheme == "https" and bool(urlparse(origin).netloc),
-        "demo_seed_disabled": not enabled("SEED_DEMO"),
+        "demo_seed_disabled": demo_enabled is False,
         "multi_worker_configured": workers >= 2,
         "database_password_not_placeholder": "REPLACE_" not in db and "example" not in db.lower(),
         "guest_identity_secret_configured": len(guest_secret) >= 32
@@ -44,8 +49,9 @@ def evaluate_production_config() -> dict:
     }
 
 
-def assert_production_ready() -> dict:
-    result = evaluate_production_config()
+def assert_production_ready(*, database_url=None, origin=None, seed_demo=None, workers=None) -> dict:
+    result = evaluate_production_config(database_url=database_url, origin=origin,
+                                        seed_demo=seed_demo, workers=workers)
     if result["status"] != "pass":
         failed = ",".join(name for name, ok in result["checks"].items() if not ok)
         raise RuntimeError("PRODUCTION_GATE_FAILED:" + failed)

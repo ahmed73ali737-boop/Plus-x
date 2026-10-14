@@ -8,6 +8,8 @@ from __future__ import annotations
 import base64, copy, hashlib, io, json, mimetypes, os, re, secrets, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from contextlib import asynccontextmanager
+from .core.settings import load_settings
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +23,8 @@ from .core.serialization import canonical_json as canon
 from .core.build_info import APP_NAME, APP_VERSION
 from .infrastructure.repository import fetch_one as row, get_site as site_row
 from .application.access import can_manage, require_scope, organization_visible
+from .application.shared_authorization import authorize_organizer_action
+from .infrastructure.g_observability import install_observability
 from .application.audit_service import new_id as uid, write_audit as log
 from .application.publishing import publish_site_version as publish, get_site_version as get_version
 from .infrastructure.seed import seed_demo_data as seed
@@ -40,20 +44,42 @@ ROOT=Path(__file__).resolve().parent.parent
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
-def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=None):
-    production_mode=(
-        os.environ.get('PULSEX_ENV','').strip().lower()=='production'
-        or os.environ.get('REQUIRE_POSTGRES','false').lower()=='true'
-    )
-    if production_mode:
-        # Enforce release conditions inside the application factory as well as
-        # deployment scripts, so direct uvicorn/run.py starts cannot bypass them.
-        assert_production_ready()
-    engine=make_engine(database_url);metadata.create_all(engine);ensure_compat_schema(engine)
-    app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None)
-    app.state.engine=engine;app.state.seed_credentials=seed(engine,credentials_path) if seed_demo else []
-    public_origin=(origin or os.environ.get('PUBLIC_ORIGIN','http://127.0.0.1:4310')).rstrip('/')
-    media_dir=Path(os.environ.get('MEDIA_DIR',str(ROOT/'data/media')));media_dir.mkdir(parents=True,exist_ok=True)
+def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=None,shared_authorizer=None):
+    shared_mode=os.environ.get('PULSEX_SHARED_AUTHORIZATION_MODE','Off')
+    if shared_mode not in ('Off','Enforce'):raise RuntimeError('SHARED_AUTHORIZATION_MODE_INVALID')
+    if shared_mode=='Enforce' and shared_authorizer is None:raise RuntimeError('SHARED_AUTHORIZATION_PROVIDER_REQUIRED')
+    settings=load_settings(database_url=database_url,origin=origin,
+                           seed_demo=seed_demo,credentials_path=credentials_path)
+    if settings.production_mode:
+        # Evaluate effective factory arguments BEFORE constructing the database engine.
+        assert_production_ready(database_url=settings.database_url,origin=settings.public_origin,
+                                seed_demo=settings.seed_demo,workers=settings.workers)
+    engine=make_engine(settings.database_url)
+    if not settings.production_mode:
+        metadata.create_all(engine)
+        ensure_compat_schema(engine)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            engine.dispose()
+
+    app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None,
+                lifespan=lifespan)
+    app.state.engine=engine
+    app.state.shared_organizer_authorizer=shared_authorizer
+    install_observability(app,'pulsex-api')
+    # Explicit ASGI/QA factory calls historically seed in-memory only unless a
+    # credential file was requested. Never write a shared default file across
+    # independent test DBs; run.py passes the settings path explicitly.
+    seed_file=(str(settings.credentials_path) if
+               credentials_path is not None or os.environ.get("CREDENTIALS_PATH")
+               else None)
+    app.state.seed_credentials=seed(engine,seed_file) if settings.seed_demo else []
+    public_origin=settings.public_origin
+    media_dir=settings.media_dir;media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
 
     install_security_middleware(app, public_origin)
@@ -63,7 +89,7 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
         path=req.scope.get('path') or '/'
-        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
+        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout','/api/auth/sessions','/api/auth/sessions/revoke-all'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
@@ -94,6 +120,32 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
         with engine.begin() as c:
             u,s=identify(request,c,True);c.execute(delete(sessions).where(sessions.c.token_hash==s['token_hash']))
         r=JSONResponse({'ok':True});r.delete_cookie('px_session',path='/');return r
+
+    @app.get('/api/auth/sessions')
+    def my_sessions(request:Request):
+        """Return an owner-only session summary, never session hashes or CSRF secrets."""
+        with engine.connect() as c:
+            u,s=identify(request,c)
+            active=c.execute(select(func.count()).select_from(sessions).where(
+                sessions.c.user_id==u['id'],sessions.c.expires_at>now()
+            )).scalar_one()
+            return {
+                'active_count':active,
+                'current_expires_at':s['expires_at'],
+                'absolute_timeout_seconds':28800,
+                'device_inventory_available':False,
+            }
+
+    @app.post('/api/auth/sessions/revoke-all')
+    def revoke_all_my_sessions(request:Request):
+        """Explicit account-wide revoke; CSRF and identity checks precede mutation."""
+        with engine.begin() as c:
+            u,_=identify(request,c,True)
+            revoked=c.execute(delete(sessions).where(sessions.c.user_id==u['id'])).rowcount
+            log(c,u,u['scope_id'],'sessions_revoked_all',{'revoked_count':revoked})
+        result=JSONResponse({'ok':True,'revoked_sessions':revoked})
+        result.delete_cookie('px_session',path='/')
+        return result
 
     @app.post('/api/auth/password')
     def change_password(body:dict,request:Request):
@@ -204,6 +256,7 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
         cfg=normalize_config(body.get('config'))
         with engine.begin() as c:
             u,_=identify(request,c,True);s=require_scope(c,u,sid)
+            authorize_organizer_action(shared_mode,shared_authorizer,u,s,'event.configure')
             rev=body.get('draft_rev')
             if not isinstance(rev,int) or rev!=s['draft_rev']:fail('DRAFT_CHANGED_REFRESH_REQUIRED',409)
             result=c.execute(update(sites).where(sites.c.id==sid,sites.c.draft_rev==rev).values(draft=cfg,draft_rev=rev+1))
@@ -215,6 +268,7 @@ def create_app(database_url=None,origin=None,seed_demo=False,credentials_path=No
     def publish_site(sid:str,body:dict,request:Request):
         with engine.begin() as c:
             u,_=identify(request,c,True);s=require_scope(c,u,sid)
+            authorize_organizer_action(shared_mode,shared_authorizer,u,s,'event.publish')
             if body.get('draft_rev')!=s['draft_rev']:fail('DRAFT_CHANGED_REFRESH_REQUIRED',409)
             version=publish(c,s,u)
         return {'published_version':version}

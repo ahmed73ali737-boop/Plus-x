@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "integration_id": "PX-AUTHZ-001",
+  "status": "TEST_DEFINITIONS_NOT_EXECUTED",
+  "scenarios": [
+    {
+      "id": "PX-AUTHZ-N1",
+      "condition": "guest attempts organizer update",
+      "expected": "DENY",
+      "executed": false,
+      "evidence": []
+    },
+    {
+      "id": "PX-AUTHZ-N2",
+      "condition": "organizer accesses another tenant's event",
+      "expected": "DENY",
+      "executed": false,
+      "evidence": []
+    },
+    {
+      "id": "PX-AUTHZ-N3",
+      "condition": "expired QR replays offline",
+      "expected": "DENY on sync",
+      "executed": false,
+      "evidence": []
+    },
+    {
+      "id": "PX-AUTHZ-N4",
+      "condition": "revoked organizer session",
+      "expected": "DENY",
+      "executed": false,
+      "evidence": []
+    },
+    {
+      "id": "PX-AUTHZ-P1",
+      "condition": "valid public guest poll within event quota",
+      "expected": "DOMAIN-POLICY grant only",
+      "executed": false,
+      "evidence": []
+    }
+  ]
+}

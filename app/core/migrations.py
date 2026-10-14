@@ -16,11 +16,15 @@ MIGRATION_PATHS = (
 )
 
 
+def migration_checksum(path: Path) -> str:
+    """Historical v1: UTF-8 text with universal newline normalization only."""
+    with path.open("r", encoding="utf-8", newline=None) as stream:
+        normalized=stream.read()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def expected_migration_checksums() -> dict[str, str]:
-    return {
-        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in MIGRATION_PATHS
-    }
+    return {path.name:migration_checksum(path) for path in MIGRATION_PATHS}
 
 
 def postgres_migration_status(connection) -> dict:
