@@ -89,7 +89,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
         path=req.scope.get('path') or '/'
-        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout'):
+        if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout','/api/auth/sessions','/api/auth/sessions/revoke-all'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
@@ -120,6 +120,32 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
         with engine.begin() as c:
             u,s=identify(request,c,True);c.execute(delete(sessions).where(sessions.c.token_hash==s['token_hash']))
         r=JSONResponse({'ok':True});r.delete_cookie('px_session',path='/');return r
+
+    @app.get('/api/auth/sessions')
+    def my_sessions(request:Request):
+        """Return an owner-only session summary, never session hashes or CSRF secrets."""
+        with engine.connect() as c:
+            u,s=identify(request,c)
+            active=c.execute(select(func.count()).select_from(sessions).where(
+                sessions.c.user_id==u['id'],sessions.c.expires_at>now()
+            )).scalar_one()
+            return {
+                'active_count':active,
+                'current_expires_at':s['expires_at'],
+                'absolute_timeout_seconds':28800,
+                'device_inventory_available':False,
+            }
+
+    @app.post('/api/auth/sessions/revoke-all')
+    def revoke_all_my_sessions(request:Request):
+        """Explicit account-wide revoke; CSRF and identity checks precede mutation."""
+        with engine.begin() as c:
+            u,_=identify(request,c,True)
+            revoked=c.execute(delete(sessions).where(sessions.c.user_id==u['id'])).rowcount
+            log(c,u,u['scope_id'],'sessions_revoked_all',{'revoked_count':revoked})
+        result=JSONResponse({'ok':True,'revoked_sessions':revoked})
+        result.delete_cookie('px_session',path='/')
+        return result
 
     @app.post('/api/auth/password')
     def change_password(body:dict,request:Request):

@@ -241,7 +241,48 @@ async function auditTab(){
   for(const e of x.entries){list.append(h('div',{class:'record-line'},h('small',{class:'muted'},new Date(e.at).toLocaleString('ar-YE')),h('strong',{},e.action),h('code',{},JSON.stringify(e.details||{}))));}
   host.append(h('p',{class:'lead'},'سجل للعمليات الإدارية المهمة: الدخول، الحفظ، النشر، الاستيراد، إنشاء الحسابات وغيرها.'),list);
 }
-function settings(){host.append(h('div',{class:'notice'},'بعد تجهيز التاب: اخرج من حساب الإدارة، وأغلق لوحة الإدارة. استخدم وضع الكشك في نظام التشغيل لمنع وصول الجمهور لإعدادات المتصفح.'),button('نسخة احتياطية من الطابور المحلي — للمشغل',backup,'btn secondary'));const old=field('كلمة المرور الحالية','password'),next=field('كلمة المرور الجديدة — 12 حرفًا على الأقل','password');host.append(h('div',{class:'card form-card'},old.node,next.node,button('تغيير كلمة المرور وإنهاء الجلسات',async()=>{await api('/api/auth/password',{current:old.input.value,password:next.input.value});location.href='/admin';})));}
+function settings(){
+  host.append(
+    h('div',{class:'notice'},'بعد تجهيز التاب: اخرج من حساب الإدارة، وأغلق لوحة الإدارة. استخدم وضع الكشك في نظام التشغيل لمنع وصول الجمهور لإعدادات المتصفح.'),
+    button('نسخة احتياطية من الطابور المحلي — للمشغل',backup,'btn secondary')
+  );
+  const old=field('كلمة المرور الحالية','password');
+  const next=field('كلمة المرور الجديدة — 12 حرفًا على الأقل','password');
+  host.append(h('div',{class:'card form-card'},old.node,next.node,
+    button('تغيير كلمة المرور وإنهاء الجلسات',async()=>{
+      await api('/api/auth/password',{current:old.input.value,password:next.input.value});
+      setCSRF('');
+      location.href='/admin';
+    })
+  ));
+  const sessionPanel=h('section',{class:'card form-card'},
+    h('h3',{},'جلساتي وأمان الحساب'),
+    h('p',{class:'muted'},'جار تحميل ملخص الجلسات...')
+  );
+  host.append(sessionPanel);
+  api('/api/auth/sessions').then(summary=>{
+    if(!sessionPanel.isConnected)return;
+    const expires=summary.current_expires_at
+      ?new Date(summary.current_expires_at).toLocaleString('ar-YE'): 'غير متاح';
+    sessionPanel.replaceChildren(
+      h('h3',{},'جلساتي وأمان الحساب'),
+      h('p',{},'الجلسات النشطة لهذا الحساب: '+summary.active_count),
+      h('p',{class:'muted'},'انتهاء صلاحية الجلسة الحالية: '+expires),
+      h('p',{class:'muted'},'هذا ملخص للجلسات فقط؛ لا تتوفر بعد قائمة تربط كل جلسة بهوية جهاز موثوق.'),
+      button('إنهاء جميع جلساتي على كل الأجهزة',async()=>{
+        if(!confirm('سيتم تسجيل خروجك من جميع الجلسات على كل الأجهزة، بما فيها هذا الجهاز. هل تريد المتابعة؟'))return;
+        await api('/api/auth/sessions/revoke-all',{});
+        setCSRF('');
+        location.href='/admin';
+      },'btn secondary')
+    );
+  }).catch(e=>{
+    if(sessionPanel.isConnected)sessionPanel.replaceChildren(
+      h('h3',{},'جلساتي وأمان الحساب'),
+      h('p',{class:'muted'},'تعذر تحميل حالة الجلسات: '+msg(e))
+    );
+  });
+}
 function createSite(){const kind=selectField('نوع المساحة',user.role==='platform'?[['event','فعالية جديدة'],['agency','جهة مشاركة']]:[['agency','جهة مشاركة']],user.role==='platform'?'event':'agency');const parents=selectField('المساحة الأعلى',allSites.filter(x=>['event','platform'].includes(x.kind)).map(x=>[x.id,x.title]),current.kind==='agency'?current.event_id:current.id);const title=field('الاسم'),slug=field('رمز الرابط بالإنجليزية');const body=h('div',{},kind.node,parents.node,title.node,slug.node,h('p',{class:'muted'},'المدير العام ينشئ الفعالية تحت المنصة. الجهة تُنشأ تحت فعالية. الصفحة الجديدة تبدأ مسودة.'));const d=modal('إنشاء مساحة وصفحة',body);body.append(button('إنشاء',async()=>{const x=await api('/api/admin/sites',{kind:kind.input.value,parent_id:parents.input.value,title:title.input.value,slug:slug.input.value});sessionStorage.setItem('px-admin-site',x.id);d.close();await loadSites();}));}
-function forcePasswordChange(){root.replaceChildren();const old=field('كلمة المرور المؤقتة الحالية','password','',{required:true}),next=field('كلمة المرور الجديدة — 12 حرفًا على الأقل','password','',{required:true});const form=h('form',{class:'login-form force-password'},h('span',{class:'eyebrow'},'حماية الحساب'),h('h2',{},'غيّر كلمة المرور المؤقتة'),h('p',{class:'muted'},'لن تفتح لوحة الإدارة قبل تعيين كلمة مرور خاصة بك.'),old.node,next.node,h('button',{type:'submit',class:'btn'},'تغيير كلمة المرور والمتابعة'));form.addEventListener('submit',async ev=>{ev.preventDefault();try{await api('/api/auth/password',{current:old.input.value,password:next.input.value});toast('تم تغيير كلمة المرور.');location.href='/admin';}catch(e){toast(msg(e),true);}});root.append(h('main',{class:'login-main password-change-screen'},form));}
+function forcePasswordChange(){root.replaceChildren();const old=field('كلمة المرور المؤقتة الحالية','password','',{required:true}),next=field('كلمة المرور الجديدة — 12 حرفًا على الأقل','password','',{required:true});const form=h('form',{class:'login-form force-password'},h('span',{class:'eyebrow'},'حماية الحساب'),h('h2',{},'غيّر كلمة المرور المؤقتة'),h('p',{class:'muted'},'لن تفتح لوحة الإدارة قبل تعيين كلمة مرور خاصة بك.'),old.node,next.node,h('button',{type:'submit',class:'btn'},'تغيير كلمة المرور والمتابعة'),button('إنهاء جميع الجلسات الآن',async()=>{if(!confirm('إنهاء جميع الجلسات الحالية لكل الأجهزة؟'))return;await api('/api/auth/sessions/revoke-all',{});setCSRF('');location.href='/admin';},'btn secondary'));form.addEventListener('submit',async ev=>{ev.preventDefault();try{await api('/api/auth/password',{current:old.input.value,password:next.input.value});toast('تم تغيير كلمة المرور.');location.href='/admin';}catch(e){toast(msg(e),true);}});root.append(h('main',{class:'login-main password-change-screen'},form));}
 function loginPage(){root.replaceChildren(h('div',{class:'login-layout'},h('div',{class:'login-art'},brand(),h('h1',{},'هويتك. صفحتك.\nتجربتك الحيّة.'),h('p',{},'أدر المحتوى والأسئلة والعروض، وشاهد أثر تفاعل الجمهور من مساحة واحدة.'),h('span',{class:'tag'},'PulseX Studio · Live Experience Platform')),h('main',{class:'login-main'})));const host=document.querySelector('.login-main');const email=field('البريد الإلكتروني','email','',{autocomplete:'username',required:true});const password=field('كلمة المرور','password','',{autocomplete:'current-password',required:true});const form=h('form',{class:'login-form'},h('span',{class:'eyebrow'},'مرحبًا بعودتك'),h('h2',{},'دخول الإدارة والجهات'),h('p',{class:'muted'},'الزوار يستطيعون التصفح والمشاركة دون تسجيل دخول.'),email.node,password.node,h('button',{type:'submit',class:'btn'},'تسجيل الدخول'),h('a',{href:'/',class:'text-btn'},'العودة إلى الموقع العام'),h('p',{class:'small muted'},'حسابات التجربة تُنشأ بكلمات مرور عشوائية في ملف محلي محمي عند أول تشغيل.'));form.addEventListener('submit',async ev=>{ev.preventDefault();try{const x=await api('/api/auth/login',{email:email.input.value,password:password.input.value});user=x.user;setCSRF(x.csrf);if(user.must_change_password)return forcePasswordChange();await loadSites();}catch(e){toast(msg(e),true);}});host.append(form);}
