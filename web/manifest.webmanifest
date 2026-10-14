@@ -1,1 +1,26 @@
-{"name":"PulseX التجربة التفاعلية","short_name":"PulseX","start_url":"/","display":"standalone","background_color":"#F5F7F6","theme_color":"#176B73","lang":"ar","dir":"rtl"}
+{
+  "name": "PulseX التجربة التفاعلية",
+  "short_name": "PulseX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F7F6",
+  "theme_color": "#176B73",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
