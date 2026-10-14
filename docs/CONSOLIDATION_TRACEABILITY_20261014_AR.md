@@ -68,3 +68,17 @@
 **سلامة التجميع:** مطابقة 22/22 Git blob SHA للأصول المستوردة على commit 8ebda29d، دون إثبات provider SIT.
 
 **العوائق:** GitHub Actions #38642801097 و#38642801145 فشلا قبل بدء أي خطوة، runner فارغ. نسخة Windows المحلية 8586c6c غير متاحة؛ Venue/Scanner/Offline خمسة أيام وTLS وPenTest وPITR وUAT ما زالت مفتوحة. لا موافقة على الدمج إلى main أو نشر Final.
+
+## 7. إغلاق فجوات محددة بعد مراجعة — 15 أكتوبر 2026
+
+| ID | الخلل | الإصلاح في PR #25 | الاختبار الفعلي | ما زال غير معتمد |
+|---|---|---|---|---|
+| PX-STORY | مواد الاستبيان والإعلان والتصويت مبعثرة ولا يمكن ترتيبها بواجهة واحدة | web/storyboard-core.mjs + storyboard.mjs + storyboard.css + تبويب الإدارة وService Worker v24 | Node storyboard_core_smoke.mjs وstoryboard_ui_contract.mjs نجحا؛ test_storyboard.py + pilot: 87 اختبار Python نجح | هذا ترتيب سجلات داخل الأقسام، وليس Builder كاملًا عابرًا للأقسام |
+| PX-REL | سير النشر راقب PulseX CI فقط بينما عقد الإصدار يشترط guest-qr-ci أيضًا | أضيف push main إلى guest-qr-ci ومراقبة نجاح الاختبارين على نفس SHA قبل أي نشر | 12 اختبار Python مركزًا تشمل dual_ci_gate وaudit_release وPWA وStoryboard نجحت | نشر Final يظل محجوبًا audit_admission، لا موافقة إنتاج |
+| PX-PWA | اختبار قديم يشير لـSW v23 بعد إضافات v24 | تحديث test_pwa_install_contract.py للتحقق من v24 وأصول Storyboard | 7 اختبارات Python مرتبطة بـPWA/Storyboard/LiveWall نجحت | أجهزة فعلية ومتصفحات أخرى |
+| PX-QUIZ | GET public site كشف correct key لأسئلة quiz المنشورة في الجهة والفعالية الأم | نسخ public config وحذف مفاتيح الإجابات للزائر فقط؛ تبقى للإدارة والخادم | أُعيد إنتاج الفشل قبل الإصلاح؛ ثم 92 اختبار Python تضم privacy/poll/storyboard/pilot نجحت | أمن إنتاجي وDAST/Pentest وتوافق عملاء خارجيين |
+| PX-CI | وظائف GitHub Actions تنتهي قبل بدء خطواتها | لم تُخفف بوابات الإصدار لتجاوز العائق | آخر run IDs 38645327068 و38645327196 على 4d14833a: failure وsteps=[] وrunner_name فارغ | إصلاح توفر GitHub runners وإعادة جميع بوابات Windows/Linux/PostgreSQL/Browser على SHA واحد |
+
+نتائج مجموعات Python المذكورة **متداخلة وليست أعدادًا تجمع للحصول على نسبة الإنجاز**، وتمت على مصدر تجريبي محلي مرقّع من أرشيف Ubuntu السابق. تشغيل مجموعة pytest الشاملة لمحاولة لاحقة توقف عند انتهاء مهلة البيئة بعد اجتياز جزء من الحالات، لذا لا يُعلن نجاح شامل لـHEAD الحالي.
+
+المصدر المعتمد لطلب الدمج: PR #25 في Plus-x؛ مرجع العمل main لم يُغيَّر، وينبغي الاحتفاظ بالـPRs القديمة إلى أن تُربط أدلتها بشكل كافٍ ويُراجع تطابق النسخة المحلية Windows 8586c6c.
