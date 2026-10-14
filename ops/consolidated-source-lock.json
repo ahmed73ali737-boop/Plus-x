@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "integration_branch": "integration/pulsex-consolidated-20261014",
+  "baseline_main": "e66369ac83e1ee17d52664147e0e874329207501",
+  "baseline_candidate": "2f0bec559f7518ecc4895de0f9d5b23a6e2f55ff",
+  "status": "REVIEW_CANDIDATE_NOT_PRODUCTION",
+  "shared_authority": {
+    "iam": "G-Factory",
+    "party": "U-SEAS",
+    "observability": "G-Factory",
+    "db": "PulseX pilot PostgreSQL"
+  },
+  "files": [
+    {
+      "source_pr": 13,
+      "path": "docs/integrations/ENTERPRISE-IAM-ADOPTION-AR.md",
+      "blob_sha": "670bfc93b8336c32763863578376dd9f0167898e"
+    },
+    {
+      "source_pr": 13,
+      "path": "docs/integrations/enterprise-iam-adoption.v1.json",
+      "blob_sha": "3875e10c38334c4ae14bb71780eb5d27e454ce32"
+    },
+    {
+      "source_pr": 15,
+      "path": "integration/party-network/ASSET-CONSUMER-MANIFEST-v1.json",
+      "blob_sha": "e5f869ecc6fd6c1b338f90c221bb04fb783d4a4b"
+    },
+    {
+      "source_pr": 14,
+      "path": "app/application/shared_authorization.py",
+      "blob_sha": "6892bc380a659fefb9acaa2dfc12d95723e386d2"
+    },
+    {
+      "source_pr": 14,
+      "path": "tests/test_shared_organizer_authorization.py",
+      "blob_sha": "b98d95afbfc8e8737f5ea43f6ffdc82ea9ce5d25"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/PORTFOLIO-ADOPTION-AR.md",
+      "blob_sha": "9c921e596736a7cfd9fd805467624760cc0a3939"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/adoptions/authorization.v1.json",
+      "blob_sha": "bf7827d792137eb83cc93c0a2c3ea0ddf937034b"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/contracts/authorization.v1.json",
+      "blob_sha": "8a22d31dcba4ca149e2c114040e69a4da522c8b0"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/evidence/shared-organizer-unit-2026-10-09.json",
+      "blob_sha": "03621e469a145db067c82e586a271fca3ceb2903"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/scenarios/authorization.v1.json",
+      "blob_sha": "a9d1e5ee777c88480d7a43e9b8c95508fdd39b3d"
+    },
+    {
+      "source_pr": 14,
+      "path": "enterprise-governance/traceability/authorization.v1.json",
+      "blob_sha": "daf96e812fe5aa24620578eb0f55a238391597a9"
+    },
+    {
+      "source_pr": 17,
+      "path": "sdk/python/pulsex_sdk/party_network.py",
+      "blob_sha": "c8c76d9216e9cb2379bf1d09ef3fd3b46d10237a"
+    },
+    {
+      "source_pr": 17,
+      "path": "tests/test_party_network_r15.py",
+      "blob_sha": "50a6cff815dae882af28f06f86266c0d96d33074"
+    },
+    {
+      "source_pr": 16,
+      "path": "tests/test_party_network_sdk.py",
+      "blob_sha": "6d2a2516ba47f1fc6437e5f0ef5dd36883e4d8db"
+    },
+    {
+      "source_pr": 21,
+      "path": "app/infrastructure/g_observability.py",
+      "blob_sha": "7dd118871d3a4c901fe993d16ef2be49534556d1"
+    },
+    {
+      "source_pr": 21,
+      "path": "components/g-observability/source-lock.json",
+      "blob_sha": "54be131a6cf32e3af37213c5beea0a8d6830de9e"
+    },
+    {
+      "source_pr": 21,
+      "path": "docs/shared-observability.md",
+      "blob_sha": "e910dcb3e9f2afac98c2bc22bebfdae633fddd8d"
+    },
+    {
+      "source_pr": 21,
+      "path": "requirements-observability.txt",
+      "blob_sha": "5cedf0b04bb1894f067e9eb3006ad8174e82bb0a"
+    },
+    {
+      "source_pr": 21,
+      "path": "tools/verify_shared_observability.py",
+      "blob_sha": "88bdc06d107f2c124370fe8a7ae85fa72a01b0e2"
+    },
+    {
+      "source_pr": 22,
+      "path": "docs/DATABASE-ARCHITECTURE-SAFE-ROLLOUT-2026-10-12.md",
+      "blob_sha": "8cdc91a19d0dafe415cb8d240983c36349557de2"
+    },
+    {
+      "source_pr": 22,
+      "path": "ops/postgresql/health_readonly.sql",
+      "blob_sha": "0bb5ef32709478c391730b2556ac1a2ec547b116"
+    },
+    {
+      "source_pr": 22,
+      "path": "tests/database_architecture/test_readonly_catalog.py",
+      "blob_sha": "33c2b4dfa1b552585aeb118727158f456671b920"
+    }
+  ]
+}
