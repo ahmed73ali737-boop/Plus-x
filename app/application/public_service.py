@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from copy import deepcopy
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -11,13 +12,26 @@ from app.infrastructure.repository import get_site
 from app.domain import now
 
 
+def public_config_without_answer_keys(config):
+    """Build an anonymous-safe copy while preserving canonical scoring data.
+
+    Server-side validation and privileged drafts retain correct answers; public
+    site and parent-event bundles must never transmit those keys.
+    """
+    result = deepcopy(config)
+    for item in result.get('records', []):
+        if isinstance(item, dict) and item.get('kind') == 'question':
+            item.pop('correct', None)
+    return result
+
+
 def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
     current={'config':site['draft'],'version':site['published_version'],'published_at':None} if draft else get_site_version(conn,site)
     event=None; children=[]; events=[]
     if site['event_id'] and site['id']!=site['event_id']:
         e=get_site(conn,site['event_id'])
         if e['published_version']:
-            event={'id':e['id'],'slug':e['slug'],'config':get_site_version(conn,e)['config']}
+            event={'id':e['id'],'slug':e['slug'],'config':public_config_without_answer_keys(get_site_version(conn,e)['config'])}
     parent_id=site['event_id'] or site['id']
     for child in conn.execute(select(sites).where(sites.c.parent_id==parent_id)).mappings():
         if child['kind']=='agency' and child['published_version']:
@@ -32,7 +46,7 @@ def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
             end=datetime.fromisoformat(cfg['end']) if cfg.get('end') else None
             status='upcoming' if start and current_time<start else 'completed' if end and current_time>=end else 'current'
             events.append({'id':e['id'],'slug':e['slug'],'title':cfg['title'],'subtitle':cfg['subtitle'],'start':cfg['start'],'end':cfg['end'],'cover':cfg['cover'],'status':status})
-    return {'id':site['id'],'slug':site['slug'],'kind':site['kind'],'event_id':site['event_id'],'version':current['version'],'config':current['config'],'published_at':current['published_at'],'event':event,'agencies':children,'events':events,'preview':draft,'draft':draft,'public_origin':public_origin}
+    return {'id':site['id'],'slug':site['slug'],'kind':site['kind'],'event_id':site['event_id'],'version':current['version'],'config':current['config'] if draft else public_config_without_answer_keys(current['config']),'published_at':current['published_at'],'event':event,'agencies':children,'events':events,'preview':draft,'draft':draft,'public_origin':public_origin}
 
 
 def build_public_poll_results(conn, site):
