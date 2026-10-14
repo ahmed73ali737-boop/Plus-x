@@ -1,7 +1,4 @@
 {
-  "/{path}": [
-    "get"
-  ],
   "/api/access-request": [
     "post"
   ],
@@ -79,10 +76,10 @@
   "/api/admin/sites/{sid}/export": [
     "get"
   ],
-  "/api/admin/sites/{sid}/imports/{iid}/commit": [
+  "/api/admin/sites/{sid}/imports/preview": [
     "post"
   ],
-  "/api/admin/sites/{sid}/imports/preview": [
+  "/api/admin/sites/{sid}/imports/{iid}/commit": [
     "post"
   ],
   "/api/admin/sites/{sid}/metrics": [
@@ -116,6 +113,12 @@
   "/api/auth/password": [
     "post"
   ],
+  "/api/auth/sessions": [
+    "get"
+  ],
+  "/api/auth/sessions/revoke-all": [
+    "post"
+  ],
   "/api/collect": [
     "post"
   ],
@@ -143,17 +146,17 @@
   "/api/public/events/{event_slug}/guest-config": [
     "get"
   ],
-  "/api/public/events/{event_slug}/guests/{guest_number}": [
-    "get"
-  ],
-  "/api/public/events/{event_slug}/guests/{guest_number}/qr": [
-    "get"
-  ],
   "/api/public/events/{event_slug}/guests/register": [
     "post"
   ],
   "/api/public/events/{event_slug}/guests/sync": [
     "post"
+  ],
+  "/api/public/events/{event_slug}/guests/{guest_number}": [
+    "get"
+  ],
+  "/api/public/events/{event_slug}/guests/{guest_number}/qr": [
+    "get"
   ],
   "/api/public/site/{slug}": [
     "get"
@@ -171,6 +174,9 @@
     "get"
   ],
   "/templates/{name}": [
+    "get"
+  ],
+  "/{path}": [
     "get"
   ]
 }
