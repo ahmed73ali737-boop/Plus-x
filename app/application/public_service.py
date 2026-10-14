@@ -38,7 +38,8 @@ def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
 def build_public_poll_results(conn, site):
     cfg=get_site_version(conn,site)['config']; result={}
     for q in cfg['records']:
-        if q['kind']!='poll' or not q['enabled'] or not q['show_results']:
+        if (q.get('kind') != 'poll' or q.get('enabled') is not True or
+                q.get('show_results') is not True or q.get('poll_style') == 'secret'):
             continue
         rows=conn.execute(select(submissions.c.payload).where(submissions.c.site_id==site['id'],submissions.c.kind=='poll',submissions.c.target==q['code'],submissions.c.version==site['published_version'])).scalars()
         counts=Counter(); ballots=0
