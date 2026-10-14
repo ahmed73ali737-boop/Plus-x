@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-10-15",
+  "repo": "ahmed73ali737-boop/Plus-x",
+  "candidate_branch": "integration/pulsex-consolidated-20261014",
+  "baseline": "Archived successful Ubuntu artifact 11796656183 plus scoped local patches; not exact complete GitHub HEAD",
+  "tested_local": {
+    "pytest": {
+      "passed": 246,
+      "failed": 0,
+      "duration_seconds": 64.59
+    },
+    "node_js": "session_ui_contract PASS",
+    "livewall_privacy_scenarios": 4,
+    "pwa_scenarios": 2
+  },
+  "environment": {
+    "python": "3.13.5",
+    "fastapi_installed": "0.128.2",
+    "fastapi_pinned": "0.142.2",
+    "sqlalchemy": "2.0.50",
+    "node": "22.16.0",
+    "db": "SQLite"
+  },
+  "git_blobs": {
+    "locked": 22,
+    "matches": 22,
+    "mismatches": 0,
+    "head_at_verification": "8ebda29d21a0b7c1fe59e9eb38ef5eef1a0730c5"
+  },
+  "runner_blockers": [
+    {
+      "id": 38642801097,
+      "name": "Ubuntu candidate",
+      "failure_before_steps": true
+    },
+    {
+      "id": 38642801145,
+      "name": "guest-qr-ci",
+      "failure_before_steps": true
+    }
+  ],
+  "admission": {
+    "ci_current_sha": false,
+    "windows_native": false,
+    "postgresql_native_current_sha": false,
+    "physical_devices": false,
+    "offline_5_days": false,
+    "external_security": false,
+    "uat": false,
+    "source_parity_local_windows": false,
+    "production_ready": false
+  },
+  "note": "Generated OpenAPI updated with local FastAPI 0.128.2; exact pinned 0.142.2 regeneration still required."
+}
