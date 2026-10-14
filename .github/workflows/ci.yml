@@ -32,6 +32,10 @@ jobs:
           pip install -r requirements.txt -r requirements-qa.txt
       - name: Compile Python
         run: python -m compileall -q app tests tools run.py
+      - name: Verify cross-system source locks
+        run: |
+          python tools/verify_consolidation_assets.py
+          python tools/verify_shared_observability.py
       - name: Audit Python dependencies
         run: python -m pip_audit -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
       - name: Run pytest suite
@@ -81,6 +85,10 @@ jobs:
           pip install -r requirements.txt -r requirements-qa.txt
       - name: Compile Python
         run: python -m compileall -q app tests tools run.py
+      - name: Verify cross-system source locks
+        run: |
+          python tools/verify_consolidation_assets.py
+          python tools/verify_shared_observability.py
       - name: Run pytest suite on Windows
         run: python -m pytest -q
       - name: Run native Windows HTTP acceptance
