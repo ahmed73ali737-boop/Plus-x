@@ -57,6 +57,10 @@ jobs:
         run: node tests/sdk_js_test.mjs
       - name: Verify Live Wall public display privacy contract
         run: node tests/livewall_smoke.mjs
+      - name: Verify editable storyboard and branching / UI contract
+        run: |
+          node tests/storyboard_core_smoke.mjs
+          node tests/storyboard_ui_contract.mjs
       - name: Verify first-login session safety UI
         run: node tests/session_ui_contract.mjs
       - name: Run Python SDK real HTTP smoke
