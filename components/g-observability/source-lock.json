@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "role": "GENERATED_DEPENDENCY_NOT_CANONICAL_OWNER",
+  "owner": "G-Factory",
+  "canonicalCapabilityId": "OPS-OBS",
+  "files": [
+    {
+      "path": "app/infrastructure/g_observability.py",
+      "sha256": "8c9aa325761d77b71d80eb5226129cd57026d8454d966b9a14a0ecc365e4af56"
+    },
+    {
+      "path": "requirements-observability.txt",
+      "sha256": "eec817d230ce4a59fb6cf4f31e28e1962c42604217bef34bd75a8d25324d4a68"
+    }
+  ],
+  "endpointProtocol": "http/protobuf",
+  "productionAccepted": false,
+  "canonicalSource": {
+    "repository": "G-Factory",
+    "commit": "c76165bd7d954fe147d3931554d616e6c7eb8f5f",
+    "files": [
+      {
+        "consumerPath": "app/infrastructure/g_observability.py",
+        "sourcePath": "packages/g_observability/python/g_observability.py",
+        "sha256": "8c9aa325761d77b71d80eb5226129cd57026d8454d966b9a14a0ecc365e4af56"
+      },
+      {
+        "consumerPath": "requirements-observability.txt",
+        "sourcePath": "packages/g_observability/python/requirements-observability.txt",
+        "sha256": "eec817d230ce4a59fb6cf4f31e28e1962c42604217bef34bd75a8d25324d4a68"
+      }
+    ]
+  }
+}
