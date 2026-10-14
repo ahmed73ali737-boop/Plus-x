@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "kind": "LOCAL_ISOLATED_UNIT_TEST_RECEIPT",
+  "date": "2026-10-09",
+  "implementation_file": "app/application/shared_authorization.py",
+  "source_blob_sha": "6892bc380a659fefb9acaa2dfc12d95723e386d2",
+  "test_file": "tests/test_shared_organizer_authorization.py",
+  "test_blob_sha": "b98d95afbfc8e8737f5ea43f6ffdc82ea9ce5d25",
+  "runtime": "Python 3.13.5 / pytest",
+  "command": "PYTHONPATH=. pytest -q tests/test_shared_organizer_authorization.py",
+  "result": "15 PASSED in 0.17s",
+  "scope": "Exact GitHub blob-identical Python helper and unit test were reconstructed in an isolated local harness; app.domain.fail was stubbed to match HTTPException behavior, not the full PulseX application.",
+  "limitations": [
+    "No FastAPI full application, SQLite/PostgreSQL or real OIDC/OAuth integration executed",
+    "No browser/mobile/offline multi-device or external provider SIT executed",
+    "No production deployment, security approval, field/UAT, or release readiness claim",
+    "Mode defaults Off and Enforce requires a registered external provider"
+  ]
+}

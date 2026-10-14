@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "integration_id": "PX-AUTHZ-001",
+  "status": "REFERENCE_ONLY_NOT_RUNTIME",
+  "source_capability": "G.Authorization",
+  "candidate_commit": "aa9d1986e9ef762438266b657c7b0d70586235cd",
+  "owner": "G-Factory",
+  "consumer": "ahmed73ali737-boop/Plus-x",
+  "protected_ports": [
+    "organization/event editor",
+    "event supervisor moderation"
+  ],
+  "public_separate_policy": [
+    "visitor poll",
+    "guest QR registration"
+  ],
+  "constraints": [
+    "No KYC account mandatory for guests",
+    "no phone number in URL",
+    "client-side offline scope never grants organizer access"
+  ],
+  "runtime_connected": false
+}
