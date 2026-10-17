@@ -2,6 +2,7 @@ name: PulseX UIP guest-preview contract static
 on:
   pull_request:
     paths:
+      - 'reference/integrations/uip-adoption-v1.json'
       - 'reference/integrations/uip-guest-status-preview-v1.json'
       - 'tools/verify_uip_guest_preview.py'
       - '.github/workflows/uip-guest-preview-contract.yml'

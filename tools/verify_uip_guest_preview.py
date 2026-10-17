@@ -36,4 +36,39 @@ class TestPulseXUipPreview(unittest.TestCase):
         x=copy.deepcopy(self.contract);x['events']['emits']=['guest.full-record.exposed']
         with self.assertRaises(AssertionError): validate(x)
 
+
+# UIP interoperable envelope v1 local adoption gate (source only; not an E2E/runtime claim).
+ADOPTION = Path(__file__).resolve().parents[1] / "reference/integrations/uip-adoption-v1.json"
+
+def validate_adoption(p):
+    assert p["protocolVersion"] == "uip.interop.v1"
+    assert p["repository"] == "Plus-x"
+    assert p["canonicalCapability"] == "engagement.guest.validation.preview"
+    assert p["sourceContract"] == "reference/integrations/uip-guest-status-preview-v1.json"
+    assert p["mode"] == "READ_ONLY"
+    assert p["operation"] == "STATUS_INQUIRY"
+    assert p["dataClassification"] == "CONFIDENTIAL"
+    assert p["tenantClaimMustMatchPayload"] is True
+    assert p["correlationIdRequired"] is True
+    assert p["idempotencyKeyRequired"] is True
+    assert p["sideEffectsAllowed"] is False
+    assert p["providerExecutionEnabled"] is False
+    assert p["enabled"] is False
+    assert p["nativeVerified"] is False
+    assert p["humanApproved"] is False
+    assert p["unknownOutcomeDirective"] == "FREEZE_AND_STATUS_INQUIRY"
+    assert p["privacyAndOwnership"]["piiExportEnabled"] is False
+
+class TestUipInteropAdoption(unittest.TestCase):
+    def setUp(self):
+        self.profile = json.loads(ADOPTION.read_text(encoding="utf8"))
+    def test_preview_profile_is_fail_closed(self):
+        validate_adoption(self.profile)
+    def test_reject_live_effects(self):
+        x = copy.deepcopy(self.profile); x["sideEffectsAllowed"] = True
+        with self.assertRaises(AssertionError): validate_adoption(x)
+    def test_reject_tenant_identity_bypass(self):
+        x = copy.deepcopy(self.profile); x["tenantClaimMustMatchPayload"] = False
+        with self.assertRaises(AssertionError): validate_adoption(x)
+
 if __name__=='__main__': unittest.main()
