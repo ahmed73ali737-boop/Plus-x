@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "capabilityCode": "engagement.guest.validation.preview",
+  "version": "1.0.0",
+  "canonicalOwner": {
+    "repository": "Plus-x",
+    "domain": "PulseX Engagement"
+  },
+  "module": "Guest & QR",
+  "effectType": "ReadOnlyQuery",
+  "dataClassification": "CONFIDENTIAL",
+  "executionPolicy": {
+    "mode": "SIMULATION_ONLY",
+    "externalEffectsEnabled": false,
+    "idempotencyRequired": false,
+    "statusInquiryCapability": null,
+    "approvalRequired": false
+  },
+  "events": {
+    "emits": [],
+    "consumes": []
+  },
+  "acceptance": {
+    "verification": "DESIGN_ONLY",
+    "evidence": [],
+    "humanReview": false
+  }
+}

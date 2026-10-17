@@ -1,0 +1,26 @@
+{
+  "protocolVersion": "uip.interop.v1",
+  "status": "CONTRACT_CANDIDATE_NO_RUNTIME",
+  "repository": "Plus-x",
+  "canonicalCapability": "engagement.guest.validation.preview",
+  "sourceContract": "reference/integrations/uip-guest-status-preview-v1.json",
+  "operation": "STATUS_INQUIRY",
+  "mode": "READ_ONLY",
+  "dataClassification": "CONFIDENTIAL",
+  "tenantAuthority": "VERIFIED_OIDC_OR_SERVICE_PRINCIPAL_REQUIRED",
+  "tenantClaimMustMatchPayload": true,
+  "correlationIdRequired": true,
+  "idempotencyKeyRequired": true,
+  "sideEffectsAllowed": false,
+  "providerExecutionEnabled": false,
+  "enabled": false,
+  "nativeVerified": false,
+  "humanApproved": false,
+  "unknownOutcomeDirective": "FREEZE_AND_STATUS_INQUIRY",
+  "protocolSpecification": "https://github.com/ahmed73ali737-boop/G-Factory/blob/feature/uip-enterprise-intake-20261015/contracts/uip/uip-interop-preview-v1.schema.json",
+  "privacyAndOwnership": {
+    "guestIdentityOwnerRetained": true,
+    "piiExportEnabled": false,
+    "offlineReplayAuthorityRetained": true
+  }
+}
