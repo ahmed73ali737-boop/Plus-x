@@ -8,3 +8,8 @@
 *.md text eol=lf
 *.sql text eol=lf
 requirements-observability.txt text eol=lf
+requirements.txt text eol=lf
+requirements-postgres.txt text eol=lf
+requirements-qa.txt text eol=lf
+requirements/locks/*.txt text eol=lf
+requirements/locks/*.in text eol=lf

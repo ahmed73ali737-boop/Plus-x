@@ -18,6 +18,8 @@ import venv
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 ENV = ROOT / '.venv'
 PYTHON = ENV / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
 REQUIREMENTS = ROOT / 'requirements.txt'
@@ -31,29 +33,21 @@ def available_port(port: int) -> bool:
             return False
 
 def env_check() -> bool:
-    if not PYTHON.is_file():
-        return False
-    code = "import importlib.metadata as m,json; pairs=json.loads(__import__('sys').argv[1]); assert all(m.version(k)==v for k,v in pairs.items())"
-    pairs = {}
-    for line in REQUIREMENTS.read_text(encoding='utf-8').splitlines():
-        if '==' in line and not line.lstrip().startswith('#'):
-            k,v = line.split('==',1)
-            pairs[k.strip()] = v.strip()
     try:
-        return subprocess.run([str(PYTHON), '-c', code, json.dumps(pairs)], capture_output=True, timeout=30).returncode == 0
-    except (OSError, subprocess.SubprocessError):
+        # Launcher and CI consume the same transitive lock and timezone probe.
+        from tools.prepare_runtime import check
+        result = check('runtime', ENV)
+        return bool(result['platform_compatible'] and result['dependencies_ok'])
+    except (OSError, ValueError, subprocess.SubprocessError):
         return False
 
 def prepare() -> None:
     if not (3,11) <= sys.version_info[:2] < (3,14):
         raise RuntimeError('This package targets Python 3.11-3.13; Python 3.13 is recommended. See START_WINDOWS_AR.html.')
-    if not PYTHON.is_file():
-        print('Creating a project-only virtual environment...', flush=True)
-        venv.EnvBuilder(with_pip=True).create(ENV)
     if not env_check():
-        print('Installing pinned application dependencies. First setup needs internet.', flush=True)
-        subprocess.run([str(PYTHON), '-m', 'pip', 'install', '--disable-pip-version-check', '-r', str(REQUIREMENTS)], check=True)
-        subprocess.run([str(PYTHON), '-m', 'pip', 'check'], check=True)
+        from tools.prepare_runtime import prepare as prepare_locked_runtime
+        print('Preparing hash-locked application dependencies. First setup needs internet.', flush=True)
+        prepare_locked_runtime('runtime', ENV)
     if not env_check():
         raise RuntimeError('Dependency check failed. No application was started.')
 
