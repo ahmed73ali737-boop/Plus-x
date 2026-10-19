@@ -469,6 +469,11 @@ export async function scanPage(slug){
 
   const tools=h('div',{class:'scanner-tools'},input.node,mode.node,checkpoint.node,button('بحث / فتح',()=>show(input.input.value),'btn secondary'),button('تحديث سجل الزوار',async()=>{manifest=await loadManifest(page.id,token);refreshCheckpointOptions();await refreshPreflight();toast('تم تحديث السجل: '+(manifest.guests||[]).length+' زائر · '+(manifest.manifest_version||'').slice(0,8));},'btn secondary'),button('مزامنة الآن',()=>refreshSync(true),'btn secondary'),syncState);
   input.input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();show(input.input.value);}});
+  // Native Android QR decoding is only another input channel. The same scoped
+  // manifest, verification, anti-passback and server confirmation still apply.
+  const nativeScan=e=>{if(typeof e.detail==='string'&&e.detail.length<=4096){input.input.value=e.detail;show(e.detail);}};
+  window.addEventListener('pulsex:native-scan',nativeScan);
+  window.addEventListener('beforeunload',()=>window.removeEventListener('pulsex:native-scan',nativeScan),{once:true});
   mode.input.addEventListener('change',()=>currentGuest&&show(currentGuest.guest_number));
   checkpoint.input.addEventListener('change',()=>currentGuest&&show(currentGuest.guest_number));
 

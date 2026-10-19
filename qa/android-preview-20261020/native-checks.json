@@ -1,0 +1,10 @@
+{
+  "server_origin_jvm_checks": 24,
+  "server_origin_status": "passed",
+  "qr_image_roundtrip": "passed",
+  "blank_image_rejection": "passed",
+  "physical_camera": "NOT_RUN",
+  "android_full_ui_journeys": "BLOCKED",
+  "emulator_note": "Software Android 28 reached boot in one attempt, but interaction timed out without KVM; no app/device acceptance PASS.",
+  "deployed_server_uat": "NOT_RUN"
+}
