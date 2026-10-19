@@ -1,0 +1,39 @@
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Generating 2,048 bit RSA key pair and self-signed certificate (SHA256withRSA) with a validity of 3,650 days
+	for: CN=PulseX Preview, O=Development, C=YE
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=PulseX Preview, O=Development, C=YE
+Signer #1 certificate SHA-256 digest: 397f9c6883711bacf587acbf68fcb944b6a6540a71774a9b7e320f64734c33b1
+Signer #1 certificate SHA-1 digest: 685b87bc60fe996c3820dbfbd098f6f6b1f4b727
+Signer #1 certificate MD5 digest: 21b703bf70ed5322e4ad893ddc186ec2
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: 6c32d196fca2a3d87612c56eeef6f756e6004249b556ce0f7c3aedf778e6378a
+Signer #1 public key SHA-1 digest: 092ec5f90d2c072ff209c5cdacce70ac311c3f90
+Signer #1 public key MD5 digest: 7a17cd61d1b340b84a7552dd0ef9f9b0
+{
+  "source_revision": "d18f5c992fb625120059fe97a46a23c9f48a90a3",
+  "source_dirty": false,
+  "package": "com.pulsex.app.preview",
+  "min_sdk": 26,
+  "target_sdk": 35,
+  "build_tools": "35.0.0",
+  "signing": "disposable_debug_key_not_production",
+  "qr_decoder": {
+    "artifact": "com.google.zxing:core:3.5.3",
+    "sha256": "8d8064c1636fdaef7189dd9055c7d59950a8940a12f2293956446ec3c109fd82"
+  },
+  "apk_sha256": "1c14b96c350066c2561956b010caa75a920d058d8bebacad0894cd9a767bd90c",
+  "apk_bytes": 299736,
+  "device_tested": false,
+  "server_included": false
+}
+/workspace/scratch/2a81399e5e90/Plus-x/android/app/build/manual/PulseX-Android-preview.apk
