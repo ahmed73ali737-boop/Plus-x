@@ -124,7 +124,7 @@
           ]
         },
         {
-          "path": ".github/workflows/ci.yml",
+          "path": ".github/workflows/pulsex-ci.yml",
           "markers": [
             "browser_question_roundtrip.py"
           ]
@@ -222,7 +222,7 @@
           ]
         },
         {
-          "path": ".github/workflows/ci.yml",
+          "path": ".github/workflows/pulsex-ci.yml",
           "markers": [
             "pip_audit"
           ]
