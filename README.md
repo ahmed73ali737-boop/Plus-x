@@ -54,6 +54,8 @@ chmod +x Start-Linux.sh
 
 ## التطبيق والإدارة
 
+حزمة Android المعاينة متاحة في [artifacts/android](artifacts/android/README.md). راجع [حالة الأوفلاين والتجهيز والأدلة](docs/OFFLINE_UPLOAD_VERIFICATION_20261020_AR.md) قبل فصل الاتصال أو تشغيل البوابات.
+
 بعد تشغيل Start-Windows.cmd أو Start-Linux.sh افتح http://127.0.0.1:4310 :
 
 | الواجهة | المسار |

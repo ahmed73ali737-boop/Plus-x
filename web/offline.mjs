@@ -7,7 +7,7 @@ export async function del(store,id){const d=await db();return new Promise((ok,no
 export async function all(store){const d=await db();return new Promise((ok,no)=>{const r=d.transaction(store).objectStore(store).getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
 async function acknowledge(item,receipt){const d=await db();return new Promise((ok,no)=>{const tx=d.transaction(['outbox','receipts'],'readwrite');tx.objectStore('receipts').put({...receipt,at:new Date().toISOString()});if(['accepted','duplicate'].includes(receipt.status))tx.objectStore('outbox').delete(item.id);else tx.objectStore('outbox').put({...item,status:'rejected',error:receipt.error});tx.oncomplete=ok;tx.onerror=()=>no(tx.error);});}
 let syncing;
-export async function sync(){if(syncing)return syncing;syncing=(async()=>{try{let batch;do{batch=(await all('outbox')).filter(x=>x.status==='pending').slice(0,50);if(!batch.length)break;const out=await api('/api/collect',{items:batch.map(x=>x.envelope)});const receipts=new Map(out.receipts.map(r=>[r.id,r]));for(const item of batch){if(receipts.has(item.id))await acknowledge(item,receipts.get(item.id));}window.dispatchEvent(new Event('px-sync'));await deviceHeartbeat(true);if(!out.receipts.length)break;}while(batch.length===50);}catch{/* Keep every unacknowledged item; connectivity flags alone are not delivery proof. */}finally{syncing=null;window.dispatchEvent(new Event('px-sync'));}})();return syncing;}
+export async function sync(){if(syncing)return syncing;syncing=(async()=>{try{let batch;do{batch=(await all('outbox')).filter(x=>x.status==='pending').slice(0,50);if(!batch.length)break;const out=await api('/api/collect',{items:batch.map(x=>x.envelope)});const receipts=new Map(out.receipts.filter(r=>['accepted','duplicate','rejected'].includes(r.status)).map(r=>[r.id,r]));let acknowledged=0;for(const item of batch){if(receipts.has(item.id)){await acknowledge(item,receipts.get(item.id));acknowledged++;}}window.dispatchEvent(new Event('px-sync'));await deviceHeartbeat(true);if(!acknowledged)break;}while(batch.length===50);}catch{/* Keep every unacknowledged item; connectivity flags alone are not delivery proof. */}finally{syncing=null;window.dispatchEvent(new Event('px-sync'));}})();return syncing;}
 export async function enqueue(envelope){await put('outbox',{id:envelope.id,status:'pending',envelope});window.dispatchEvent(new Event('px-sync'));await sync();const receipt=await get('receipts',envelope.id);return receipt||{id:envelope.id,status:'pending'};}
 export async function bundle(slug){try{const b=await api('/api/public/site/'+encodeURIComponent(slug));const cached_at=new Date().toISOString();put('bundles',{id:slug,data:b,cached_at}).catch(()=>{});return {...b,offline:false};}catch(e){if(e.status&&e.status<500)throw e;const x=await Promise.race([get('bundles',slug),new Promise(resolve=>setTimeout(()=>resolve(null),2500))]);if(!x)throw e;return {...x.data,offline:true,cached_at:x.cached_at};}}
 export async function status(){const [xs,guests,checkins]=await Promise.all([all('outbox'),all('guest_outbox'),all('checkin_outbox')]);const count=(arr,state)=>arr.filter(x=>x.status===state).length;return{pending:count(xs,'pending')+count(guests,'pending')+count(checkins,'pending'),rejected:count(xs,'rejected')+count(guests,'rejected')+count(checkins,'rejected'),interaction_pending:count(xs,'pending'),guest_pending:count(guests,'pending'),checkin_pending:count(checkins,'pending'),items:xs,guest_items:guests,checkin_items:checkins};}
@@ -27,6 +27,40 @@ async function currentRuntimeVersion(){
     cachedRuntimeVersion=info.version.trim();
     return cachedRuntimeVersion;
 }
-export async function deviceHeartbeat(synced=false){const auth=await get('bundles','device-auth');const token=auth?.data?.token;if(!token)return{paired:false};const local=await status();try{const r=await fetch('/api/device/heartbeat',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({pending_count:local.pending,app_version:await currentRuntimeVersion(),synced,metadata:{kiosk:new URLSearchParams(location.search).get('kiosk')==='1',user_agent:navigator.userAgent.slice(0,300)}})});if(!r.ok)throw new Error('DEVICE_HEARTBEAT_FAILED');const data=await r.json();return{paired:true,...data};}catch(e){return{paired:true,offline:true,error:String(e?.message||e)};}}
+async function invalidateDeviceAuthority(token){
+  const d=await db();
+  return new Promise((ok,no)=>{
+    const tx=d.transaction(['bundles','guest_manifests'],'readwrite');let wasCurrent=false;
+    // A single transaction serializes cleanup with re-pairing. Never erase
+    // outboxes/receipts or the authority of a different/new device token.
+    for(const store of ['bundles','guest_manifests']){
+      const cursor=tx.objectStore(store).openCursor();
+      cursor.onsuccess=()=>{const row=cursor.result;if(!row)return;const value=row.value;
+        const current=store==='bundles'&&value.id==='device-auth'&&value.data?.token===token;
+        const scoped=value.token===token&&(store==='guest_manifests'||String(value.id).startsWith('gate-context:'));
+        if(current||scoped){if(current)wasCurrent=true;row.delete();}row.continue();
+      };
+    }
+    tx.oncomplete=()=>ok(wasCurrent);tx.onerror=()=>no(tx.error);tx.onabort=()=>no(tx.error||new Error('DEVICE_CACHE_INVALIDATION_ABORTED'));
+  });
+}
+export async function deviceHeartbeat(synced=false){
+  const auth=await get('bundles','device-auth');const token=auth?.data?.token;if(!token)return{paired:false};
+  const local=await status();
+  try{
+    const r=await fetch('/api/device/heartbeat',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-PulseX-Device-Token':token},body:JSON.stringify({pending_count:local.pending,app_version:await currentRuntimeVersion(),synced,metadata:{kiosk:new URLSearchParams(location.search).get('kiosk')==='1',user_agent:navigator.userAgent.slice(0,300)}})});
+    if(r.status===401||r.status===403){
+      let wasCurrent;
+      try{wasCurrent=await invalidateDeviceAuthority(token);}catch{
+        window.dispatchEvent(new Event('px-device-authorization-revoked'));
+        return{paired:false,authorization_failed:true,cache_cleanup_failed:true,error:'DEVICE_AUTHORIZATION_DENIED'};
+      }
+      if(wasCurrent)window.dispatchEvent(new Event('px-device-authorization-revoked'));
+      return{paired:false,authorization_failed:true,error:'DEVICE_AUTHORIZATION_DENIED'};
+    }
+    if(!r.ok)throw new Error('DEVICE_HEARTBEAT_FAILED');
+    return{paired:true,...await r.json()};
+  }catch(e){return{paired:true,offline:true,error:String(e?.message||e)};}
+}
 export async function backup(){const [items,guestRaw,checkins]=await Promise.all([all('outbox'),all('guest_outbox'),all('checkin_outbox')]);const guest_registrations=guestRaw.map(item=>({...item,body:item.body?{...item.body,pass_token:item.body.pass_token?'[REDACTED]':undefined}:item.body}));download('pulsex-offline-pending.json',JSON.stringify({format:'pulsex-offline-v04-redacted',exported_at:new Date().toISOString(),sensitive_note:'Contains pending visitor data; guest pass possession secrets are redacted.',items,guest_registrations,checkins},null,2));}
 export function activate(){if('serviceWorker'in navigator&&window.isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});window.addEventListener('online',sync);setInterval(sync,6000);setInterval(()=>deviceHeartbeat(false),30000);sync();deviceHeartbeat(false);}

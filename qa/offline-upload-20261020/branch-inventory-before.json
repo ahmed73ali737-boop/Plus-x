@@ -1,0 +1,170 @@
+{
+  "main": "45c6f25ad59abe6311bbbec085b74d22dd1c8179",
+  "branches": [
+    {
+      "branch": "origin",
+      "sha": "45c6f25ad59abe6311bbbec085b74d22dd1c8179",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "audit/2026-10-05-structure-qa",
+      "sha": "5a00b06731a7e1d3418dc9e2940e4b026f094db9",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "ci/windows11-verification-20261005",
+      "sha": "124e0597665bdd604202a5fe4cec4d6ffc88cde4",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "codex/database-observability-safety-20261012",
+      "sha": "56630410da1b60524a08f829760f4626ea955aa8",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "docs/closure-evidence-20261006",
+      "sha": "a9c1e5e72506d207fe6c9a719cad952d51aff42e",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feat/guest-qr-offline-brand-sites",
+      "sha": "29422416a40a824ac0b933b8bc6f2f3bc6e93cdd",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/29-uip-guest-status-preview",
+      "sha": "eb0a63647f98bc6ad8d3275e0afef28c21ba5e65",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/enterprise-adoption-compose-r1",
+      "sha": "2a67a833ac471783bcb88e74fcb450a8fb323e0b",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/iam-consumer-adoption-v1",
+      "sha": "6a5a515506881c98018cb9c792d48aafee4a85cd",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/party-network-asset-consumer-v1",
+      "sha": "78eafc1880976138d78ee301e1177186247ead23",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/public-experience-v2",
+      "sha": "5e593e96da332166c6c7c3efd481c356440d813e",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "feature/useas-party-network-consumer-v1",
+      "sha": "b252b7be4aeb8423b68be38391cef1a2954bf4ed",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/27-auth-self-service-session-revoke-20261014",
+      "sha": "a02bb93e6f695e2a5afc063e4236c8105bcc2b19",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/audit-2026-10-07-360-regressions",
+      "sha": "ceb84ccc5a36963b4f0d1e3210148567a1257189",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/audit-2026-10-07-p0",
+      "sha": "55ea74d7f92bf66862f138bed2f55ed2c036bc00",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/audit-update1-release-admission-20261008",
+      "sha": "208ba752b7a4d349bb48acdd96a6a4d02baf3bde",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/pulsex-party-evidence-r15-20261009",
+      "sha": "e220ee57f33906ec50ab4d7557f65b6c006d63e6",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "fix/reactivate-pulsex-ci-20261019",
+      "sha": "86b06ff4bc77e4b2ee81435f4484b216c63de403",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "integration/pulsex-consolidated-20261014",
+      "sha": "71c6689ef10d22624de1b5c2e1425dac85fdb303",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "integration/shared-observability-20261011",
+      "sha": "bb31d562abb462d68e19f863a1118b5a19d2c798",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "main",
+      "sha": "45c6f25ad59abe6311bbbec085b74d22dd1c8179",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "release/linux-ubuntu2404-standalone-candidate-20261010",
+      "sha": "35f3347e5aeaa256a47e1898f7b0229c9526419a",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "release/unified-v1.0.1",
+      "sha": "d47dd315234c52441537b83a29ef2ea65cc7d71c",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "release/v1.0.0",
+      "sha": "99a3709a278c2ba096f0ee6f17de1713d3a18bda",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "release/v1.0.1-delivery-pack",
+      "sha": "6d0455e397cc53e9688a19d1af1cf6ffbbdaae2c",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "reuse-manifest-v1",
+      "sha": "9371fa2cb2d7ed1258b73a885c1424a5d3d22821",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "review/pulsex-shutdown-gate-r22-20261010",
+      "sha": "df19dd383630410ab7b0b5d044b555aad3e4d19a",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "review/pulsex-sqlite-url-win-r23-20261010",
+      "sha": "ae40111bccc72a211d160138b2331698743057e8",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "review/pulsex-two-version-requirements-20261013",
+      "sha": "2f0bec559f7518ecc4895de0f9d5b23a6e2f55ff",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "windows-native-gate-v1",
+      "sha": "7516485c11222e1dc0ec1d064de9ad7c68e66f72",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "work/android-apk-20261020",
+      "sha": "cc9dcd9a757bbb740c46c252e03d5f6c2584337f",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "work/invitations-completion-20261019",
+      "sha": "a822727501c0979011aa21e94380295db6681a45",
+      "contained_in_main_before_this_patch": true
+    },
+    {
+      "branch": "work/phase01-baseline-20261020",
+      "sha": "a9599c48fc26e506e72898767c68089c4e3ba5b9",
+      "contained_in_main_before_this_patch": true
+    }
+  ]
+}

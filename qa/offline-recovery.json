@@ -1,0 +1,10 @@
+{
+  "status": "blocked",
+  "scope": "Real browser + HTTP/SQLite + Service Worker + IndexedDB; no device/five-day claim",
+  "checks": [],
+  "attempted_browser": "Google Chrome for Testing 143.0.7499.4",
+  "error": "Browser launch blocked: Unix socket creation is not permitted in this environment",
+  "original_failure_log_sha256": "74d099c6599722580145c2f1512ff6af77201a3b40d3b734cda4c0cc6ed3b479",
+  "source_baseline": "45c6f25ad59abe6311bbbec085b74d22dd1c8179",
+  "note": "No application scenario executed; CI browser execution is required."
+}

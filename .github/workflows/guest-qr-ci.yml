@@ -59,6 +59,10 @@ jobs:
           node --check web/sw.js
       - name: Guest QR and offline regression
         run: python -m pytest -q --junitxml=qa/ci/guest-identity-and-offline-contract/junit.xml tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py tests/test_invitations_ui_contract.py
+      - name: Offline runtime authorization and receipt contracts
+        run: |
+          npm ci --prefix tests/offline-runtime --ignore-scripts
+          node --experimental-vm-modules --test tests/test_offline_runtime.mjs
       - name: Run 1000-guest capacity smoke
         run: python tests/guest_capacity_smoke.py
       - name: Generate current OpenAPI artifact
@@ -68,6 +72,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run guest browser journey
         run: python tests/browser_guest_flow.py
+      - name: Verify actual browser offline reload and reconnect
+        run: python tests/browser_offline_recovery.py
       - name: Run invitation RSVP and admission browser acceptance
         run: python tests/invitations_native_acceptance.py
       - name: Run exhibition brand journeys
@@ -95,12 +101,13 @@ jobs:
             qa/rts-live.png
             qa/guest-mobile.png
             qa/guest-browser-failure.png
+            qa/offline-recovery.json
 
             qa/invitations/
           if-no-files-found: ignore
       - name: Seal exact-source evidence even when a required check fails
         if: always()
-        run: python tools/build_provenance.py snapshot --baseline qa/ci/guest-identity-and-offline-contract/baseline.json --output qa/ci/guest-identity-and-offline-contract/bundle/provenance.json --verify-ci --profile qa --job-id guest-identity-and-offline-contract --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --evidence 'qa/ci/guest-identity-and-offline-contract/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/invitations/browser-acceptance.json' --evidence 'qa/contracts'
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/guest-identity-and-offline-contract/baseline.json --output qa/ci/guest-identity-and-offline-contract/bundle/provenance.json --verify-ci --profile qa --job-id guest-identity-and-offline-contract --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --evidence 'qa/ci/guest-identity-and-offline-contract/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/invitations/browser-acceptance.json' --evidence 'qa/contracts' --evidence 'qa/offline-recovery.json' --require-pass 'qa/offline-recovery.json'
       - name: Upload same-run source and acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4

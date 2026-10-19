@@ -306,6 +306,13 @@ export async function scanPage(slug){
   const result=h('div',{class:'scan-result empty',role:'status','aria-live':'polite','aria-atomic':'true'},'بانتظار المسح');
   let currentGuest=null;
   let showSerial=0;
+  const authorizationRevoked=()=>{
+    manifest=emptyManifest(page.id,'DEVICE_NOT_PAIRED');currentGuest=null;showSerial++;
+    result.className='scan-result denied';result.replaceChildren(h('p',{class:'warning'},'أوقف الخادم تفويض الجهاز. أعد الربط بعد مراجعة المنظم. العمليات المعلقة محفوظة ولم تُحذف.'));
+    refreshCheckpointOptions();refreshPreflight().catch(()=>{});
+  };
+  window.addEventListener('px-device-authorization-revoked',authorizationRevoked);
+  window.addEventListener('beforeunload',()=>window.removeEventListener('px-device-authorization-revoked',authorizationRevoked),{once:true});
 
   function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:7200,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
   function checkpoints(){const scoped=Array.isArray(manifest.allowed_checkpoints);const xs=(access().checkpoints||[]).filter(x=>x.enabled!==false&&(!scoped||manifest.allowed_checkpoints.includes(x.key)));return xs.length||scoped?xs:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}];}
@@ -441,14 +448,16 @@ export async function scanPage(slug){
     let pendingScanId='';
     const check=button(selectedMode==='exit'?'تسجيل خروج':'تسجيل دخول',async()=>{
       if(serial!==showSerial)return;
-      const admission=await authoritativeValidate(g);if(admission.status!=='valid'){toast(reasonText(admission.reason),true);feedback(false);return;}
+      const admission=await authoritativeValidate(g);if(serial!==showSerial)return;if(admission.status!=='valid'){toast(reasonText(admission.reason),true);feedback(false);return;}
       const count=managed&&selectedMode==='entry'?Number(quantity.input.value):1;
       if(!Number.isInteger(count)||count<1||count>51||(Number.isFinite(admission.admission?.remaining)&&count>admission.admission.remaining)){toast(reasonText('ADMISSION_QUANTITY_INVALID'),true);return;}
       const latest=await get('gate_presence',gatePresenceKey(page.id,g.guest_number))||presence;
+      if(serial!==showSerial)return;
       if(!managed&&policy.anti_passback!==false&&selectedMode==='entry'&&latest.state==='inside'){toast('الزائر داخل الفعالية بالفعل. استخدم «تحقق فقط» أو «خروج».',true);feedback(false);return;}
       if(policy.anti_passback!==false&&selectedMode==='exit'&&latest.state!=='inside'){toast('الزائر خارج الفعالية بالفعل.',true);feedback(false);return;}
       if(selectedMode==='entry'&&policy.allow_reentry===false&&latest.last_direction==='exit'){toast('سياسة الفعالية لا تسمح بإعادة الدخول بعد الخروج.',true);feedback(false);return;}
       const pending=(await all('checkin_outbox')).find(x=>x.event_id===page.id&&x.status==='pending'&&x.payload.guest_number===g.guest_number&&x.payload.mode===selectedMode);
+      if(serial!==showSerial)return;
       const scan_id=pending?.id||pendingScanId||crypto.randomUUID(),point=checkpoint.input.value;pendingScanId=scan_id;
       const previous={state:latest.state||'outside',last_direction:latest.last_direction||'',last_checkpoint:latest.last_checkpoint||''};
       const scannedOffline=!navigator.onLine||manifest.offline||!!admission.offline;

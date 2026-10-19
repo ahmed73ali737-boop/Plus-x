@@ -10,3 +10,4 @@ android/**/build/
 android/*.jks
 android/*.keystore
 /codex-audit-artifacts/
+tests/offline-runtime/node_modules/
