@@ -1,0 +1,107 @@
+(node:12) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ heartbeat 401 invalidates only denied device authority, preserving pending work (22.675093ms)
+✖ heartbeat 403 invalidates only denied device authority, preserving pending work (8.1378ms)
+✔ transport/server failure retains cached authority and pending work {"network":true} (7.215953ms)
+✔ transport/server failure retains cached authority and pending work {"http":500} (5.726948ms)
+✖ late denial for an old token must not erase a newly paired device (7.649839ms)
+✖ full batch with unrelated receipts stops without deleting or retry-spinning (13.195279ms)
+✔ accepted and duplicate receipts drain only matching items; rejection remains inspectable (6.399682ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 3
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 302.813064
+
+✖ failing tests:
+
+test at tests/test_offline_runtime.mjs:36:29
+✖ heartbeat 401 invalidates only denied device authority, preserving pending work (22.675093ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/2a81399e5e90/Plus-x/tests/test_offline_runtime.mjs:39:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processImmediate (node:internal/timers:502:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test_offline_runtime.mjs:36:29
+✖ heartbeat 403 invalidates only denied device authority, preserving pending work (8.1378ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/2a81399e5e90/Plus-x/tests/test_offline_runtime.mjs:39:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processImmediate (node:internal/timers:502:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test_offline_runtime.mjs:54:1
+✖ late denial for an old token must not erase a newly paired device (7.649839ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   data: {
+  +     guests: []
+  +   },
+  +   id: 'event-a',
+  +   token: 'revoked-token'
+  + }
+  - undefined
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/2a81399e5e90/Plus-x/tests/test_offline_runtime.mjs:60:68)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processImmediate (node:internal/timers:502:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { id: 'event-a', token: 'revoked-token', data: { guests: [] } },
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test_offline_runtime.mjs:63:1
+✖ full batch with unrelated receipts stops without deleting or retry-spinning (13.195279ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/2a81399e5e90/Plus-x/tests/test_offline_runtime.mjs:66:29)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processImmediate (node:internal/timers:502:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

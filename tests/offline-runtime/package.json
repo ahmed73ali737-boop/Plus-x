@@ -1,0 +1,8 @@
+{
+  "name": "pulsex-offline-runtime-tests",
+  "version": "0.0.0",
+  "private": true,
+  "devDependencies": {
+    "fake-indexeddb": "6.2.4"
+  }
+}

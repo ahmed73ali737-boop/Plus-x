@@ -1,0 +1,30 @@
+(node:21) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ QR parser accepts exact new passes and canonical URLs only (4.779932ms)
+✔ manifest validity depends on server generation time and credential version (3.110674ms)
+✔ controlled invitations fail closed offline while unmanaged valid records remain provisional (2.431699ms)
+✔ offline manifest cannot outlive or precede device shift even while otherwise fresh (2.502341ms)
+✔ device checkpoint scope distinguishes deny-all from legacy unrestricted (2.184774ms)
+✔ HTTP 401 deletes cached manifest and never falls back (3.662753ms)
+✔ HTTP 403 deletes cached manifest and never falls back (7.41877ms)
+✔ network outage permits only fresh cache bound to the current device token (7.62049ms)
+✔ private scanner context uses scoped device endpoint and clears cache after denial (6.12118ms)
+(node:22) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ heartbeat 401 invalidates only denied device authority, preserving pending work (19.05786ms)
+✔ heartbeat 403 invalidates only denied device authority, preserving pending work (6.952911ms)
+✔ transport/server failure retains cached authority and pending work {"network":true} (7.359955ms)
+✔ transport/server failure retains cached authority and pending work {"http":500} (4.494766ms)
+✔ late denial for an old token must not erase a newly paired device (11.366543ms)
+✔ full batch with unrelated receipts stops without deleting or retry-spinning (9.058946ms)
+✔ accepted and duplicate receipts drain only matching items; rejection remains inspectable (6.138473ms)
+✔ nonterminal/unknown receipts retain pending work (4.170578ms)
+✔ storage cleanup failure still emits a fail-closed authorization denial (4.963928ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 224.71346

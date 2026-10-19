@@ -1,0 +1,19 @@
+(node:12) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ heartbeat 401 invalidates only denied device authority, preserving pending work (21.958246ms)
+✔ heartbeat 403 invalidates only denied device authority, preserving pending work (7.690134ms)
+✔ transport/server failure retains cached authority and pending work {"network":true} (5.095832ms)
+✔ transport/server failure retains cached authority and pending work {"http":500} (4.113207ms)
+✔ late denial for an old token must not erase a newly paired device (8.468466ms)
+✔ full batch with unrelated receipts stops without deleting or retry-spinning (7.50116ms)
+✔ accepted and duplicate receipts drain only matching items; rejection remains inspectable (5.617973ms)
+✔ nonterminal/unknown receipts retain pending work (4.46994ms)
+✔ storage cleanup failure still emits a fail-closed authorization denial (4.679462ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 288.519756
