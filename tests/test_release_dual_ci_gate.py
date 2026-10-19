@@ -16,7 +16,7 @@ def test_release_blocks_without_two_exact_sha_push_run_ids():
     source=(ROOT/'.github/workflows/release.yml').read_text()
     ci=(ROOT/'.github/workflows/pulsex-ci.yml').read_text()
     assert 'name: PulseX CI' in ci
-    assert re.search(r'(?m)^  push:\\n    branches: \\[ main \\]', ci)
+    assert re.search(r'(?m)^  push:\n    branches: \[ main \]', ci)
     blocks=re.findall(r'      - name: Require .+?\n.*?(?=      - name: |\Z)',source,re.S)
     assert len(blocks)==2
     for name in ('pulsex-ci.yml','guest-qr-ci'):
