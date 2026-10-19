@@ -1,0 +1,6 @@
+<resources>
+    <style name="PulseXTheme" parent="PulseXBase">
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:navigationBarColor">#F4F8F7</item>
+    </style>
+</resources>

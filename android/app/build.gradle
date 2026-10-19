@@ -1,0 +1,20 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.pulsex.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.pulsex.app'
+        minSdk 26
+        targetSdk 35
+        versionCode 10002
+        versionName '1.0.2-android-preview'
+        buildConfigField 'String', 'SOURCE_SHA', '"' + (System.getenv('PULSEX_SOURCE_SHA') ?: 'local-unverified') + '"'
+    }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    buildTypes {
+        debug { applicationIdSuffix '.preview'; versionNameSuffix '-debug' }
+        release { minifyEnabled false }
+    }
+}
+dependencies { implementation 'com.google.zxing:core:3.5.3' }
