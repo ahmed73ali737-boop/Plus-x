@@ -1,7 +1,12 @@
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+ARG PULSEX_SOURCE_SHA=unrecorded
+LABEL org.opencontainers.image.revision="${PULSEX_SOURCE_SHA}"
+ENV PULSEX_BUILD_LABEL=git-${PULSEX_SOURCE_SHA}
 WORKDIR /app
-COPY requirements*.txt ./
-RUN python -m pip install --no-cache-dir -r requirements-postgres.txt && useradd --uid 10001 --create-home pulsex
+COPY requirements/locks/bootstrap.txt requirements/locks/postgres.txt ./requirements/locks/
+RUN python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt && \
+    python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements/locks/postgres.txt && \
+    python -m pip check && useradd --uid 10001 --create-home pulsex
 COPY app ./app
 COPY web ./web
 COPY templates ./templates

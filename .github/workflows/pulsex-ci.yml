@@ -10,6 +10,8 @@ permissions:
   contents: read
 
 env:
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
   PYTHONUTF8: "1"
 
 concurrency:
@@ -22,24 +24,35 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/python-core/baseline.json --verify-ci --profile qa --job-id python-core
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/python-core/dependency-audit.json', 'qa/ci/python-core/junit.xml', 'qa/ci/python-core/source-locks.json', 'qa/ci/python-core/bundle', 'qa/contracts']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/python-core/source-locks.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install runtime and QA dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-qa.txt
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
       - name: Compile Python
         run: python -m compileall -q app tests tools run.py
-      - name: Verify cross-system source locks
-        run: |
-          python tools/verify_consolidation_assets.py
-          python tools/verify_shared_observability.py
       - name: Audit Python dependencies
-        run: python -m pip_audit -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
+        run: python -m pip_audit --strict --no-deps --disable-pip --require-hashes -r requirements/locks/qa-postgres.txt -r requirements/locks/bootstrap.txt --format json --output qa/ci/python-core/dependency-audit.json
       - name: Run pytest suite
-        run: python -m pytest -q
+        run: python -m pytest -q --junitxml=qa/ci/python-core/junit.xml
       - name: Run local HTTP acceptance
         run: python tests/native_acceptance.py
       - name: Run security hardening smoke
@@ -75,28 +88,59 @@ jobs:
             qa/exhibition-scale-smoke.json
             qa/hardening/*.json
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/python-core/baseline.json --output qa/ci/python-core/bundle/provenance.json --verify-ci --profile qa --job-id python-core --job-status '${{ job.status }}' --evidence 'qa/ci/python-core/source-locks.json' --evidence 'qa/ci/python-core/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/ci/python-core/source-locks.json' --require-pass 'qa/ci/python-core/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/contracts' --evidence 'qa/ci/python-core/dependency-audit.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-python-core-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/python-core/bundle/
+          if-no-files-found: error
+      - name: Preserve JUnit and Node contract diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-pulsex-python-core-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            qa/ci/python-core/junit.xml
+            qa/contracts/
+            qa/ci/python-core/baseline.json
+          if-no-files-found: error
 
   windows-core:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-          cache: pip
+          python-version: '3.13.16'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/windows-core/baseline.json --verify-ci --profile qa --job-id windows-core
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/windows-core/junit.xml', 'qa/ci/windows-core/source-locks.json', 'qa/ci/windows-core/bundle', 'qa/contracts', 'qa/invitations']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/windows-core/source-locks.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install runtime and QA dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-qa.txt
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
       - name: Compile Python
         run: python -m compileall -q app tests tools run.py
-      - name: Verify cross-system source locks
-        run: |
-          python tools/verify_consolidation_assets.py
-          python tools/verify_shared_observability.py
       - name: Run pytest suite on Windows
-        run: python -m pytest -q
+        run: python -m pytest -q --junitxml=qa/ci/windows-core/junit.xml
       - name: Run native Windows HTTP acceptance
         run: python tests/native_acceptance.py
       - name: Install Chromium for Windows output tests
@@ -144,20 +188,53 @@ jobs:
             qa/browser-server.log
             qa/*.png
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/windows-core/baseline.json --output qa/ci/windows-core/bundle/provenance.json --verify-ci --profile qa --job-id windows-core --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/windows-core/source-locks.json' --evidence 'qa/ci/windows-core/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/windows-core/source-locks.json' --require-pass 'qa/ci/windows-core/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/invitations/browser-acceptance.json' --evidence 'qa/contracts'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-windows-core-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/windows-core/bundle/
+          if-no-files-found: error
+      - name: Preserve JUnit and Node contract diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-pulsex-windows-core-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            qa/ci/windows-core/junit.xml
+            qa/contracts/
+            qa/ci/windows-core/baseline.json
+          if-no-files-found: error
 
   browser-components:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/browser-components/baseline.json --verify-ci --profile qa --job-id browser-components
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/browser-components/junit.xml', 'qa/ci/browser-components/source-locks.json', 'qa/ci/browser-components/bundle', 'qa/invitations']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/browser-components/source-locks.json
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-qa.txt
+        run: |-
+          python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt
           python -m playwright install --with-deps chromium
       - name: Run read-only Chromium component suite
         run: python tests/browser_components.py
@@ -199,13 +276,23 @@ jobs:
             qa/browser-server.log
             qa/*.png
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/browser-components/baseline.json --output qa/ci/browser-components/bundle/provenance.json --verify-ci --profile qa --job-id browser-components --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/browser-components/source-locks.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/browser-components/source-locks.json' --require-pass 'qa/invitations/browser-acceptance.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-browser-components-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/browser-components/bundle/
+          if-no-files-found: error
 
   postgres-native:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
         env:
           POSTGRES_DB: pulsex_test
           POSTGRES_USER: pulsex
@@ -222,14 +309,26 @@ jobs:
       PX_ALLOW_POSTGRES_TEST_RESET: "YES"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/postgres-native/baseline.json --verify-ci --profile qa-postgres --job-id postgres-native
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/postgres-native/junit.xml', 'qa/ci/postgres-native/source-locks.json', 'qa/ci/postgres-native/bundle', 'qa/postgres-invitations-acceptance.json']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/postgres-native/source-locks.json
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install PostgreSQL test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa-postgres.txt'
       - name: Run PostgreSQL native acceptance
         run: python tests/postgres_native_acceptance.py
       - name: Run PostgreSQL invitations and admission concurrency acceptance
@@ -246,26 +345,77 @@ jobs:
             qa/postgres-invitations-acceptance.json
             qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/postgres-native/baseline.json --output qa/ci/postgres-native/bundle/provenance.json --verify-ci --profile qa-postgres --job-id postgres-native --job-status '${{ job.status }}' --probe-postgres --evidence 'qa/ci/postgres-native/source-locks.json' --evidence 'qa/postgres-invitations-acceptance.json' --require-pass 'qa/ci/postgres-native/source-locks.json' --require-pass 'qa/postgres-invitations-acceptance.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-postgres-native-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/postgres-native/bundle/
+          if-no-files-found: error
 
   container-import:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/container-import/baseline.json --verify-ci --profile postgres --job-id container-import
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/container-import/junit.xml', 'qa/ci/container-import/source-locks.json', 'qa/ci/container-import/bundle', 'qa/container-runtime.json']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/container-import/source-locks.json
       - name: Build production image
-        run: docker build -f ops/Dockerfile -t pulsex-ci .
+        run: docker build --build-arg "PULSEX_SOURCE_SHA=$SOURCE_HEAD" -f ops/Dockerfile -t pulsex-ci .
       - name: Verify runtime imports and migration assets inside image
-        run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; from tools.migrate_postgres import MIGRATIONS; assert all(p.is_file() for p in MIGRATIONS); print('container-runtime-and-migrations-ok')"
+        run: docker run --rm -e PULSEX_EXPECTED_SOURCE_SHA="$SOURCE_HEAD" --entrypoint python pulsex-ci -c "import os, fastapi, sqlalchemy, psycopg, qrcode; import app.server; from app.core.build_info import runtime_identity; assert runtime_identity()['build']=='git-'+os.environ['PULSEX_EXPECTED_SOURCE_SHA']; from tools.migrate_postgres import MIGRATIONS; assert all(p.is_file() for p in MIGRATIONS); print('container-runtime-and-migrations-ok')"
+      - name: Record successful container import acceptance
+        run: python -c "import json, pathlib, subprocess; p=pathlib.Path('qa/container-runtime.json'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps({'status':'passed','image_id':subprocess.check_output(['docker','image','inspect','pulsex-ci','--format','{{.Id}}'],text=True).strip()}),encoding='utf-8')"
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/container-import/baseline.json --output qa/ci/container-import/bundle/provenance.json --verify-ci --profile postgres --job-id container-import --job-status '${{ job.status }}' --evidence 'qa/ci/container-import/source-locks.json' --evidence 'qa/container-runtime.json' --require-pass 'qa/ci/container-import/source-locks.json' --require-pass 'qa/container-runtime.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-container-import-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/container-import/bundle/
+          if-no-files-found: error
 
   package-windows-candidate:
     runs-on: windows-latest
-    needs: [python-core, windows-core, browser-components, postgres-native, container-import]
+    needs: [python-core, windows-core, browser-components, postgres-native, container-import, repro-linux, repro-windows]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.16"
+      - name: Verify packaging source identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/package/baseline.json --profile runtime --job-id package-windows-candidate --verify-ci
+      - name: Download only evidence from this source, run and attempt
+        uses: actions/download-artifact@v4
+        with:
+          pattern: phase01-pulsex-*-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/package/downloaded-evidence
+          merge-multiple: false
+      - name: Reject missing, failed, stale or mismatched acceptance evidence
+        run: python tools/build_provenance.py validate --evidence-root qa/ci/package/downloaded-evidence --verify-ci --require-job python-core --require-job windows-core --require-job browser-components --require-job postgres-native --require-job container-import --require-job repro-linux --require-job repro-windows
       - name: Archive the exact CI checkout for Windows testing
         shell: pwsh
         run: |
@@ -291,7 +441,7 @@ jobs:
           pathlib.Path("dist/SHA256SUMS.txt").write_text(
               f"{digest}  {archive.name}\n", encoding="utf-8")
           pathlib.Path("dist/BUILD_ID.txt").write_text(
-              f"CHECKOUT_SHA={os.environ['GITHUB_SHA']}\n"
+              f"CHECKOUT_SHA={os.environ['SOURCE_HEAD']}\n"
               f"COMMIT_SHA={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n",
               encoding="utf-8")
           '@ | python -
@@ -300,4 +450,73 @@ jobs:
         with:
           name: PulseX-Windows-Standalone-Candidate
           path: dist/*
+          if-no-files-found: error
+
+
+  repro-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/repro-linux/baseline.json --verify-ci --profile qa --job-id repro-linux
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/repro-linux/junit.xml', 'qa/ci/repro-linux/source-locks.json', 'qa/ci/repro-linux/bundle', 'qa/repro']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/repro-linux/source-locks.json
+      - name: Compare two clean locked dependency installations
+        run: python tools/verify_reproducible_runtime.py --profile qa --output qa/repro/report.json
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/repro-linux/baseline.json --output qa/ci/repro-linux/bundle/provenance.json --verify-ci --profile qa --job-id repro-linux --job-status '${{ job.status }}' --evidence 'qa/ci/repro-linux/source-locks.json' --evidence 'qa/repro/report.json' --require-pass 'qa/ci/repro-linux/source-locks.json' --require-pass 'qa/repro/report.json' --evidence 'qa/repro'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-repro-linux-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/repro-linux/bundle/
+          if-no-files-found: error
+
+  repro-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.16'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/repro-windows/baseline.json --verify-ci --profile qa --job-id repro-windows
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/repro-windows/junit.xml', 'qa/ci/repro-windows/source-locks.json', 'qa/ci/repro-windows/bundle', 'qa/repro']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/repro-windows/source-locks.json
+      - name: Compare two clean locked dependency installations
+        run: python tools/verify_reproducible_runtime.py --profile qa --output qa/repro/report.json
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/repro-windows/baseline.json --output qa/ci/repro-windows/bundle/provenance.json --verify-ci --profile qa --job-id repro-windows --job-status '${{ job.status }}' --evidence 'qa/ci/repro-windows/source-locks.json' --evidence 'qa/repro/report.json' --require-pass 'qa/ci/repro-windows/source-locks.json' --require-pass 'qa/repro/report.json' --evidence 'qa/repro'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-pulsex-repro-windows-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/repro-windows/bundle/
           if-no-files-found: error

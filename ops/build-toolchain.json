@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "python_linux": "3.12.15",
+  "python_windows": "3.13.16",
+  "node": "22.23.3",
+  "selection": "Exact patches observed in the last successful baseline CI; no major-runtime upgrade",
+  "baseline_source_sha": "a822727501c0979011aa21e94380295db6681a45",
+  "evidence": {
+    "linux_python": "https://github.com/ahmed73ali737-boop/Plus-x/actions/runs/39312132047/job/118264234912",
+    "windows_python": "https://github.com/ahmed73ali737-boop/Plus-x/actions/runs/39312132047/job/118264234748",
+    "node": "https://github.com/ahmed73ali737-boop/Plus-x/actions/runs/39312132022/job/118264321245"
+  },
+  "container_base": "ops/container-image-lock.json",
+  "local_validation_python": "3.12.14",
+  "local_validation_is_native_windows": false,
+  "hosted_runner_limit": "Hosted runner images receive updates; actual OS/runtime versions are recorded per job. Dependency reproducibility does not claim immutable hosted operating systems or byte-identical images across architectures."
+}

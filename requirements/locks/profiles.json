@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "resolver": "uv 0.12.23 (x86_64-unknown-linux-gnu)",
+  "index_url": "https://pypi.org/simple",
+  "index_selection": "Explicit --default-index; --no-config; UV_/PIP_ overrides excluded from resolver environment.",
+  "profiles": {
+    "runtime": [
+      "requirements.txt"
+    ],
+    "postgres": [
+      "requirements-postgres.txt"
+    ],
+    "qa": [
+      "requirements.txt",
+      "requirements-qa.txt"
+    ],
+    "qa-postgres": [
+      "requirements-postgres.txt",
+      "requirements-qa.txt"
+    ],
+    "observability": [
+      "requirements.txt",
+      "requirements-observability.txt"
+    ],
+    "postgres-observability": [
+      "requirements-postgres.txt",
+      "requirements-observability.txt"
+    ],
+    "bootstrap": [
+      "requirements/locks/bootstrap.in"
+    ]
+  },
+  "native_ci_targets": [
+    {
+      "python": "3.12",
+      "os": "linux",
+      "architectures": [
+        "x86_64",
+        "aarch64"
+      ]
+    },
+    {
+      "python": "3.13",
+      "os": "windows",
+      "architectures": [
+        "AMD64"
+      ]
+    }
+  ],
+  "legacy_python_3_11": "Universal resolution retained; native execution is a separate acceptance claim.",
+  "policy": "Preserve direct pins and observed baseline transitive versions. All allowed distribution hashes are committed. Install wheels only.",
+  "sha256": {
+    "requirements/locks/bootstrap.in": "ce0ac7ec2ed4fca0d15cb4dc3648a04f012fae2e72953e10006079c93541207d",
+    "requirements/locks/bootstrap.txt": "9cbb5eb515ea9db4bf574be76f2a0e0d42911c41a01e3327b5e6903b8af9f412",
+    "requirements/locks/constraints.txt": "f9f33dd54309a1aadb565960c61913955cab848d4df29251bd6ccb87a00b201d",
+    "requirements/locks/observability.txt": "1c461283f9a4757c6c5b8287f2fce730ea56ded0421281ee5a51c8a00fce698d",
+    "requirements/locks/postgres-observability.txt": "005295b32ac398c376bf2e3f061449e5fe25ba97f52fb8004a3111a9fa370b38",
+    "requirements/locks/postgres.txt": "7d6dfdf2bef013cc65324e304f0e54d2fa4f49428f431798beeaa725f621e417",
+    "requirements/locks/qa-postgres.txt": "30fa3bf94666ce18f759796016d47dc2b66bc771bcc0bd23b6278720bef65de1",
+    "requirements/locks/qa.txt": "de43cce2caf969213481e96ceab5ab4c9d63d97693e40bfa6b13bea5136ffbd9",
+    "requirements/locks/runtime.txt": "2adb308c8758cb142ebed6ffc05d51a5beb7baf44dba69537418b145b2a3caae",
+    "requirements-observability.txt": "eec817d230ce4a59fb6cf4f31e28e1962c42604217bef34bd75a8d25324d4a68",
+    "requirements-postgres.txt": "63b36eb50e55ef239d1de1bef817d35a353ca71ad5fd5c8fd1a8055167797b62",
+    "requirements-qa.txt": "8524622e240e514b904ddf2dab7584103cf2bb0b0da3baddbc7a58bd19bca5b6",
+    "requirements.txt": "e6148492a064856c880e26f47d27ee30d45809fc3cfb43d216ad6b21a13070d2"
+  }
+}

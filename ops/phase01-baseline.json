@@ -1,0 +1,25 @@
+{
+  "phase": "01",
+  "baseline_sha": "f53c206c0d113e6db9c11afab7569fbe868b5dd7",
+  "candidate_identity": "Recorded from git HEAD and actual tracked source bytes by tools/build_provenance.py for every CI job",
+  "external_test_patch": {
+    "status": "not_available_not_recovered",
+    "description": "The supplied plan describes five modified tests and one new regression file on the user's Windows working tree. Their contents were not supplied.",
+    "searched": ["current Plus-x worktree and its refs", "two older local Plus-x checkouts", "provided phase01 and overview attachments"],
+    "result": "Older local modifications matched already committed ancestors of f53c206; none matched the six-file patch described in the plan.",
+    "external_windows_passes": 160,
+    "external_linux_passes": 158,
+    "external_results_attributed_to_this_candidate": false,
+    "closure_requires": "The exact five-file diff and new regression file, or an archive including their source hashes, followed by review and CI on the resulting commit."
+  },
+  "new_tests_are_not_recovered_patch": [
+    "tests/test_invitations_ui_contract.py",
+    "tests/test_source_lock_contract.py",
+    "tests/test_build_provenance.py"
+  ],
+  "source_lock_algorithms": ["raw-byte SHA256", "Git blob SHA1"],
+  "migration_checksum_policy": "Unchanged; migration files 002 through 009 are not rewritten",
+  "generated_evidence": "codex-audit-artifacts/remediation-runs/<run-id>/phase-01/ or workflow-owned qa/ci artifacts",
+  "scope": "Source, test contracts, dependency and image locks, build provenance and CI gates only",
+  "production_acceptance": false
+}

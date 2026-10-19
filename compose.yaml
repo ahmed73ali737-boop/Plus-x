@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
     restart: unless-stopped
     environment:
       POSTGRES_DB: pulsex
@@ -17,6 +17,8 @@ services:
     build:
       context: .
       dockerfile: ops/Dockerfile
+      args:
+        PULSEX_SOURCE_SHA: ${PULSEX_SOURCE_SHA:-unrecorded}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,7 +43,7 @@ services:
       - app_data:/app/data
     expose: ["4310"]
   proxy:
-    image: caddy:2
+    image: caddy:2@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af
     restart: unless-stopped
     depends_on: [app]
     environment:

@@ -4,11 +4,16 @@ on:
   pull_request:
     branches: [main, 'release/linux-*']
   push:
-    branches: ['release/linux-*']
+    branches: [main, 'release/linux-*']
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  PYTHONUTF8: "1"
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
 
 concurrency:
   group: linux-standalone-${{ github.ref }}
@@ -20,12 +25,25 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/linux-qa/baseline.json --verify-ci --profile qa --job-id linux-qa
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/linux-qa/junit.xml', 'qa/ci/linux-qa/source-locks.json', 'qa/ci/linux-qa/bundle', 'qa/contracts', 'qa/invitations']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/linux-qa/source-locks.json
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.3'
       - name: Prepare isolated Python environment
         run: |
           python3 -m tools.prepare_runtime --profile qa
@@ -33,7 +51,7 @@ jobs:
       - name: Syntax and QA suite
         run: |
           .venv/bin/python -m compileall -q app tools tests run.py
-          .venv/bin/python -m pytest -q
+          .venv/bin/python -m pytest -q --junitxml=qa/ci/linux-qa/junit.xml
           .venv/bin/python tests/native_acceptance.py
           .venv/bin/python tests/security_hardening.py
           .venv/bin/python tests/capacity_smoke.py
@@ -92,13 +110,37 @@ jobs:
             live.json
             ready.json
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        shell: bash
+        run: |
+          evidence_python=python
+          if [ -x .venv/bin/python ]; then evidence_python=.venv/bin/python; fi
+          "$evidence_python" tools/build_provenance.py snapshot --baseline qa/ci/linux-qa/baseline.json --output qa/ci/linux-qa/bundle/provenance.json --verify-ci --profile qa --job-id linux-qa --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/linux-qa/source-locks.json' --evidence 'qa/ci/linux-qa/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/linux-qa/source-locks.json' --require-pass 'qa/ci/linux-qa/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/invitations/browser-acceptance.json' --evidence 'qa/contracts'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-linux-linux-qa-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/linux-qa/bundle/
+          if-no-files-found: error
+      - name: Preserve JUnit and Node contract diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-linux-linux-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            qa/ci/linux-qa/junit.xml
+            qa/contracts/
+            qa/ci/linux-qa/baseline.json
+          if-no-files-found: error
 
   postgres-qa:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
         env:
           POSTGRES_DB: pulsex_test
           POSTGRES_USER: pulsex
@@ -114,9 +156,22 @@ jobs:
       PX_ALLOW_POSTGRES_TEST_RESET: 'YES'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/postgres-qa/baseline.json --verify-ci --profile qa-postgres --job-id postgres-qa
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/postgres-qa/junit.xml', 'qa/ci/postgres-qa/source-locks.json', 'qa/ci/postgres-qa/bundle', 'qa/postgres-invitations-acceptance.json']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/postgres-qa/source-locks.json
       - name: Prepare PostgreSQL QA runtime
         run: |
           python3 -m tools.prepare_runtime --profile qa-postgres
@@ -135,13 +190,27 @@ jobs:
             qa/postgres-invitations-acceptance.json
             qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        shell: bash
+        run: |
+          evidence_python=python
+          if [ -x .venv/bin/python ]; then evidence_python=.venv/bin/python; fi
+          "$evidence_python" tools/build_provenance.py snapshot --baseline qa/ci/postgres-qa/baseline.json --output qa/ci/postgres-qa/bundle/provenance.json --verify-ci --profile qa-postgres --job-id postgres-qa --job-status '${{ job.status }}' --probe-postgres --evidence 'qa/ci/postgres-qa/source-locks.json' --evidence 'qa/postgres-invitations-acceptance.json' --require-pass 'qa/ci/postgres-qa/source-locks.json' --require-pass 'qa/postgres-invitations-acceptance.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-linux-postgres-qa-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/postgres-qa/bundle/
+          if-no-files-found: error
 
   arm64-qa:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
         env:
           POSTGRES_DB: pulsex_test
           POSTGRES_USER: pulsex
@@ -157,32 +226,87 @@ jobs:
       PX_ALLOW_POSTGRES_TEST_RESET: 'YES'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/arm64-qa/baseline.json --verify-ci --profile qa-postgres --job-id arm64-qa
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/arm64-qa/junit.xml', 'qa/ci/arm64-qa/source-locks.json', 'qa/ci/arm64-qa/bundle', 'qa/contracts', 'qa/postgres-invitations-acceptance.json']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/arm64-qa/source-locks.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
       - name: ARM64 runtime and QA dependencies
-        run: |
-          python3 -m tools.prepare_runtime --profile postgres
-          .venv/bin/python -m tools.prepare_runtime --profile postgres --check
-          .venv/bin/python -m pip install pytest==9.1.1 httpx==0.28.1 'psutil>=7,<8'
+        run: |-
+          python3 -m tools.prepare_runtime --profile qa-postgres
+          .venv/bin/python -m tools.prepare_runtime --profile qa-postgres --check
       - name: ARM64 backend, DB and source QA
         run: |
-          .venv/bin/python -m pytest -q
+          .venv/bin/python -m pytest -q --junitxml=qa/ci/arm64-qa/junit.xml
           .venv/bin/python tests/native_acceptance.py
           .venv/bin/python tests/postgres_native_acceptance.py
           .venv/bin/python tests/postgres_invitations_acceptance.py
           .venv/bin/python tests/postgres_capacity_smoke.py
       - name: Build and inspect native Linux ARM64 container
         run: |
-          docker build --platform linux/arm64 -f ops/Dockerfile -t pulsex-arm64-ci .
-          docker run --rm --platform linux/arm64 --entrypoint python pulsex-arm64-ci -c "import platform; from app.core.build_info import runtime_identity; from tools.migrate_postgres import MIGRATIONS; assert platform.machine() in ('aarch64','arm64'); assert runtime_identity()['version']=='1.0.1'; assert all(p.is_file() for p in MIGRATIONS); print('arm64-runtime-ok')"
+          docker build --platform linux/arm64 --build-arg "PULSEX_SOURCE_SHA=$SOURCE_HEAD" -f ops/Dockerfile -t pulsex-arm64-ci .
+          docker run --rm --platform linux/arm64 -e PULSEX_EXPECTED_SOURCE_SHA="$SOURCE_HEAD" --entrypoint python pulsex-arm64-ci -c "import os, platform; from app.core.build_info import runtime_identity; from tools.migrate_postgres import MIGRATIONS; assert platform.machine() in ('aarch64','arm64'); assert runtime_identity()['version']=='1.0.1'; assert runtime_identity()['build']=='git-'+os.environ['PULSEX_EXPECTED_SOURCE_SHA']; assert all(p.is_file() for p in MIGRATIONS); print('arm64-runtime-ok')"
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        shell: bash
+        run: |
+          evidence_python=python
+          if [ -x .venv/bin/python ]; then evidence_python=.venv/bin/python; fi
+          "$evidence_python" tools/build_provenance.py snapshot --baseline qa/ci/arm64-qa/baseline.json --output qa/ci/arm64-qa/bundle/provenance.json --verify-ci --profile qa-postgres --job-id arm64-qa --job-status '${{ job.status }}' --probe-postgres --evidence 'qa/ci/arm64-qa/source-locks.json' --evidence 'qa/ci/arm64-qa/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/postgres-invitations-acceptance.json' --require-pass 'qa/ci/arm64-qa/source-locks.json' --require-pass 'qa/ci/arm64-qa/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/postgres-invitations-acceptance.json' --evidence 'qa/contracts'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-linux-arm64-qa-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/arm64-qa/bundle/
+          if-no-files-found: error
+      - name: Preserve JUnit and Node contract diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-linux-arm64-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            qa/ci/arm64-qa/junit.xml
+            qa/contracts/
+            qa/ci/arm64-qa/baseline.json
+          if-no-files-found: error
 
   package:
     runs-on: ubuntu-24.04
-    needs: [linux-qa, postgres-qa, arm64-qa]
+    needs: [linux-qa, postgres-qa, arm64-qa, repro-linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Verify packaging source identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/package/baseline.json --profile runtime --job-id package --verify-ci
+      - name: Download only evidence from this source, run and attempt
+        uses: actions/download-artifact@v4
+        with:
+          pattern: phase01-linux-*-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/package/downloaded-evidence
+          merge-multiple: false
+      - name: Reject missing, failed, stale or mismatched acceptance evidence
+        run: python tools/build_provenance.py validate --evidence-root qa/ci/package/downloaded-evidence --verify-ci --require-job linux-qa --require-job postgres-qa --require-job arm64-qa --require-job repro-linux
       - name: Build standalone source ZIP/TAR from exact tested SHA
         shell: bash
         run: |
@@ -209,10 +333,45 @@ jobs:
               assert entry.mode & 0o111,oct(entry.mode)
           PY
           (cd dist && sha256sum *.zip *.tar.gz > SHA256SUMS.txt)
-          printf 'SOURCE_SHA=%s\n' "$GITHUB_SHA" > dist/BUILD_ID.txt
+          printf 'SOURCE_SHA=%s\n' "$(git rev-parse HEAD)" > dist/BUILD_ID.txt
       - name: Upload complete standalone source artifact
         uses: actions/upload-artifact@v4
         with:
           name: PulseX-Ubuntu2404-Standalone-Candidate
           path: dist/*
+          if-no-files-found: error
+
+
+  repro-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/repro-linux/baseline.json --verify-ci --profile qa --job-id repro-linux
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/repro-linux/junit.xml', 'qa/ci/repro-linux/source-locks.json', 'qa/ci/repro-linux/bundle', 'qa/repro']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/repro-linux/source-locks.json
+      - name: Compare two clean locked dependency installations
+        run: python tools/verify_reproducible_runtime.py --profile qa --output qa/repro/report.json
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/repro-linux/baseline.json --output qa/ci/repro-linux/bundle/provenance.json --verify-ci --profile qa --job-id repro-linux --job-status '${{ job.status }}' --evidence 'qa/ci/repro-linux/source-locks.json' --evidence 'qa/repro/report.json' --require-pass 'qa/ci/repro-linux/source-locks.json' --require-pass 'qa/repro/report.json' --evidence 'qa/repro'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-linux-repro-linux-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/repro-linux/bundle/
           if-no-files-found: error

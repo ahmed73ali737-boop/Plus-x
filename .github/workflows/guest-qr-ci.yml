@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+
+env:
+  PYTHONUTF8: "1"
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
 jobs:
   guest-identity-and-offline-contract:
     runs-on: ubuntu-24.04
@@ -17,20 +22,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - name: Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: pip
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/guest-identity-and-offline-contract/baseline.json --verify-ci --profile qa --job-id guest-identity-and-offline-contract
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/guest-identity-and-offline-contract/junit.xml', 'qa/ci/guest-identity-and-offline-contract/source-locks.json', 'qa/ci/guest-identity-and-offline-contract/bundle', 'qa/contracts', 'qa/invitations']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/guest-identity-and-offline-contract/source-locks.json
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install runtime and focused QA dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-qa.txt
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
       - name: Compile Python
         run: python -m compileall -q app
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.3'
       - name: Check JavaScript modules
         run: |
           node --check web/guest.mjs
@@ -41,7 +58,7 @@ jobs:
           node --check web/admin.mjs
           node --check web/sw.js
       - name: Guest QR and offline regression
-        run: python -m pytest -q tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py
+        run: python -m pytest -q --junitxml=qa/ci/guest-identity-and-offline-contract/junit.xml tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py tests/test_invitations_ui_contract.py
       - name: Run 1000-guest capacity smoke
         run: python tests/guest_capacity_smoke.py
       - name: Generate current OpenAPI artifact
@@ -51,6 +68,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run guest browser journey
         run: python tests/browser_guest_flow.py
+      - name: Run invitation RSVP and admission browser acceptance
+        run: python tests/invitations_native_acceptance.py
       - name: Run exhibition brand journeys
         run: python tests/browser_exhibition_sites.py
       - name: Upload guest journey evidence
@@ -58,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: guest-qr-browser-qa
-          path: |
+          path: |-
             qa/windows12-guest-browser.json
             qa/guest-capacity-smoke.json
             qa/openapi.generated.json
@@ -76,4 +95,26 @@ jobs:
             qa/rts-live.png
             qa/guest-mobile.png
             qa/guest-browser-failure.png
+
+            qa/invitations/
           if-no-files-found: ignore
+      - name: Seal exact-source evidence even when a required check fails
+        if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/guest-identity-and-offline-contract/baseline.json --output qa/ci/guest-identity-and-offline-contract/bundle/provenance.json --verify-ci --profile qa --job-id guest-identity-and-offline-contract --job-status '${{ job.status }}' --probe-browser --evidence 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --evidence 'qa/ci/guest-identity-and-offline-contract/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/invitations/browser-acceptance.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/source-locks.json' --require-pass 'qa/ci/guest-identity-and-offline-contract/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/invitations/browser-acceptance.json' --evidence 'qa/contracts'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-guest-guest-identity-and-offline-contract-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/guest-identity-and-offline-contract/bundle/
+          if-no-files-found: error
+      - name: Preserve JUnit and Node contract diagnostics on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-guest-guest-identity-and-offline-contract-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            qa/ci/guest-identity-and-offline-contract/junit.xml
+            qa/contracts/
+            qa/ci/guest-identity-and-offline-contract/baseline.json
+          if-no-files-found: error
