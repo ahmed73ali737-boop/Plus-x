@@ -1,0 +1,30 @@
+2026-10-19T23:32:55.0392458Z ##[group]Run python tests/browser_offline_recovery.py
+2026-10-19T23:32:55.0392879Z [36;1mpython tests/browser_offline_recovery.py[0m
+2026-10-19T23:32:55.0454680Z shell: /usr/bin/bash -e {0}
+2026-10-19T23:32:55.0455099Z env:
+2026-10-19T23:32:55.0455424Z   PYTHONUTF8: 1
+2026-10-19T23:32:55.0455900Z   SOURCE_HEAD: cebc056aeb1ebc6c7c0804178219234d74d14aad
+2026-10-19T23:32:55.0456529Z   PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
+2026-10-19T23:32:55.0457172Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-19T23:32:55.0457758Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+2026-10-19T23:32:55.0458194Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-19T23:32:55.0458939Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-19T23:32:55.0459314Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+2026-10-19T23:32:55.0459711Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+2026-10-19T23:32:55.0460060Z ##[endgroup]
+2026-10-19T23:32:57.9997995Z {
+2026-10-19T23:32:57.9999814Z   "scope": "Real browser + HTTP/SQLite + actual Service Worker + IndexedDB; no hardware/five-day claim",
+2026-10-19T23:32:58.0001176Z   "checks": [
+2026-10-19T23:32:58.0001944Z     "prepare_real_service_worker_and_public_content",
+2026-10-19T23:32:58.0002832Z     "cached_shell_and_bundle_reload_with_network_disconnected",
+2026-10-19T23:32:58.0003722Z     "offline_interaction_persisted_without_false_acknowledgment",
+2026-10-19T23:32:58.0004462Z     "offline_queue_survives_page_close_and_cached_reopen",
+2026-10-19T23:32:58.0005141Z     "reconnect_receipt_drains_queue_and_server_has_one_row",
+2026-10-19T23:32:58.0005944Z     "heartbeat_denial_clears_only_revoked_device_cache_preserving_pending_data"
+2026-10-19T23:32:58.0006593Z   ],
+2026-10-19T23:32:58.0006945Z   "browser_version": "143.0.7499.4",
+2026-10-19T23:32:58.0007532Z   "browser_source": "Playwright-managed Chromium",
+2026-10-19T23:32:58.0008044Z   "prepared_pages": 11,
+2026-10-19T23:32:58.0008744Z   "missing_optional_media_count": 0,
+2026-10-19T23:32:58.0009199Z   "status": "passed"
+2026-10-19T23:32:58.0009520Z }
