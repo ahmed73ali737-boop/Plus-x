@@ -148,7 +148,7 @@ try:
                     continue
                 nav = page.locator("#admin-nav").get_by_role("button", name=label, exact=True)
                 nav.click()
-                page.get_by_role("heading", name=label, exact=True).wait_for()
+                page.get_by_role("heading", name=label, exact=True, level=1).wait_for()
                 page.wait_for_timeout(80)
                 audit(page, role, label)
 

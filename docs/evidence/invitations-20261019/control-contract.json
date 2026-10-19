@@ -1,0 +1,467 @@
+{
+  "status": "passed",
+  "roles": [
+    "platform",
+    "organizer",
+    "agency"
+  ],
+  "totals": {
+    "surfaces": 56,
+    "buttons": 1553,
+    "fields": 380,
+    "links": 182
+  },
+  "surfaces": [
+    {
+      "role": "platform",
+      "tab": "نظرة عامة",
+      "buttons": 33,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الهوية والقالب",
+      "buttons": 33,
+      "fields": 31,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "أقسام الصفحة",
+      "buttons": 21,
+      "fields": 51,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "المؤسسات والمشاركات",
+      "buttons": 64,
+      "fields": 8,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الفعالية والخدمات",
+      "buttons": 29,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "ترتيب التجربة",
+      "buttons": 22,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "إدخال الأسئلة",
+      "buttons": 26,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "التصويت",
+      "buttons": 22,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "التقييم والملاحظات",
+      "buttons": 29,
+      "fields": 4,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الإعلانات والعروض",
+      "buttons": 23,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الحقائق والأرقام",
+      "buttons": 22,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "Excel / CSV",
+      "buttons": 21,
+      "fields": 4,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "النتائج والتقارير",
+      "buttons": 21,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "معاينة الصفحة",
+      "buttons": 20,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الأجهزة والطرفيات",
+      "buttons": 21,
+      "fields": 6,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "الحسابات",
+      "buttons": 22,
+      "fields": 3,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "السجل والتدقيق",
+      "buttons": 20,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "platform",
+      "tab": "أمان الحساب",
+      "buttons": 23,
+      "fields": 3,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "نظرة عامة",
+      "buttons": 36,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الهوية والقالب",
+      "buttons": 36,
+      "fields": 31,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "أقسام الصفحة",
+      "buttons": 24,
+      "fields": 51,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "المؤسسات والمشاركات",
+      "buttons": 67,
+      "fields": 8,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الزوار و QR",
+      "buttons": 27,
+      "fields": 13,
+      "links": 6,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الدعوات وتأكيد الحضور",
+      "buttons": 29,
+      "fields": 4,
+      "links": 5,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "اللجان والصلاحيات",
+      "buttons": 25,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الفعالية والخدمات",
+      "buttons": 38,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "ترتيب التجربة",
+      "buttons": 37,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "إدخال الأسئلة",
+      "buttons": 42,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "التصويت",
+      "buttons": 25,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "التقييم والملاحظات",
+      "buttons": 32,
+      "fields": 4,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الإعلانات والعروض",
+      "buttons": 26,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الحقائق والأرقام",
+      "buttons": 27,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "Excel / CSV",
+      "buttons": 24,
+      "fields": 4,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "النتائج والتقارير",
+      "buttons": 24,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "معاينة الصفحة",
+      "buttons": 23,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الأجهزة والطرفيات",
+      "buttons": 24,
+      "fields": 6,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "الحسابات",
+      "buttons": 25,
+      "fields": 3,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "السجل والتدقيق",
+      "buttons": 23,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "organizer",
+      "tab": "أمان الحساب",
+      "buttons": 26,
+      "fields": 3,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "نظرة عامة",
+      "buttons": 31,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "الهوية والقالب",
+      "buttons": 32,
+      "fields": 31,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "أقسام الصفحة",
+      "buttons": 20,
+      "fields": 51,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "المؤسسات والمشاركات",
+      "buttons": 23,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "الفعالية والخدمات",
+      "buttons": 34,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "ترتيب التجربة",
+      "buttons": 41,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "إدخال الأسئلة",
+      "buttons": 40,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "التصويت",
+      "buttons": 23,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "التقييم والملاحظات",
+      "buttons": 28,
+      "fields": 4,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "الإعلانات والعروض",
+      "buttons": 26,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "الحقائق والأرقام",
+      "buttons": 23,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "Excel / CSV",
+      "buttons": 20,
+      "fields": 4,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "النتائج والتقارير",
+      "buttons": 20,
+      "fields": 1,
+      "links": 4,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "معاينة الصفحة",
+      "buttons": 19,
+      "fields": 2,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "الأجهزة والطرفيات",
+      "buttons": 20,
+      "fields": 6,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "السجل والتدقيق",
+      "buttons": 19,
+      "fields": 1,
+      "links": 3,
+      "failures": []
+    },
+    {
+      "role": "agency",
+      "tab": "أمان الحساب",
+      "buttons": 22,
+      "fields": 3,
+      "links": 3,
+      "failures": []
+    }
+  ],
+  "page_errors": [],
+  "contract": "every visible admin control has an accessible name; every visible button is click/submit wired; every visible link has a non-javascript href",
+  "note": "Destructive actions are wiring-checked here and are functionally covered by their dedicated API/browser journeys where applicable."
+}

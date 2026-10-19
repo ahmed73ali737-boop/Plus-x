@@ -114,4 +114,4 @@ def test_normal_host_login_rate_limit_still_applies(tmp_path):
 
 
 def test_postgres_migration_chain_includes_event_guest_pass_number():
-    assert MIGRATIONS[-1].name == "007_event_guest_pass_number.sql"
+    assert MIGRATIONS[-1].name == "009_invitations.sql"

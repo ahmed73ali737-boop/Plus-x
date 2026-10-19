@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "backend": "SQLite",
+  "native_browser": true,
+  "physical_camera_tested": false,
+  "native_postgresql_tested": false,
+  "checks": [
+    "real_http_policy_list_and_invitation_created",
+    "private_event_hidden_from_catalog_and_public_bundles",
+    "private_invitation_mobile_page_no_overflow_or_premature_qr",
+    "rsvp_companion_bound_and_consent_validation",
+    "mobile_rsvp_manual_pending_without_pass",
+    "approved_rsvp_shows_real_qr_and_companions_on_mobile",
+    "private_guest_pass_link_renders_without_public_event_disclosure",
+    "paired_private_gate_resolves_approved_pass",
+    "managed_invitation_fails_closed_when_scanner_disconnected",
+    "scanner_companions_admitted_in_two_batches_then_blocked",
+    "fully_consumed_invitation_still_allows_exit",
+    "revocation_removes_qr_and_invalidates_pass_endpoint",
+    "revoked_cached_pass_is_removed_on_online_refresh",
+    "public_self_registration_ui_to_approved_pass",
+    "phone_only_registration_does_not_recover_existing_pass",
+    "new_scanner_account_password_change_and_limited_checkin_ui",
+    "scanner_cannot_read_editor_or_export_guests",
+    "no_uncaught_browser_javascript_errors"
+  ],
+  "page_errors": [],
+  "browser_version": "143.0.7499.0",
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 410 (Gone)"
+  ],
+  "passed": 18
+}

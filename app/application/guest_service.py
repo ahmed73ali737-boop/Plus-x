@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import os
 import re
+import secrets
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,8 @@ from app.db import event_guests, guests
 from app.domain import boolean, fail, now, text
 
 PHONE_DIGIT_TRANSLATION=str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹','01234567890123456789')
+EVENT_PASS_PATTERN=re.compile(r"G-[0-9A-F]{30}")
+RESERVED_ADMISSION_METADATA={"invitation_id","selected_days","party_size","entitlement_id","admission_managed"}
 
 
 def normalize_phone(raw, country_code="+967") -> str:
@@ -63,10 +66,69 @@ def phone_hash(phone_e164: str) -> str:
 
 
 def guest_number_for_phone(phone_e164: str) -> str:
-    # Public guest numbers are keyed/opaque. They are associated with the phone
-    # identity, but cannot be reproduced from the phone without the server key.
+    # This stable identity is INTERNAL ONLY. A phone number is a deduplication
+    # key, never evidence that its holder owns a pass for any event.
     h=_guest_hmac("guest-number",phone_e164).upper()
     return f"G-{h[:4]}-{h[4:8]}-{h[8:12]}-{h[12:16]}"
+
+
+def _new_event_pass_number() -> str:
+    # 120 random bits, independent of phone/global identity/other events.
+    # Keep the existing API field name guest_number and fit VARCHAR(32).
+    return "G-"+secrets.token_hex(15).upper()
+
+
+def _ensure_event_pass_number(conn, registration: dict) -> str:
+    """Allocate legacy credentials transactionally; concurrent callers agree.
+
+    The caller owns the transaction. Read-only endpoints must never mint a pass
+    in a connection that will roll back when closed; startup/backfill and
+    authenticated recovery supply the durable upgrade path instead.
+    """
+    current=dict(registration)
+    for _ in range(8):
+        existing=current.get("pass_number")
+        if existing and EVENT_PASS_PATTERN.fullmatch(existing):
+            return existing
+        candidate=_new_event_pass_number()
+        expected=(event_guests.c.pass_number.is_(None) if existing is None
+                  else event_guests.c.pass_number==existing)
+        try:
+            with conn.begin_nested():
+                changed=conn.execute(
+                    update(event_guests)
+                    .where(event_guests.c.id==current["id"],expected)
+                    .values(pass_number=candidate)
+                )
+            if changed.rowcount:
+                return candidate
+        except IntegrityError:
+            # A random collision is extraordinarily unlikely, but a unique
+            # index remains the authority and a collision must not abort the
+            # enclosing import/registration transaction.
+            continue
+        row=conn.execute(select(event_guests).where(event_guests.c.id==current["id"])).mappings().first()
+        if row is None:
+            fail("GUEST_NOT_FOUND",404)
+        current=dict(row)
+    fail("GUEST_PASS_ALLOCATION_FAILED",503)
+
+
+def backfill_event_pass_numbers(conn, event_id: str | None = None) -> int:
+    """Upgrade legacy registrations inside a caller-owned write transaction.
+
+    The former phone-derived pass is deliberately not retained as an alias:
+    doing so would restore the cross-event disclosure this migration closes.
+    """
+    query=select(event_guests)
+    if event_id is not None:
+        query=query.where(event_guests.c.event_id==event_id)
+    changed=0
+    for row in conn.execute(query).mappings().all():
+        if not row.get("pass_number") or not EVENT_PASS_PATTERN.fullmatch(row["pass_number"]):
+            _ensure_event_pass_number(conn,dict(row))
+            changed+=1
+    return changed
 
 
 def guest_qr_payload(event_slug: str, guest_number: str, public_origin: str) -> str:
@@ -171,8 +233,11 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
             "guest_id":guest["id"],
             "status":"registered",
             "guest_type":guest_type,
+            "pass_number":_new_event_pass_number(),
             "pass_token_hash":digest(issued_pass_token),
-            "metadata_json":body.get("metadata") if isinstance(body.get("metadata"),dict) else {},
+            # Admission links are server-owned. Public registration (including
+            # offline sync) must never attach itself to another invitation.
+            "metadata_json":{key:value for key,value in (body.get("metadata") or {}).items() if key not in RESERVED_ADMISSION_METADATA} if isinstance(body.get("metadata"),dict) else {},
             "registered_at":now(),
             "updated_at":now(),
         }
@@ -204,9 +269,10 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
     if allow_guest_type and guest_type!=reg.get("guest_type"):
         conn.execute(update(event_guests).where(event_guests.c.id==reg["id"]).values(guest_type=guest_type,updated_at=now()))
         reg={**dict(reg),"guest_type":guest_type,"updated_at":now()}
+    pass_number=_ensure_event_pass_number(conn,reg)
     return {
         "id":guest["id"],
-        "guest_number":guest["guest_number"],
+        "guest_number":pass_number,
         "phone":guest["phone_e164"],
         "name":guest.get("name") or "",
         "job_title":guest.get("job_title") or "",
@@ -221,19 +287,30 @@ def register_guest(conn, event: dict, body: dict, *, allow_profile_update: bool 
 
 
 def event_guest_by_number(conn, event_id: str, guest_number: str):
+    number=str(guest_number or "").upper()
+    if not EVENT_PASS_PATTERN.fullmatch(number):
+        return None
     row=conn.execute(
         select(
             guests,
             event_guests.c.id.label("event_guest_id"),
             event_guests.c.status.label("event_guest_status"),
             event_guests.c.guest_type,
+            event_guests.c.pass_number,
             event_guests.c.metadata_json,
             event_guests.c.registered_at,
         )
         .join(event_guests,event_guests.c.guest_id==guests.c.id)
-        .where(event_guests.c.event_id==event_id,guests.c.guest_number==guest_number.upper())
+        .where(event_guests.c.event_id==event_id,event_guests.c.pass_number==number)
     ).mappings().first()
-    return dict(row) if row else None
+    return _event_guest_row(row) if row else None
+
+
+def _event_guest_row(row) -> dict:
+    result=dict(row)
+    result["internal_guest_number"]=result["guest_number"]
+    result["guest_number"]=result.get("pass_number") or ""
+    return result
 
 
 def public_guest_view(row: dict) -> dict:
@@ -266,6 +343,7 @@ def list_event_guests(conn, event_id: str) -> list[dict]:
             event_guests.c.id.label("event_guest_id"),
             event_guests.c.status.label("event_guest_status"),
             event_guests.c.guest_type,
+            event_guests.c.pass_number,
             event_guests.c.metadata_json,
             event_guests.c.registered_at,
         )
@@ -273,4 +351,4 @@ def list_event_guests(conn, event_id: str) -> list[dict]:
         .where(event_guests.c.event_id==event_id)
         .order_by(event_guests.c.registered_at.desc())
     ).mappings()
-    return [staff_guest_view(dict(x)) for x in rows]
+    return [staff_guest_view(_event_guest_row(x)) for x in rows]

@@ -163,8 +163,9 @@ try:
         # Validate-only mode checks eligibility/presence without writing a movement.
         page.get_by_label("وضع المسح",exact=True).select_option("validate")
         page.get_by_role("button",name="بحث / فتح",exact=True).click()
-        page.get_by_text("صالح للدخول",exact=True).wait_for()
+        page.get_by_text("البيانات صالحة — لم يُسجل دخول",exact=True).wait_for()
         assert "success" in (page.locator(".scan-result").get_attribute("class") or "")
+        assert page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');return (await m.all('checkin_outbox')).length+(await m.all('checkin_receipts')).length}""")==0
         mark("validate_only_does_not_check_in")
         mark("gate_success_state_is_visually_explicit")
 
@@ -178,9 +179,11 @@ try:
         # Offline scan/check-in from the already prepared local manifest.
         context.set_offline(True)
         page.get_by_role("button",name="تسجيل دخول",exact=True).click()
-        page.get_by_text("تم حفظ الدخول محليًا",exact=False).wait_for()
+        page.get_by_text("الحركة محفوظة محليًا ومؤقتة حتى تأكيد الخادم",exact=False).wait_for()
+        assert "success" not in (page.locator(".scan-result").get_attribute("class") or "")
         pending=page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');const xs=await m.all('checkin_outbox');return xs.filter(x=>x.status==='pending').length}""")
         assert pending>=1
+        assert page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');return (await m.all('checkin_receipts')).filter(x=>['accepted','duplicate'].includes(x.status)).length}""")==0
         mark("offline_checkin_queued")
 
         context.set_offline(False)
@@ -207,7 +210,8 @@ try:
         exit_action=page.get_by_role("button",name="تسجيل خروج",exact=True)
         exit_action.wait_for(state="visible")
         exit_action.click()
-        page.get_by_text("تم تسجيل الخروج ومزامنته.",exact=False).wait_for()
+        page.get_by_text("أكد الخادم تسجيل الخروج.",exact=False).wait_for()
+        assert page.evaluate("""async()=>{const m=await import('/assets/offline.mjs');return (await m.all('checkin_receipts')).some(x=>['accepted','duplicate'].includes(x.status)&&x.direction==='exit')}""")
         mark("online_exit_checkpoint_recorded")
 
         # Guest can register while the already-loaded page is offline. The local

@@ -13,6 +13,8 @@ MIGRATION_PATHS = (
     ROOT / "ops/005_guest_presence.sql",
     ROOT / "ops/006_guest_pass_token.sql",
     ROOT / "ops/007_event_guest_pass_number.sql",
+    ROOT / "ops/008_event_pass_isolation.sql",
+    ROOT / "ops/009_invitations.sql",
 )
 
 

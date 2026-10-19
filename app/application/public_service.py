@@ -10,6 +10,7 @@ from app.db import event_participations, sites, submissions
 from app.application.publishing import get_site_version
 from app.infrastructure.repository import get_site
 from app.domain import now
+from app.application.event_visibility import event_id_for_site, is_public_event, require_public_event
 
 
 def public_config_without_answer_keys(config):
@@ -25,7 +26,12 @@ def public_config_without_answer_keys(config):
     return result
 
 
-def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
+def build_public_bundle(conn, site, public_origin: str, draft: bool = False, *, authorized_event_id: str | None = None):
+    event_id = event_id_for_site(conn, site)
+    # The internal invitation endpoint may pass this only after validating the
+    # invitation credential. Public routes must never forward a client parameter.
+    if not draft and (not event_id or authorized_event_id != event_id):
+        require_public_event(conn, event_id)
     current={'config':site['draft'],'version':site['published_version'],'published_at':None} if draft else get_site_version(conn,site)
     event=None; children=[]; events=[]
     if site['event_id'] and site['id']!=site['event_id']:
@@ -41,6 +47,8 @@ def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
     if site['kind']=='platform':
         current_time=datetime.now(timezone.utc)
         for e in conn.execute(select(sites).where(sites.c.kind=='event',sites.c.published_version>0)).mappings():
+            if not is_public_event(conn, e['id']):
+                continue
             cfg=get_site_version(conn,e)['config']
             start=datetime.fromisoformat(cfg['start']) if cfg.get('start') else None
             end=datetime.fromisoformat(cfg['end']) if cfg.get('end') else None
@@ -50,6 +58,7 @@ def build_public_bundle(conn, site, public_origin: str, draft: bool = False):
 
 
 def build_public_poll_results(conn, site):
+    require_public_event(conn, event_id_for_site(conn, site))
     cfg=get_site_version(conn,site)['config']; result={}
     for q in cfg['records']:
         if (q.get('kind') != 'poll' or q.get('enabled') is not True or
