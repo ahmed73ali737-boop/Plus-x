@@ -169,8 +169,8 @@ try:
         mark("gate_success_state_is_visually_explicit")
 
         page.get_by_label("وضع المسح",exact=True).select_option("entry")
-        page.get_by_role("button",name="بحث / فتح",exact=True).click()
         gate_action=page.get_by_role("button",name="تسجيل دخول",exact=True)
+        gate_action.wait_for(state="visible")
         gate_box=gate_action.bounding_box()
         assert gate_box and gate_box["height"] >= 54, gate_box
         mark("gate_primary_action_is_large_touch_target")
@@ -204,8 +204,9 @@ try:
         # The same operator flow supports exit and named checkpoints.
         page.get_by_label("وضع المسح",exact=True).select_option("exit")
         page.get_by_label("نقطة الوصول",exact=True).select_option("main")
-        page.get_by_role("button",name="بحث / فتح",exact=True).click()
-        page.get_by_role("button",name="تسجيل خروج",exact=True).click()
+        exit_action=page.get_by_role("button",name="تسجيل خروج",exact=True)
+        exit_action.wait_for(state="visible")
+        exit_action.click()
         page.get_by_text("تم تسجيل الخروج ومزامنته.",exact=False).wait_for()
         mark("online_exit_checkpoint_recorded")
 
