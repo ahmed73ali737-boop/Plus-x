@@ -1,0 +1,16 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_all_normalized_text_blobs_are_stored_as_lf ________________
+
+    def test_all_normalized_text_blobs_are_stored_as_lf():
+        """A CRLF blob under text/eol policy becomes dirty immediately on checkout."""
+        entries = subprocess.check_output(["git", "ls-files", "--eol"], cwd=ROOT, text=True).splitlines()
+        invalid = [entry for entry in entries if "attr/text" in entry and entry.startswith(("i/crlf", "i/mixed"))]
+>       assert not invalid, "Renormalize tracked text blobs without changing checkout EOL policy: " + repr(invalid)
+E       AssertionError: Renormalize tracked text blobs without changing checkout EOL policy: ['i/crlf  w/crlf  attr/text eol=crlf    \tandroid/gradlew.bat']
+E       assert not ['i/crlf  w/crlf  attr/text eol=crlf    \tandroid/gradlew.bat']
+
+tests/test_source_lock_contract.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_source_lock_contract.py::test_all_normalized_text_blobs_are_stored_as_lf
+1 failed in 0.19s

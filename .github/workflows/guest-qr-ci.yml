@@ -32,7 +32,7 @@ jobs:
       - name: Record and verify exact checkout identity
         run: python tools/build_provenance.py snapshot --output qa/ci/guest-identity-and-offline-contract/baseline.json --verify-ci --profile qa --job-id guest-identity-and-offline-contract
       - name: Remove only generated evidence from previous checkouts
-        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/guest-identity-and-offline-contract/junit.xml', 'qa/ci/guest-identity-and-offline-contract/source-locks.json', 'qa/ci/guest-identity-and-offline-contract/bundle', 'qa/contracts', 'qa/invitations']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/guest-identity-and-offline-contract/junit.xml', 'qa/ci/guest-identity-and-offline-contract/source-locks.json', 'qa/ci/guest-identity-and-offline-contract/bundle', 'qa/contracts', 'qa/invitations', 'qa/offline-recovery.json']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
       - name: Verify SHA256 observability source lock before dependencies
         run: python tools/verify_shared_observability.py
       - name: Verify Git blob consolidation source lock before dependencies
