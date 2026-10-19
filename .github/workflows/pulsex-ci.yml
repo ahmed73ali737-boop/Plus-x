@@ -1,0 +1,294 @@
+name: PulseX CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+concurrency:
+  group: pulsex-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install runtime and QA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-qa.txt
+      - name: Compile Python
+        run: python -m compileall -q app tests tools run.py
+      - name: Verify cross-system source locks
+        run: |
+          python tools/verify_consolidation_assets.py
+          python tools/verify_shared_observability.py
+      - name: Audit Python dependencies
+        run: python -m pip_audit -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
+      - name: Run pytest suite
+        run: python -m pytest -q
+      - name: Run local HTTP acceptance
+        run: python tests/native_acceptance.py
+      - name: Run security hardening smoke
+        run: python tests/security_hardening.py
+      - name: Run exhibition capacity smoke
+        run: python tests/capacity_smoke.py
+      - name: Run 70-entity exhibition topology smoke
+        run: python tests/exhibition_scale_smoke.py
+      - name: Check JavaScript syntax
+        run: |
+          for f in web/*.mjs sdk/javascript/*.mjs tests/*.mjs; do
+            [ -f "$f" ] && node --check "$f"
+          done
+      - name: Run JavaScript SDK tests
+        run: node tests/sdk_js_test.mjs
+      - name: Verify Live Wall public display privacy contract
+        run: node tests/livewall_smoke.mjs
+      - name: Verify editable storyboard and branching / UI contract
+        run: |
+          node tests/storyboard_core_smoke.mjs
+          node tests/storyboard_ui_contract.mjs
+      - name: Verify first-login session safety UI
+        run: node tests/session_ui_contract.mjs
+      - name: Run Python SDK real HTTP smoke
+        run: python tests/sdk_native_smoke.py
+      - name: Upload hardening and capacity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardening-capacity-qa
+          path: |
+            qa/hardening/capacity-smoke.json
+            qa/exhibition-scale-smoke.json
+            qa/hardening/*.json
+          if-no-files-found: ignore
+
+  windows-core:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install runtime and QA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-qa.txt
+      - name: Compile Python
+        run: python -m compileall -q app tests tools run.py
+      - name: Verify cross-system source locks
+        run: |
+          python tools/verify_consolidation_assets.py
+          python tools/verify_shared_observability.py
+      - name: Run pytest suite on Windows
+        run: python -m pytest -q
+      - name: Run native Windows HTTP acceptance
+        run: python tests/native_acceptance.py
+      - name: Install Chromium for Windows output tests
+        run: python -m playwright install chromium
+      - name: Run Windows Chromium component suite
+        run: python tests/browser_components.py
+      - name: Run Windows updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run Windows updated legacy UX contract
+        run: python tests/ux_contract_w08.py
+      - name: Run Windows real HTTP browser end-to-end
+        run: python tests/browser_smoke.py
+      - name: Run Windows exhibition brand journeys
+        run: python tests/browser_exhibition_sites.py
+      - name: Run Windows guest QR and offline browser flow
+        run: python tests/browser_guest_flow.py
+      - name: Run Windows full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
+      - name: Run Windows IndexedDB offline component
+        run: python tests/browser_offline_indexeddb.py
+      - name: Upload Windows browser QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-browser-qa
+          path: |
+            qa/browser-components.json
+            qa/browser-smoke.json
+            qa/browser-platform-diagnostic.json
+            qa/exhibition-brands.json
+            qa/exhibition-browser-server.log
+            qa/windows11-browser-offline-indexeddb.json
+            qa/windows12-guest-browser.json
+            qa/browser-question-roundtrip.json
+            qa/browser-question-roundtrip.png
+            qa/browser-question-roundtrip-server.log
+            qa/browser-control-contract.json
+            qa/browser-control-contract-server.log
+            qa/guest-browser-server.log
+            qa/browser-server.log
+            qa/*.png
+          if-no-files-found: ignore
+
+  browser-components:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-qa.txt
+          python -m playwright install --with-deps chromium
+      - name: Run read-only Chromium component suite
+        run: python tests/browser_components.py
+      - name: Run updated legacy UI bridge
+        run: python tests/run_ui_bridge.py
+      - name: Run updated legacy UX contract
+        run: python tests/ux_contract_w08.py
+      - name: Run real HTTP browser end-to-end flow
+        run: python tests/browser_smoke.py
+      - name: Run exhibition brand journeys
+        run: python tests/browser_exhibition_sites.py
+      - name: Run guest QR and offline browser flow
+        run: python tests/browser_guest_flow.py
+      - name: Run full question control roundtrip
+        run: python tests/browser_question_roundtrip.py
+      - name: Audit all rendered admin controls across roles
+        run: python tests/browser_control_contract.py
+      - name: Run IndexedDB offline queue component
+        if: always()
+        run: python tests/browser_offline_indexeddb.py
+      - name: Require IndexedDB evidence
+        if: always()
+        run: python -c "import json, pathlib; d=json.loads(pathlib.Path('qa/windows11-browser-offline-indexeddb.json').read_text(encoding='utf-8')); assert d.get('status')=='passed', d"
+      - name: Upload browser QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa
+          path: |
+            qa/browser-components.json
+            qa/browser-smoke.json
+            qa/browser-platform-diagnostic.json
+            qa/windows11-browser-offline-indexeddb.json
+            qa/windows12-guest-browser.json
+            qa/guest-browser-server.log
+            qa/browser-server.log
+            qa/*.png
+          if-no-files-found: ignore
+
+  postgres-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pulsex_test
+          POSTGRES_USER: pulsex
+          POSTGRES_PASSWORD: pulsex_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pulsex -d pulsex_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PX_POSTGRES_TEST_URL: postgresql+psycopg://pulsex:pulsex_ci@127.0.0.1:5432/pulsex_test
+      PX_ALLOW_POSTGRES_TEST_RESET: "YES"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install PostgreSQL test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
+      - name: Run PostgreSQL native acceptance
+        run: python tests/postgres_native_acceptance.py
+      - name: Run PostgreSQL application-path capacity smoke
+        run: python tests/postgres_capacity_smoke.py
+      - name: Upload PostgreSQL QA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-qa
+          path: |
+            qa/postgres-native-acceptance.json
+            qa/postgres-capacity-smoke.json
+          if-no-files-found: ignore
+
+  container-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build -f ops/Dockerfile -t pulsex-ci .
+      - name: Verify runtime imports and migration assets inside image
+        run: docker run --rm --entrypoint python pulsex-ci -c "import fastapi, sqlalchemy, psycopg, qrcode; import app.server; from tools.migrate_postgres import MIGRATIONS; assert all(p.is_file() for p in MIGRATIONS); print('container-runtime-and-migrations-ok')"
+
+  package-windows-candidate:
+    runs-on: windows-latest
+    needs: [python-core, windows-core, browser-components, postgres-native, container-import]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Archive the exact CI checkout for Windows testing
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          git archive --format=zip --prefix=PulseX-Windows/ --output=dist/PulseX-Windows-Candidate.zip HEAD
+          @'
+          import hashlib
+          import os
+          import subprocess
+          import pathlib
+          import zipfile
+          archive = pathlib.Path("dist/PulseX-Windows-Candidate.zip")
+          with zipfile.ZipFile(archive) as z:
+              names = set(z.namelist())
+              required = ("Start-Windows.cmd", "tools/launcher.py", "requirements.txt",
+                          "run.py", "app/server.py", "web/sw.js", "START_WINDOWS_AR.html")
+              for path in required:
+                  assert "PulseX-Windows/" + path in names, path
+              assert not any("/.venv/" in name or name.endswith("/.env") or
+                             "/first-run-accounts.json" in name or
+                             "/bootstrap-admin.json" in name for name in names)
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path("dist/SHA256SUMS.txt").write_text(
+              f"{digest}  {archive.name}\n", encoding="utf-8")
+          pathlib.Path("dist/BUILD_ID.txt").write_text(
+              f"CHECKOUT_SHA={os.environ['GITHUB_SHA']}\n"
+              f"COMMIT_SHA={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n",
+              encoding="utf-8")
+          '@ | python -
+      - name: Upload Windows test candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: PulseX-Windows-Standalone-Candidate
+          path: dist/*
+          if-no-files-found: error
