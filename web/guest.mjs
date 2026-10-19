@@ -256,6 +256,7 @@ export async function scanPage(slug){
   const checkpoint=selectField('نقطة الوصول',[], '');
   const result=h('div',{class:'scan-result empty',role:'status','aria-live':'polite','aria-atomic':'true'},'بانتظار المسح');
   let currentGuest=null;
+  let showSerial=0;
 
   function access(){return manifest.access_control||{anti_passback:true,allow_reentry:true,manifest_max_age_minutes:7200,checkpoints:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}]};}
   function checkpoints(){const xs=(access().checkpoints||[]).filter(x=>x.enabled!==false);return xs.length?xs:[{key:'main',label:'البوابة الرئيسية',enabled:true,allowed_guest_types:[]}];}
@@ -340,18 +341,22 @@ export async function scanPage(slug){
     return matches;
   }
   async function show(raw){
+    const serial=++showSerial;
     const matches=await findGuest(raw);
+    if(serial!==showSerial)return;
     if(matches.length>1){currentGuest=null;chooseMatches(matches);feedback(false);return;}
     const g=matches[0];currentGuest=g||null;
     if(!g){result.className='scan-result denied';result.replaceChildren(h('p',{class:'warning'},'لم أجد زائرًا مطابقًا في سجل البوابة. استخدم الاسم أو رقم الزائر، أو حدّث السجل عند توفر الاتصال.'));feedback(false);return;}
 
     const validation=await authoritativeValidate(g);
+    if(serial!==showSerial)return;
     if(validation.status!=='valid'){
       result.className='scan-result denied';result.replaceChildren(h('span',{class:'tag'},'غير مسموح'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{class:'warning'},reasonText(validation.reason)));feedback(false);return;
     }
 
     const selectedMode=mode.input.value;
     const presence=await get('gate_presence',gatePresenceKey(page.id,g.guest_number))||{state:g.presence||'outside',last_direction:g.last_direction||'',last_checkpoint:g.last_checkpoint||''};
+    if(serial!==showSerial)return;
     if(selectedMode==='validate'){
       result.className='scan-result success';result.replaceChildren(h('span',{class:'tag status-current'},'صالح للدخول'),h('h2',{},g.name||'زائر'),h('strong',{class:'scan-number'},g.guest_number),h('p',{},[g.organization,g.job_title,g.guest_type].filter(Boolean).join(' · ')),h('p',{class:'muted'},'الحالة الحالية: '+(validation.presence||presence.state||'outside')+' · نقطة الوصول: '+checkpoint.input.value));feedback(true);return;
     }
