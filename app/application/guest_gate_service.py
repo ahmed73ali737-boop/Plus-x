@@ -6,6 +6,9 @@ import json
 from datetime import datetime, timezone
 
 from sqlalchemy import insert, select, update
+from fastapi import HTTPException
+from app.application.invitation_service import get_policy, lock_policy, entitlement_status, consume_entitlement
+from app.invitations_db import admission_uses
 from sqlalchemy.exc import IntegrityError
 
 from app.application.audit_service import new_id
@@ -128,7 +131,7 @@ def event_presence_map(conn,event_id: str) -> dict[str,dict]:
     return {row["guest_id"]:dict(row) for row in rows}
 
 
-def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main",at_time: datetime|None=None) -> dict:
+def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main",at_time: datetime|None=None,*,check_admission=True,body=None) -> dict:
     event=_event(conn,event_or_id)
     event_id=event["id"]
     guest=event_guest_by_number(conn,event_id,guest_number)
@@ -152,7 +155,15 @@ def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main",at_
     if allowed and guest_type not in allowed:
         return {"status":"invalid","reason":"GUEST_TYPE_NOT_ALLOWED","guest":staff_guest_view(guest),"presence":presence}
 
-    return {"status":"valid","guest":staff_guest_view(guest),"presence":presence,"checkpoint":rule,"access_control":access}
+    admission={"managed":False}
+    if check_admission:
+        try:
+            admission=entitlement_status(conn,event,guest,body)
+            if get_policy(conn,event_id)["enabled"] and not admission["managed"]:
+                fail("INVITATION_REQUIRED",403)
+        except HTTPException as exc:
+            return {"status":"invalid","reason":exc.detail,"guest":staff_guest_view(guest),"presence":presence}
+    return {"status":"valid","guest":staff_guest_view(guest),"presence":presence,"checkpoint":rule,"access_control":access,"admission":admission}
 
 
 def _set_presence(conn,event_id: str,guest_id: str,state: str,scan_id: str,direction: str,checkpoint: str):
@@ -163,9 +174,12 @@ def _set_presence(conn,event_id: str,guest_id: str,state: str,scan_id: str,direc
     )
 
 
-def _duplicate_scan_result(conn,event_id: str,guest_number: str,scan_id: str,mode: str,checkpoint: str,existing) -> dict:
+def _duplicate_scan_result(conn,event_id: str,guest_number: str,scan_id: str,mode: str,checkpoint: str,existing,quantity=1) -> dict:
     existing=dict(existing)
-    if existing["guest_number"]!=guest_number.upper() or existing["direction"]!=mode or existing["checkpoint"]!=checkpoint:
+    use=conn.execute(select(admission_uses).where(admission_uses.c.scan_id==scan_id)).mappings().first()
+    if use and use["quantity"]!=quantity:
+        fail("SCAN_ID_CONFLICT",409)
+    if existing["event_id"]!=event_id or existing["guest_number"]!=guest_number.upper() or existing["direction"]!=mode or existing["checkpoint"]!=checkpoint:
         fail("SCAN_ID_CONFLICT",409)
     replay_guest=event_guest_by_number(conn,event_id,guest_number)
     if not replay_guest:
@@ -174,10 +188,17 @@ def _duplicate_scan_result(conn,event_id: str,guest_number: str,scan_id: str,mod
     return {
         "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
         "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":staff_guest_view(replay_guest),
+        "admission":{"managed":bool(use),"quantity":use["quantity"] if use else 1},
     }
 
 
 def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: str|None,source: str) -> dict:
+    # Each scan is atomic even when the batch caller catches a rejected sibling.
+    with conn.begin_nested():
+        return _record_checkin(conn,event_or_id,guest_number,body,scanner_id=scanner_id,source=source)
+
+
+def _record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: str|None,source: str) -> dict:
     event=_event(conn,event_or_id)
     event_id=event["id"]
     mode=body.get("mode") or body.get("direction") or "entry"
@@ -191,22 +212,39 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         scan_id=text(body.get("scan_id") or new_id(),64,True)
         existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
         if existing:
-            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,existing)
+            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,existing,body.get("quantity",1))
 
+    raw_guest=event_guest_by_number(conn,event_id,guest_number)
+    if not raw_guest:
+        fail("GUEST_NOT_REGISTERED",404)
+    if get_policy(conn,event_id)["enabled"] or (raw_guest.get("metadata_json") or {}).get("invitation_id"):
+        lock_policy(conn,event_id)
+    if mode!="validate":
+        _ensure_presence(conn,event_id,raw_guest["id"])
+        # Serialize all entrances for one ticket on PostgreSQL as well as SQLite.
+        conn.execute(select(guest_presence).where(guest_presence.c.event_id==event_id,guest_presence.c.guest_id==raw_guest["id"]).with_for_update()).first()
+        replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+        if replay:
+            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
+    admission_policy=get_policy(conn,event_id)
     access_now=access_config(event)
     offline_scan=body.get("offline_scan") is True
     at_time=None
     if offline_scan:
+        if admission_policy["enabled"]:
+            fail("ONLINE_ADMISSION_REQUIRED",409)
         supplied_policy=text(body.get("access_policy_version"),40,True)
         current_policy=access_policy_version(access_now)
         if supplied_policy!=current_policy:
             fail("ACCESS_POLICY_CHANGED",409)
         at_time=_scan_time(body.get("client_time"))
+        if (datetime.now(timezone.utc)-at_time).total_seconds()>access_now["manifest_max_age_minutes"]*60:
+            fail("OFFLINE_SCAN_EXPIRED",409)
         if at_time>datetime.now(timezone.utc).replace(microsecond=0):
             # Small clock differences are handled at field setup; future scans are never trusted.
             if (at_time-datetime.now(timezone.utc)).total_seconds()>300:
                 fail("OFFLINE_SCAN_TIME_FUTURE")
-    validated=validate_guest(conn,event,guest_number,checkpoint,at_time=at_time)
+    validated=validate_guest(conn,event,guest_number,checkpoint,at_time=at_time,check_admission=mode!="exit",body=body)
     guest=validated["guest"]
     if mode=="validate":
         return {
@@ -218,6 +256,7 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
             "checkpoint":checkpoint,
             "presence":validated["presence"],
             "guest":guest,
+            "admission":validated.get("admission"),
         }
     if validated["status"]!="valid":
         fail(validated.get("reason") or "ACCESS_DENIED",403)
@@ -227,10 +266,17 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
     expected="outside" if mode=="entry" else "inside"
     next_state="inside" if mode=="entry" else "outside"
 
-    if mode=="entry" and not access["allow_reentry"] and presence.get("last_direction")=="exit" and presence.get("last_scan_id"):
+    admission=validated.get("admission") or {"managed":False}
+    managed=admission.get("managed") and mode=="entry"
+    if managed:
+        admission=consume_entitlement(conn,event,raw_guest,{**body,"scan_id":scan_id})
+    elif body.get("quantity",1)!=1:
+        fail("ADMISSION_QUANTITY_INVALID")
+
+    if not managed and mode=="entry" and not access["allow_reentry"] and presence.get("last_direction")=="exit" and presence.get("last_scan_id"):
         fail("REENTRY_NOT_ALLOWED",403)
 
-    if access["anti_passback"]:
+    if access["anti_passback"] and not managed:
         transition=conn.execute(
             update(guest_presence)
             .where(
@@ -245,7 +291,7 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
         if transition.rowcount!=1:
             replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
             if replay:
-                return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay)
+                return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
             current=conn.execute(
                 select(guest_presence).where(
                     guest_presence.c.event_id==event_id,
@@ -274,11 +320,11 @@ def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: s
     except IntegrityError:
         replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
         if replay:
-            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay)
+            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
         raise
     return {
         "scan_id":scan_id,"status":"accepted","mode":mode,"direction":mode,"checkpoint":checkpoint,
-        "presence":next_state,"guest":guest,
+        "presence":next_state,"guest":guest,"admission":admission,
     }
 
 def build_guest_manifest(conn,event_or_id) -> dict:
@@ -307,9 +353,12 @@ def build_guest_manifest(conn,event_or_id) -> dict:
     return {
         "event_id":event_id,
         "generated_at":now(),
+        "credential_version":2,
         "manifest_version":hashlib.sha256(source.encode("utf-8")).hexdigest()[:20],
         "access_policy_version":policy_version,
         "guest_count":len(guests),
+        "admission_managed":get_policy(conn,event_id)["enabled"],
+        "requires_online":get_policy(conn,event_id)["enabled"],
         "access_control":access,
         "guests":guests,
     }

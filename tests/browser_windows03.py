@@ -1,6 +1,6 @@
 """Chromium DOM + real backend HTTP through an explicit Python bridge.
 Native browser network, native browser cookies, service workers and IndexedDB are NOT tested.
-The environment blocks native browser navigation. Storage below is a test double.
+This bridge deliberately replaces browser transport. Storage below is a test double.
 """
 from pathlib import Path
 import base64, json, re, sys, traceback, os, shutil
@@ -20,14 +20,14 @@ def module(name):
 
 ui=module('ui.mjs')
 ui=ui.replace("else e.setAttribute(k,v===true?'':String(v));", "else e.setAttribute(k,k==='src'&&window._media[String(v)]?window._media[String(v)]:v===true?'':String(v));")
-common='const UI=(()=>{'+ui+';return {h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels,types,setCSRF,download};})();'
+common='const UI=(()=>{'+ui+';return {h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels,types,setCSRF,download,isoToLocalInput,localInputToISO};})();'
 icons='const Icons=(()=>{'+module('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+module('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
 questions='const Questions=(()=>{const{h,field,selectField}=UI;'+module('questions.mjs')+';return{question,visible};})();'
 exhibition='const Exhibition=(()=>{'+module('exhibition.mjs')+';return{exhibitionExperience};})();'
 public=module('public.mjs').replace('new URLSearchParams(location.search)', "new URLSearchParams(window._query||'')")
 public='const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const{exhibitionExperience}=Exhibition;const bundle=async slug=>await api("/api/public/site/"+slug);const enqueue=async item=>(await api("/api/collect",{items:[item]})).receipts[0];const prepare=async()=>{throw Error("Native offline test unavailable in harness")};const backup=prepare;const sync=async()=>{};const activate=()=>{};const status=async()=>({pending:0,rejected:0,items:[]});'+public+';return{publicPage,welcome,renderRoute};})();window.PXPublic=Public;'
-admin='const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error("Not a native storage test")};'+module('admin.mjs')+';return{adminPage};})();window.PXAdmin=Admin;'
+admin='const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg,isoToLocalInput,localInputToISO}=UI;const{icon}=Icons;const backup=async()=>{throw Error("Not a native storage test")};'+module('admin.mjs')+';return{adminPage};})();window.PXAdmin=Admin;'
 media={}
 for file in (ROOT/'web/media').glob('*'):
     media['/media/'+file.name]='data:image/svg+xml;base64,'+base64.b64encode(file.read_bytes()).decode()
@@ -192,7 +192,7 @@ with sync_playwright() as p:
         mark('preview_endpoint_returns_actual_draft')
         if errors:raise AssertionError(errors)
         report={'status':'passed','passed':len(checks),'checks':checks,'errors':errors,
-        'method':'Chromium DOM with Python HTTP bridge to Uvicorn/SQLite. Native browser networking blocked. Storage test double, NOT IndexedDB.',
+        'method':'Chromium DOM with Python HTTP bridge to Uvicorn/SQLite. Native browser networking is not exercised. Storage test double, NOT IndexedDB.',
         'native_windows_tested':False,'native_browser_network_tested':False,'service_worker_tested':False,'indexeddb_tested':False,'real_backend_used':True}
     except Exception as exc:
         report={'status':'failed','passed_before_failure':len(checks),'checks':checks,'error':str(exc),'trace':traceback.format_exc(),'page_errors':errors,'not_native_browser_e2e':True}

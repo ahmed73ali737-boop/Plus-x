@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "guests": 1000,
+  "unique_guest_numbers": 1000,
+  "manifest_guests": 1000,
+  "checkins": 1000,
+  "duplicate_replay_batch": 100,
+  "backend": "SQLite",
+  "elapsed_seconds": 17.747,
+  "scope": "capacity smoke for guest registry/manifest/check-in; not a production load certificate"
+}

@@ -80,7 +80,7 @@ def test_lost_registration_ack_can_retry_with_same_pass_token(tmp_path):
 def test_guest_number_qr_and_public_view_do_not_expose_phone(tmp_path):
     app,c=boot(tmp_path);slug=event_slug(c)
     guest=register(c,slug,'777222333',name='Nash').json()
-    assert guest['guest_number'].startswith('G-') and len(guest['guest_number'])==21
+    assert guest['guest_number'].startswith('G-') and len(guest['guest_number'])==32
     public=c.get(f"/api/public/events/{slug}/guests/{guest['guest_number']}")
     assert public.status_code==200
     body=public.json()

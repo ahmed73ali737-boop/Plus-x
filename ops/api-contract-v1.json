@@ -2,10 +2,28 @@
   "/api/access-request": [
     "post"
   ],
+  "/api/admin/admission/events": [
+    "get"
+  ],
   "/api/admin/audit": [
     "get"
   ],
+  "/api/admin/events/{event_id}/admission-policy": [
+    "get",
+    "put"
+  ],
+  "/api/admin/events/{event_id}/committee": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/committee/{assignment_id}": [
+    "patch"
+  ],
   "/api/admin/events/{event_id}/guest-checkins": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/guest-lists": [
     "get",
     "post"
   ],
@@ -16,9 +34,35 @@
   "/api/admin/events/{event_id}/guests/export": [
     "get"
   ],
+  "/api/admin/events/{event_id}/invitations": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/invitations/import/commit": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/invitations/import/preview": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/invitations/{invitation_id}/review": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/invitations/{invitation_id}/revoke": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/invitations/{invitation_id}/rotate": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/on-site-registration": [
+    "get",
+    "post"
+  ],
   "/api/admin/events/{event_id}/participations": [
     "get",
     "post"
+  ],
+  "/api/admin/events/{event_id}/permissions": [
+    "get"
   ],
   "/api/admin/media": [
     "post"
@@ -122,6 +166,9 @@
   "/api/collect": [
     "post"
   ],
+  "/api/device/events/by-slug/{event_slug}/gate-context": [
+    "get"
+  ],
   "/api/device/events/{event_id}/guest-checkins": [
     "post"
   ],
@@ -157,6 +204,16 @@
   ],
   "/api/public/events/{event_slug}/guests/{guest_number}/qr": [
     "get"
+  ],
+  "/api/public/events/{event_slug}/registration": [
+    "get",
+    "post"
+  ],
+  "/api/public/invitations/{token}": [
+    "get"
+  ],
+  "/api/public/invitations/{token}/rsvp": [
+    "post"
   ],
   "/api/public/site/{slug}": [
     "get"

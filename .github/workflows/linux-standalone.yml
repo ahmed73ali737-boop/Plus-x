@@ -75,6 +75,7 @@ jobs:
           .venv/bin/python tests/browser_smoke.py
           .venv/bin/python tests/browser_exhibition_sites.py
           .venv/bin/python tests/browser_guest_flow.py
+          .venv/bin/python tests/invitations_native_acceptance.py
           .venv/bin/python tests/browser_question_roundtrip.py
           .venv/bin/python tests/browser_control_contract.py
           .venv/bin/python tests/browser_offline_indexeddb.py
@@ -85,6 +86,7 @@ jobs:
           name: linux-ubuntu2404-qa
           path: |
             qa/**/*.json
+            qa/invitations/
             qa/**/*.png
             linux-startup.log
             live.json
@@ -122,6 +124,7 @@ jobs:
       - name: Native PostgreSQL and capacity acceptance
         run: |
           .venv/bin/python tests/postgres_native_acceptance.py
+          .venv/bin/python tests/postgres_invitations_acceptance.py
           .venv/bin/python tests/postgres_capacity_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -129,6 +132,7 @@ jobs:
           name: linux-ubuntu2404-postgres-qa
           path: |
             qa/postgres-native-acceptance.json
+            qa/postgres-invitations-acceptance.json
             qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
 
@@ -166,6 +170,7 @@ jobs:
           .venv/bin/python -m pytest -q
           .venv/bin/python tests/native_acceptance.py
           .venv/bin/python tests/postgres_native_acceptance.py
+          .venv/bin/python tests/postgres_invitations_acceptance.py
           .venv/bin/python tests/postgres_capacity_smoke.py
       - name: Build and inspect native Linux ARM64 container
         run: |

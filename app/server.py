@@ -23,7 +23,8 @@ from .core.security import digest, hash_password as password_hash, verify_passwo
 from .core.serialization import canonical_json as canon
 from .core.build_info import APP_NAME, APP_VERSION
 from .infrastructure.repository import fetch_one as row, get_site as site_row
-from .application.access import can_manage, require_scope, organization_visible
+from .application.event_visibility import require_public_event, event_id_for_site
+from .application.access import can_manage, require_scope, organization_visible, can_read, require_read_scope, require_event_permission
 from .application.shared_authorization import authorize_organizer_action
 from .infrastructure.g_observability import install_observability
 from .application.audit_service import new_id as uid, write_audit as log
@@ -37,6 +38,8 @@ from .application.device_service import create_device, list_devices, update_devi
 from .application.access_request_service import list_requests, set_request_status
 from .application.public_service import build_public_bundle, build_public_poll_results
 from .api.guest_routes import install_guest_routes
+from .api.invitation_routes import install_invitation_routes
+from .api.admission_access_routes import install_admission_access_routes
 from tools.production_gate import assert_production_ready
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -95,6 +98,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
         return u,sess
 
     install_guest_routes(app, engine, public_origin, identify=identify, site_row=site_row, log=log)
+    install_invitation_routes(app, engine, public_origin, identify=identify, log=log, authorize=require_event_permission)
+    install_admission_access_routes(app, engine, identify=identify)
 
 
     @app.post('/api/auth/login')
@@ -159,7 +164,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     @app.post('/api/access-request')
     def access_request(body:dict):
         with engine.begin() as c:
-            sid=text(body.get('site_id'),64,True);site_row(c,sid);email=text(body.get('email'),200,True).lower()
+            sid=text(body.get('site_id'),64,True);target=site_row(c,sid);require_public_event(c,event_id_for_site(c,target));email=text(body.get('email'),200,True).lower()
             if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):fail('EMAIL_INVALID')
             c.execute(insert(requests).values(id=uid(),site_id=sid,email=email,name=text(body.get('name'),160,True),created_at=now(),status='pending'))
         return {'status':'pending_approval','grants_access':False}
@@ -168,6 +173,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     def signup_request(body:dict):
         with engine.begin() as c:
             sid=text(body.get('site_id'),64,True);site=site_row(c,sid)
+            require_public_event(c,event_id_for_site(c,site))
             role=body.get('requested_role')
             if role not in ('organizer','participant'):fail('REQUESTED_ROLE_INVALID')
             email=text(body.get('email'),200,True).lower()
@@ -231,7 +237,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
         with engine.connect() as c:
             u,s=identify(request,c)
             result=c.execute(select(sites)).mappings()
-            return {'sites':[{'id':x['id'],'slug':x['slug'],'kind':x['kind'],'event_id':x['event_id'],'title':x['draft']['title'],'draft_rev':x['draft_rev'],'published_version':x['published_version']} for x in result if can_manage(c,u,x)],'types':QTYPES,'kinds':KINDS,'sections':SECTIONS}
+            return {'sites':[{'id':x['id'],'slug':x['slug'],'kind':x['kind'],'event_id':x['event_id'],'title':x['draft']['title'],'draft_rev':x['draft_rev'],'published_version':x['published_version']} for x in result if can_read(c,u,x)],'types':QTYPES,'kinds':KINDS,'sections':SECTIONS}
 
     @app.post('/api/admin/sites')
     def create_site(body:dict,request:Request):
@@ -250,7 +256,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     @app.get('/api/admin/sites/{sid}')
     def get_admin_site(sid:str,request:Request):
         with engine.connect() as c:
-            u,_=identify(request,c);s=dict(require_scope(c,u,sid));s['event_slug']=site_row(c,s['event_id'])['slug'] if s['event_id'] else None;return s
+            u,_=identify(request,c);s=dict(require_read_scope(c,u,sid));s['can_manage']=can_manage(c,u,s);s['event_slug']=site_row(c,s['event_id'])['slug'] if s['event_id'] else None;return s
 
     @app.put('/api/admin/sites/{sid}')
     def save_site(sid:str,body:dict,request:Request):
@@ -605,6 +611,9 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
                     if old:
                         if old['fingerprint']!=digest(canon(b)):fail('IDEMPOTENCY_BODY_CONFLICT',409)
                         out.append({'id':sid,'status':'duplicate'});continue
+                    if not isinstance(b,dict):fail('SUBMISSION_OBJECT_REQUIRED')
+                    target=site_row(c,b.get('site_id'))
+                    require_public_event(c,event_id_for_site(c,target))
                     clean=validate_submission(c,b)
                     c.execute(insert(submissions).values(**clean));out.append({'id':sid,'status':'accepted'})
             except HTTPException as e:out.append({'id':sid,'status':'rejected','error':e.detail})
@@ -619,7 +628,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     @app.get('/api/admin/sites/{sid}/metrics')
     def admin_metrics(sid:str,request:Request):
         with engine.connect() as c:
-            u,_=identify(request,c);s=require_scope(c,u,sid);return build_metrics(c,s,True)
+            u,_=identify(request,c);s=require_read_scope(c,u,sid);return build_metrics(c,s,True)
 
     @app.get('/api/public/site/{slug}/results')
     def public_results(slug:str):

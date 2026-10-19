@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "entities": 70,
+  "agency_bundle_requests": 700,
+  "concurrent_clients": 20,
+  "errors": 0,
+  "elapsed_s": 78.748,
+  "rps": 8.9,
+  "p50_s": 0.6312,
+  "p95_s": 11.6034,
+  "p99_s": 18.5542,
+  "backend": "SQLite",
+  "not_production_capacity_certificate": true,
+  "purpose": "Verify the exhibition topology supports the target 70 participating entities without truncation and can serve repeated agency bundles."
+}

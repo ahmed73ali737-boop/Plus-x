@@ -1,0 +1,40 @@
+{
+  "baseline": "ced50485bc071c5e4bb86507b5147b4f82b97271",
+  "date": "2026-10-19",
+  "environment": {
+    "backend": "SQLite",
+    "browser": "Chromium 143.0.7499.0",
+    "platform": "Linux",
+    "physical_scanner_tested": false,
+    "native_windows_tested": false,
+    "native_postgresql_tested": false
+  },
+  "pytest": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "402",
+    "time": "133.692",
+    "timestamp": "2026-10-19T14:25:25.080181-05:00",
+    "test_functions": 388,
+    "subtests": 14
+  },
+  "browser_cases": {
+    "invitations": 18,
+    "guest_flow": 22,
+    "base_flow": 10
+  },
+  "control_surfaces": 56,
+  "security_http_cases": 13,
+  "source_locks": "passed",
+  "production_ready": false,
+  "notes": [
+    "Managed admission requires a reachable shared server.",
+    "PostgreSQL/Windows jobs added to CI; local evidence does not replace them.",
+    "700-request SQLite concurrent smoke p95 11.60s is not production load acceptance."
+  ],
+  "dom_contract_cases": 24,
+  "timezone_package": "tzdata==2026.5",
+  "post_projection_tests_passed": 27
+}

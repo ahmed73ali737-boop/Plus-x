@@ -1,0 +1,8 @@
+{
+  "status": "blocked",
+  "database": "PostgreSQL",
+  "checks": [],
+  "test_data": "synthetic isolated schema",
+  "sqlite_fallback": false,
+  "reason": "Dedicated PX_POSTGRES_TEST_URL and PX_ALLOW_POSTGRES_TEST_RESET=YES are required."
+}

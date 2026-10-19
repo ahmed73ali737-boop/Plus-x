@@ -33,7 +33,7 @@ assert '005_guest_presence.sql' in migration_result['applied']
 assert '006_guest_pass_token.sql' in migration_result['applied']
 assert '007_event_guest_pass_number.sql' in migration_result['applied']
 migration_repeat=apply_migrations(engine)
-assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==6
+assert not migration_repeat['applied'] and len(migration_repeat['skipped'])==len(MIGRATIONS)
 app=create_app(url,origin='http://testserver',seed_demo=True)
 c=TestClient(app)
 checks=[]
@@ -46,7 +46,7 @@ ok('postgres_readiness_http_200',ready.status_code==200)
 ok('postgres_readiness_migrations_current',ready.json().get('schema_migrations_current') is True and ready.json().get('migration_count')==len(MIGRATIONS))
 ok('migration_runner_applied_guest_schema','004_windows12_guest_identity.sql' in migration_result['applied'])
 ok('migration_runner_007_applied','007_event_guest_pass_number.sql' in migration_result['applied'])
-ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==6)
+ok('migration_runner_idempotent',not migration_repeat['applied'] and len(migration_repeat['skipped'])==len(MIGRATIONS))
 with engine.connect() as con:
     ok('database_roundtrip',con.execute(text('select 1')).scalar_one()==1)
     tables=set(con.execute(text("select tablename from pg_tables where schemaname='public' and tablename like 'px_%'")).scalars())

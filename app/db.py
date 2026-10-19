@@ -219,3 +219,11 @@ def ensure_compat_schema(engine):
             with engine.begin() as c:
                 c.execute(sa_text('ALTER TABLE px_event_guests ADD COLUMN pass_number VARCHAR(32)'))
                 c.execute(sa_text('CREATE UNIQUE INDEX IF NOT EXISTS px_event_guests_pass_number ON px_event_guests(pass_number)'))
+
+        from app.application.guest_service import backfill_event_pass_numbers
+        with engine.begin() as c:
+            backfill_event_pass_numbers(c)
+
+
+# Register additive admission tables for both application and migration entrypoints.
+from app import invitations_db as _invitations_db  # noqa: E402,F401

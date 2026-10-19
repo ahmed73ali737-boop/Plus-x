@@ -1,6 +1,6 @@
 """Read-only DOM component checks with in-memory fixtures; NO network or IndexedDB assurance.
-Chromium policy blocks navigation to the local server in this environment. Do not treat
-these checks as the blocked end-to-end test, offline test, or deployment validation.
+This suite deliberately uses captured fixtures. Native HTTP journeys live in the
+separate browser suites; these component checks are not offline or deployment validation.
 """
 from pathlib import Path
 import json,re,base64,sys
@@ -11,7 +11,28 @@ from app.server import create_app
 ROOT=Path(__file__).resolve().parents[1]
 app=create_app('sqlite:///:memory:',origin='http://testserver',seed_demo=True);client=TestClient(app)
 account=app.state.seed_credentials[2];auth=client.post('/api/auth/login',json={'email':account['email'],'password':account['password']}).json()
-routes={'/api/auth/me':auth,'/api/admin/sites':client.get('/api/admin/sites').json(),'/api/admin/sites/agency-01':client.get('/api/admin/sites/agency-01').json(),'/api/admin/sites/agency-01/metrics':client.get('/api/admin/sites/agency-01/metrics').json(),'/api/admin/sites/agency-01/preview':client.get('/api/admin/sites/agency-01/preview').json()}
+def capture_admin_reads(auth_data):
+    """Capture authorized reads from the real application, never invented grants."""
+    captured={'/api/auth/me':auth_data}
+    def read(path):
+        response=client.get(path)
+        assert response.status_code==200,(path,response.status_code,response.text)
+        captured[path]=response.json()
+        return captured[path]
+    visible=read('/api/admin/sites')['sites']
+    admission=read('/api/admin/admission/events')['events']
+    for site in visible:
+        read('/api/admin/sites/'+site['id'])
+    event_ids={site['id'] for site in visible if site['kind']=='event'}|{event['id'] for event in admission}
+    for event_id in event_ids:
+        read('/api/admin/events/'+event_id+'/permissions')
+    return captured
+routes=capture_admin_reads(auth)
+for path in ('/api/admin/sites/agency-01/metrics','/api/admin/sites/agency-01/preview'):
+    response=client.get(path)
+    assert response.status_code==200,(path,response.status_code,response.text)
+    routes[path]=response.json()
+
 for slug in ('platform','demo','agency-01','tharawat','easy','rts'):
     routes['/api/public/site/'+slug]=client.get('/api/public/site/'+slug).json()
     routes['/api/public/site/'+slug+'/results']=client.get('/api/public/site/'+slug+'/results').json()
@@ -30,12 +51,12 @@ def code(name):
 ui=code('ui.mjs').replace("else e.setAttribute(k,v===true?'':String(v));","else e.setAttribute(k,k==='src'&&String(v).includes('/qr')?window._qr:v===true?'':String(v));")
 icons='const Icons=(()=>{'+code('icons.mjs')+';return{icon};})();'
 catalog='const Catalog=(()=>{'+code('catalog.mjs')+';return{sectionsMeta,snippet,route,sectionLink,itemLink};})();'
-common="const UI=(()=>{"+ui+";return {h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels,types,setCSRF,download};})();"
+common="const UI=(()=>{"+ui+";return {h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels,types,setCSRF,download,isoToLocalInput,localInputToISO};})();"
 questions="const Questions=(()=>{const {h,field,selectField}=UI;"+code('questions.mjs')+";return{question,visible};})();"
 exhibition="const Exhibition=(()=>{"+code('exhibition.mjs')+";return{exhibitionExperience};})();"
 public=code('public.mjs').replace("if(!preview&&page.kind!=='platform')", "if(false&&page.kind!=='platform')").replace('identity();',"visitor='fixture';session='fixture';")
 public="const Public=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,media,msg,labels}=UI;const{icon}=Icons;const{sectionsMeta,snippet,route,sectionLink,itemLink}=Catalog;const{question,visible}=Questions;const{exhibitionExperience}=Exhibition;const bundle=async slug=>structuredClone(window._routes['/api/public/site/'+slug]);const enqueue=async()=>{throw Error('Read-only component harness forbids writes')};const prepare=enqueue,backup=enqueue,sync=async()=>{},activate=()=>{},status=async()=>({pending:0,rejected:0,items:[]});"+public+";return {publicPage,welcome};})();window.PXPublic=Public;"
-admin="const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg}=UI;const{icon}=Icons;const backup=async()=>{throw Error('Read-only')};"+code('admin.mjs')+";return{adminPage};})();window.PXAdmin=Admin;"
+admin="const Admin=(()=>{const{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg,isoToLocalInput,localInputToISO}=UI;const{icon}=Icons;const backup=async()=>{throw Error('Read-only')};"+code('admin.mjs')+";return{adminPage};})();window.PXAdmin=Admin;"
 checks=[];errors=[]
 with sync_playwright() as p:
     browser=p.chromium.launch(args=['--no-sandbox'])
@@ -74,6 +95,19 @@ with sync_playwright() as p:
     page.get_by_role('button',name='إدخال الأسئلة',exact=True).click();page.get_by_role('button',name='+ سؤال واحد',exact=True).first.click();page.locator('dialog').get_by_label('نوع الإجابة',exact=True).select_option('matrix');page.locator('dialog').get_by_label('بنود المصفوفة',exact=False).fill('الوضوح\nالسرعة');page.screenshot(path=str(ROOT/'qa/manual-question-editor.png'),full_page=True);checks.append('manual_question_editor_component');page.locator('dialog').get_by_role('button',name='×',exact=True).click()
     page.get_by_role('button',name='Excel / CSV',exact=True).click();page.get_by_role('button',name='فحص ومعاينة الاستيراد',exact=True).wait_for();page.screenshot(path=str(ROOT/'qa/import-component.png'),full_page=True);checks.append('import_controls_component')
     page.get_by_role('button',name='النتائج والتقارير',exact=True).click();page.get_by_text('أشخاص فريدون موثّقون',exact=True).wait_for();checks.append('metric_definitions_component')
+    # Exercise the event branch too: its permissions come from an authenticated
+    # backend read, while the browser fetch adapter continues forbidding writes.
+    client.cookies.clear()
+    organizer=app.state.seed_credentials[1]
+    response=client.post('/api/auth/login',json={'email':organizer['email'],'password':organizer['password']})
+    assert response.status_code==200,response.text
+    routes=replace_media(capture_admin_reads(response.json()))
+    assert '/api/admin/events/event-demo/permissions' in routes
+    setup(admin);page.evaluate('PXAdmin.adminPage()')
+    page.get_by_role('heading',name='نظرة عامة',exact=True,level=1).wait_for()
+    page.get_by_role('button',name='الدعوات وتأكيد الحضور',exact=True).wait_for()
+    page.get_by_role('button',name='اللجان والصلاحيات',exact=True).wait_for()
+    checks.append('organizer_event_permissions_captured_read_component')
     browser.close()
 assert not errors,errors
 report={'scope':'read-only browser DOM components; in-memory fixtures','network_used':False,'not_e2e':True,'not_offline_storage_test':True,'passed':len(checks),'checks':checks,'page_errors':errors}

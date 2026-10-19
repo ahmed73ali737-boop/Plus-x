@@ -113,6 +113,8 @@ jobs:
         run: python tests/browser_exhibition_sites.py
       - name: Run Windows guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run invitation RSVP and admission browser acceptance
+        run: python tests/invitations_native_acceptance.py
       - name: Run Windows full question control roundtrip
         run: python tests/browser_question_roundtrip.py
       - name: Audit all rendered admin controls across roles
@@ -126,6 +128,7 @@ jobs:
           name: windows-browser-qa
           path: |
             qa/browser-components.json
+            qa/invitations/
             qa/browser-smoke.json
             qa/browser-platform-diagnostic.json
             qa/exhibition-brands.json
@@ -168,6 +171,8 @@ jobs:
         run: python tests/browser_exhibition_sites.py
       - name: Run guest QR and offline browser flow
         run: python tests/browser_guest_flow.py
+      - name: Run invitation RSVP and admission browser acceptance
+        run: python tests/invitations_native_acceptance.py
       - name: Run full question control roundtrip
         run: python tests/browser_question_roundtrip.py
       - name: Audit all rendered admin controls across roles
@@ -185,6 +190,7 @@ jobs:
           name: browser-qa
           path: |
             qa/browser-components.json
+            qa/invitations/
             qa/browser-smoke.json
             qa/browser-platform-diagnostic.json
             qa/windows11-browser-offline-indexeddb.json
@@ -226,6 +232,8 @@ jobs:
           pip install -r requirements.txt -r requirements-postgres.txt -r requirements-qa.txt
       - name: Run PostgreSQL native acceptance
         run: python tests/postgres_native_acceptance.py
+      - name: Run PostgreSQL invitations and admission concurrency acceptance
+        run: python tests/postgres_invitations_acceptance.py
       - name: Run PostgreSQL application-path capacity smoke
         run: python tests/postgres_capacity_smoke.py
       - name: Upload PostgreSQL QA artifact
@@ -235,6 +243,7 @@ jobs:
           name: postgres-qa
           path: |
             qa/postgres-native-acceptance.json
+            qa/postgres-invitations-acceptance.json
             qa/postgres-capacity-smoke.json
           if-no-files-found: ignore
 

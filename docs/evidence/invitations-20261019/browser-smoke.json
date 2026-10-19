@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "passed": 10,
+  "checks": [
+    "platform_real_http_render",
+    "agency_real_http_render_no_overflow",
+    "public_survey_ui_to_database",
+    "mobile_layout_no_overflow",
+    "agency_login_and_dashboard",
+    "time_question_saved_from_admin_ui",
+    "time_question_renders_semantic_time_input_after_publish",
+    "xlsx_preview_commit_ui",
+    "draft_preview_ui",
+    "analytics_output_ui"
+  ],
+  "page_errors": [],
+  "console_messages": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "failed_requests": [],
+  "backend": "SQLite",
+  "real_local_http": true,
+  "native_browser_network_tested": true,
+  "semantic_time_input_verified": true,
+  "not_native_postgresql": true
+}
