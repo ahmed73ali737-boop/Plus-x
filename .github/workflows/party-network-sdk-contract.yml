@@ -1,0 +1,30 @@
+name: party-network-sdk-contract
+
+on:
+  pull_request:
+    paths:
+      - "sdk/python/pulsex_sdk/party_network.py"
+      - "tests/test_party_network*.py"
+      - ".github/workflows/party-network-sdk-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  party-proof-sdk:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile Party link SDK and tests
+        run: python -m compileall -q sdk/python/pulsex_sdk/party_network.py tests/test_party_network_sdk.py tests/test_party_network_r15.py
+      - name: Run deterministic guest-consent/Party-link tests
+        run: python -m unittest discover -s tests -p 'test_party_network*.py' -v

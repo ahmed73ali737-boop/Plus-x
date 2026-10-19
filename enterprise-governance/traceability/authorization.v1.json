@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "integration_id": "PX-AUTHZ-001",
+  "status": "DESIGN_ONLY",
+  "actors": [
+    "organizer",
+    "organization administrator",
+    "event supervisor",
+    "kiosk operator",
+    "public guest"
+  ],
+  "terminals": [
+    "mobile/QR",
+    "web",
+    "kiosk/tablet",
+    "scanning terminal",
+    "offline client"
+  ],
+  "screens": [
+    "event settings",
+    "experience editor",
+    "visitor QR participation",
+    "public vote",
+    "scan/entry"
+  ],
+  "inputs": [
+    "scoped organizer principal",
+    "event id",
+    "tenant/organization resource",
+    "guest event ticket token without phone in URL"
+  ],
+  "validations": [
+    "protected organizer paths require current IAM AND event owner policy",
+    "public guest voting uses separate Event Policy and anti-duplication",
+    "offline queued is not online authorisation",
+    "QR/signature expiry and replay protection"
+  ],
+  "outputs": [
+    "event permission decision",
+    "guest vote accepted only by event domain",
+    "no credentials or KYC created from guest QR"
+  ],
+  "permissions": [
+    "field/screen/action for protected editor",
+    "public-only guest exceptions cannot elevate organizer role"
+  ],
+  "workflows": [
+    "content moderation/publish independent supervisor approval"
+  ],
+  "apis": [
+    "event admin and QR interfaces maintain PulseX boundaries"
+  ],
+  "events": [
+    "visitor engagement outcome after confirmed write"
+  ],
+  "data": [
+    "PulseX event/experience/participation canonical",
+    "Party/KYC/identity outside PulseX"
+  ],
+  "notifications": [
+    "real outcome with delivery state"
+  ],
+  "reports": [
+    "event/visitor analytics with masked personally identifying data"
+  ],
+  "limits": [
+    "one vote/participation policy with idempotency"
+  ],
+  "currencies": [
+    "N/A: guest event authorization is not a monetary flow"
+  ],
+  "fees": [
+    "N/A: event access policy does not own commercial fees"
+  ],
+  "channels": [
+    "mobile/web/QR/kiosk and offline expiry"
+  ],
+  "audit": [
+    "organizer + event + action decision; no raw phone"
+  ],
+  "tests": [
+    "scenario definitions in enterprise-governance/scenarios/authorization.v1.json; not executed"
+  ],
+  "evidence": [
+    "source-only candidate and browser/device/SIT gates remain open"
+  ]
+}

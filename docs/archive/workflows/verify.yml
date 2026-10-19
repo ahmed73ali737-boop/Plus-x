@@ -1,0 +1,142 @@
+name: PulseX Windows 11 verification
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - 'web/**'
+      - 'sdk/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'ops/**'
+      - 'requirements*.txt'
+      - 'run.py'
+      - 'compose.yaml'
+      - '.github/workflows/verify.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'web/**'
+      - 'sdk/**'
+      - 'tests/**'
+      - 'tools/**'
+      - 'ops/**'
+      - 'requirements*.txt'
+      - 'run.py'
+      - 'compose.yaml'
+      - '.github/workflows/verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pulsex-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install runtime and QA dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-qa.txt
+          python -m playwright install --with-deps chromium
+      - name: Run portable hardening suite
+        run: sh Test-Hardening-Linux.sh
+      - name: Run x5/x10 bounded load profiles
+        run: sh Test-Scale-Linux.sh
+      - name: Exercise IndexedDB component on Chromium
+        run: |
+          python tests/browser_offline_indexeddb.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('qa/windows11-browser-offline-indexeddb.json')
+          d=json.loads(p.read_text())
+          if d.get('status') != 'passed':
+              raise SystemExit(f"IndexedDB browser evidence not passed: {d}")
+          print(d)
+          PY
+      - name: Verify production gate fails closed without acceptance evidence
+        env:
+          DATABASE_URL: postgresql+psycopg://pulsex:not-a-production-password@localhost/pulsex
+          PUBLIC_ORIGIN: https://example.invalid
+          SEED_DEMO: 'false'
+          WEB_WORKERS: '4'
+          PX_NATIVE_POSTGRES_ACCEPTED: 'false'
+          PX_LOAD_ACCEPTED: 'false'
+          PX_SECURITY_ACCEPTED: 'false'
+          PX_FIELD_OFFLINE_ACCEPTED: 'false'
+        run: |
+          set +e
+          python tools/production_gate.py
+          code=$?
+          set -e
+          test "$code" -eq 2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pulsex-portable-evidence
+          path: qa/
+          if-no-files-found: error
+
+  postgres-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pulsex_test
+          POSTGRES_USER: pulsex
+          POSTGRES_PASSWORD: pulsex_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pulsex -d pulsex_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      PX_POSTGRES_TEST_URL: postgresql+psycopg://pulsex:pulsex_ci_only@localhost:5432/pulsex_test
+      PX_ALLOW_POSTGRES_TEST_RESET: 'YES'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install PostgreSQL acceptance dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-postgres.txt -r requirements-qa.txt
+      - name: Execute destructive acceptance against dedicated CI database
+        run: python tests/postgres_native_acceptance.py
+      - name: Assert evidence is PostgreSQL and does not claim RLS
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('qa/postgres-native-acceptance.json').read_text())
+          assert d['status']=='passed', d
+          assert d['database']=='PostgreSQL', d
+          assert 'RLS policies are not claimed' in d['warning'], d
+          print(d)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pulsex-postgres-evidence
+          path: qa/postgres-native-acceptance.json
+          if-no-files-found: error

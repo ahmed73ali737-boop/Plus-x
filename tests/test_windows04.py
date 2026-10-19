@@ -48,6 +48,13 @@ def test_membership_grants_same_user_access_in_second_event(env):
     sites=c2.get('/api/admin/sites').json()['sites']
     assert {'agency-01',second_agency}.issubset({x['id'] for x in sites})
 
+def test_seed_demo_participation_access_is_clock_stable(env,monkeypatch):
+    import app.application.access as access_policy
+    app,c=env
+    monkeypatch.setattr(access_policy,'now',lambda:'2099-01-01T00:00:00+00:00')
+    login(c,app,2)
+    assert c.get('/api/admin/sites/agency-01').status_code==200
+
 def test_platform_access_request_is_public_signup_request(env):
     _,c=env
     r=c.post('/api/access-request',json={'site_id':'platform','name':'مؤسسة ترغب بالاشتراك','email':'join@example.test'})

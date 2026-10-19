@@ -43,10 +43,11 @@ def main():
             assert len(j('/api/public/site/demo')['agencies'])==10;mark('organizer_and_ten_agencies')
             accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'))
             assert len(accounts)==12;mark('unique_first_run_accounts')
-            credentials=accounts[2];auth=j('/api/auth/login',{'email':credentials['email'],'password':credentials['password']});csrf=auth['csrf'];mark('http_cookie_login')
+            credentials=accounts[1];auth=j('/api/auth/login',{'email':credentials['email'],'password':credentials['password']});csrf=auth['csrf'];mark('organizer_http_cookie_login')
             dev=j('/api/admin/sites/agency-01/devices',{'name':'Native Tablet','device_type':'tablet','app_version':'0.9.0'});mark('device_registered')
             heartbeat=j('/api/device/heartbeat',{'pending_count':3,'app_version':'0.9.0','synced':True},extra={'X-PulseX-Device-Token':dev['device_token']});assert heartbeat['pending_count']==3;mark('device_heartbeat')
-            j('/api/admin/sites/agency-02',code=403);mark('tenant_scope_denial')
+            j('/api/admin/sites/agency-02');mark('organizer_event_scope_allows_participant')
+            j('/api/admin/sites/platform',code=403);mark('organizer_platform_scope_denial')
             d=j('/api/admin/sites/agency-01')
             j('/api/admin/sites/agency-01',{'draft_rev':d['draft_rev'],'config':d['draft']},'PUT',403,{'X-CSRF':''});mark('csrf_write_denial')
             d['draft']['records'].append({'kind':'question','code':'native-q','qtype':'short_text','title':'سؤال اختبار محلي','form_id':'native'})
@@ -74,6 +75,18 @@ def main():
                 assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
                 assert con.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0]==1
             mark('restart_persists_database')
+            proc.terminate();proc.wait(timeout=8)
+            if os.name == 'nt':
+                db_path=temp/'db.sqlite';probe=temp/'db-release-probe.sqlite';released=False
+                for _ in range(40):
+                    try:
+                        if db_path.exists():
+                            os.replace(db_path,probe);os.replace(probe,db_path)
+                        released=True;break
+                    except PermissionError:
+                        time.sleep(.1)
+                assert released,'SQLite handle was not released after server shutdown'
+                mark('sqlite_handle_released')
             report={'status':'passed','passed':len(checks),'checks':checks,'host_os':platform.platform(),'native_windows':os.name=='nt','python':platform.python_version(),'database':'SQLite','browser_ui_tested':False,'physical_kiosks_tested':False,'postgresql_tested':False}
         except Exception as exc:
             report={'status':'failed','passed_before_failure':len(checks),'checks':checks,'error':str(exc),'host_os':platform.platform(),'native_windows':os.name=='nt'}

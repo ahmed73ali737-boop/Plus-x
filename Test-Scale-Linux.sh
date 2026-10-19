@@ -1,5 +1,9 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
-cd "$(dirname "$0")"
-python tests/load_profiles.py --profile x5
-python tests/load_profiles.py --profile x10
+CDPATH= cd -P "$(dirname "$0")"
+ROOT=$(pwd)
+PY="$ROOT/.venv/bin/python"
+[ -x "$PY" ] || { echo "Run: python3 -m tools.prepare_runtime --profile qa" >&2; exit 2; }
+for profile in pilot x5 x10 stretch; do
+    "$PY" tests/load_profiles.py --profile "$profile"
+done

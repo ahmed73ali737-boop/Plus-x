@@ -1,0 +1,30 @@
+name: Database read-only catalog safety
+
+on:
+  pull_request:
+    paths:
+      - 'ops/postgresql/**'
+      - 'tests/database_architecture/**'
+      - '.github/workflows/database-readonly.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/postgresql/**'
+      - 'tests/database_architecture/**'
+      - '.github/workflows/database-readonly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject destructive SQL and require bounded read-only diagnostics
+        run: python -m unittest discover -s tests/database_architecture -p 'test_*.py' -v

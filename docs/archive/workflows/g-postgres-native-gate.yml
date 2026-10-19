@@ -1,0 +1,76 @@
+name: PulseX - PostgreSQL Native Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/**"
+      - "tests/postgres_native_acceptance.py"
+      - "requirements.txt"
+      - "requirements-postgres.txt"
+      - ".github/workflows/g-postgres-native-gate.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "app/**"
+      - "tests/postgres_native_acceptance.py"
+      - "requirements.txt"
+      - "requirements-postgres.txt"
+      - ".github/workflows/g-postgres-native-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pulsex-postgres-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PX_POSTGRES_TEST_URL: "postgresql+psycopg://pulsex:pulsex-ci@127.0.0.1:5432/pulsex_test"
+  PX_ALLOW_POSTGRES_TEST_RESET: "YES"
+
+jobs:
+  postgres-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: pulsex
+          POSTGRES_PASSWORD: pulsex-ci
+          POSTGRES_DB: pulsex_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pulsex -d pulsex_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install PostgreSQL acceptance dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-postgres.txt
+          python -m pip check
+
+      - name: Run destructive dedicated-database PostgreSQL acceptance
+        run: python tests/postgres_native_acceptance.py
+
+      - name: Evidence boundary
+        if: always()
+        run: |
+          echo "This gate proves the existing PulseX application flow against a dedicated PostgreSQL 18.6 CI database only."
+          echo "The acceptance script does not claim PostgreSQL RLS, offline/browser soak, load/DAST/pentest, field UAT, deployment, or production readiness."

@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "passed": 31,
+  "passed": 32,
   "checks": [
     "application_health",
     "route_/",
@@ -13,10 +13,11 @@
     "route_/sw.js",
     "organizer_and_ten_agencies",
     "unique_first_run_accounts",
-    "http_cookie_login",
+    "organizer_http_cookie_login",
     "device_registered",
     "device_heartbeat",
-    "tenant_scope_denial",
+    "organizer_event_scope_allows_participant",
+    "organizer_platform_scope_denial",
     "csrf_write_denial",
     "manual_question_persisted",
     "draft_not_leaked",
@@ -34,9 +35,9 @@
     "csv_export_utf8_bom",
     "restart_persists_database"
   ],
-  "host_os": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "host_os": "Linux-6.18.55-x86_64-with-glibc2.39",
   "native_windows": false,
-  "python": "3.13.5",
+  "python": "3.12.14",
   "database": "SQLite",
   "browser_ui_tested": false,
   "physical_kiosks_tested": false,

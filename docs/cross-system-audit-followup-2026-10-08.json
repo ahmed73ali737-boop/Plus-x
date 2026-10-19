@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-08",
+  "scope": "Static inspection only; no native runtime or full cross-system scenario execution",
+  "systems": [
+    {
+      "repository": "ahmed73ali737-boop/Plus-x",
+      "commit": "e66369ac83e1ee17d52664147e0e874329207501",
+      "status": "partial_candidate_fixes"
+    },
+    {
+      "repository": "ahmed73ali737-boop/Banks-Core-Banking",
+      "commit": "0d330226fe6692c58cc0ec8d771581f9d6c43671",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/G-Factory",
+      "commit": "6ead10864b60e3ca1f614ad01ab50e374dd5fb9b",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/WorkAds-FQA-R1",
+      "commit": "5397210a8ec1b52fe19f03d09b182ac72021229e",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/Ads-Platform",
+      "commit": "cc907f656fd08c217d3eba1ff60a350747cb1f94",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/Factory-Runtime",
+      "commit": "fd0ed8de235daaff1aa5256883320358bceb68bf",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/factory-os",
+      "commit": "f7629ddb2026dd9ca98275d223c7b56e7aba929f",
+      "status": "not_runtime_verified"
+    },
+    {
+      "repository": "ahmed73ali737-boop/UCAD-Distribution-Collection",
+      "commit": "cf7dbe824d6eb715233db4d22eac4b00fae47d41",
+      "status": "static_followup_findings"
+    }
+  ],
+  "findings": [
+    {
+      "system": "UCAD-Distribution-Collection",
+      "path": "src/Hosts/UCAD.Api/wwwroot/sw.js",
+      "id": "X-SW-01",
+      "status": "confirmed_source_pattern_not_runtime_defect",
+      "detail": "Activation deletes all cache names except ucad-shell-r1; cache cleanup must be scoped to caches owned by UCAD. Fixed shell namespace requires real prior-version upgrade test. Network-first behavior differs from PulseX cache-first; do not equate stale-shell reproduction.",
+      "required_test": "Populate unrelated caches and pending IndexedDB data; activate new worker; assert preservation; upgrade actual previous bundle; test online/offline/reconnect without duplicates."
+    },
+    {
+      "system": "UCAD-Distribution-Collection",
+      "path": "scripts/release-360-gate.py",
+      "id": "X-EVIDENCE-01",
+      "status": "confirmed_scope_limit",
+      "detail": "This gate counts registries and validates keys. It does not execute business journeys; PASS cannot alone prove operational acceptance. Other gates have not been fully reviewed."
+    },
+    {
+      "system": "WorkAds-FQA-R1 / Ads-Platform",
+      "path": "src/WorkAds.Api/Program.cs",
+      "status": "partial_static_protection",
+      "detail": "Both inspected entry points reject non-Development environment before PostgreSQL setup. No bypass or runtime safety conclusion was tested."
+    },
+    {
+      "system": "Banks-Core-Banking",
+      "path": "src/Host/DCB.Api/Program.cs",
+      "status": "followup_required",
+      "detail": "Entry point invokes DevelopmentRuntimeGuard.EnsureAllowed; guard implementation and effective settings require execution before declaring production protection."
+    }
+  ],
+  "unavailable_audited_source": {
+    "commit": "7633742f431eff17533f38405c60320bd36cd398",
+    "github_result": "422 No commit found",
+    "note": "Uploaded report is available; Update1 source and full regression fixtures are not. The main-branch source is a different baseline."
+  }
+}

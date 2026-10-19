@@ -7,7 +7,9 @@ try:
     source=(ROOT/'web/offline.mjs').read_text(encoding='utf-8')
     source=re.sub(r"^import .*?;\s*$",'',source,flags=re.M).replace('export ','')
     with sync_playwright() as p:
-        browser=p.chromium.launch(executable_path='/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None,args=['--no-sandbox'])
+        browser=p.chromium.launch(args=['--no-sandbox'])
+        report['chromium_version']=browser.version
+        report['browser_source']='Playwright-managed Chromium'
         page=browser.new_page()
         page.route('http://pulsex.test/**',lambda route:route.fulfill(status=200,content_type='text/html',body='<html><body>offline-test</body></html>'))
         page.goto('http://pulsex.test/',timeout=10000)

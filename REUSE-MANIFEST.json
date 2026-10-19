@@ -122,5 +122,23 @@
   "rollback": [
     "retain current main source and provenance until Windows12 promotion",
     "extracted shared engines must preserve PulseX compatibility tests"
-  ]
+  ],
+  "party_network_consumer": {
+    "canonical_owner": "U-SEAS PartyCustomer",
+    "source_artifact": "sdk/python/pulsex_sdk/party_network.py",
+    "source_branch": "feature/useas-party-network-consumer-v1",
+    "asset_registration": "G-Factory registry/enterprise-asset-index.v1.json",
+    "state": "SOURCE_CANDIDATE_NOT_RUNTIME_INTEGRATED",
+    "native_verified": false,
+    "production_ready": false,
+    "negative_test_source": "tests/test_party_network_sdk.py",
+    "changes_existing_domain_truth": false,
+    "guarantees": [
+      "PartyId external reference only",
+      "one authorized network/scope at a time",
+      "never merge another issuer's master",
+      "fail closed on missing permission/consent/eligibility",
+      "cross-provider SIT pending"
+    ]
+  }
 }

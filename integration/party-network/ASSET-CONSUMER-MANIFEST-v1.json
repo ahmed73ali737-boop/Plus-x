@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0",
+  "integration": "U-SEAS PartyCustomer / Dynamic Network / G.Metadata",
+  "created_date": "2026-10-09",
+  "canonical_party_owner": "U-SEAS PartyCustomer",
+  "canonical_iam_owner": "G Identity / Enterprise IAM",
+  "canonical_metadata_owner": "G.Metadata via G-Factory",
+  "financial_owner": "DCB Financial Platform",
+  "asset_catalog": "ahmed73ali737-boop/G-Factory/registry/enterprise-asset-index.v1.json@feature/party-network-scoped-metadata-v1",
+  "authority_policy": {
+    "parties": "Party identity is a single U-SEAS-owned master; consumers store opaque references and legally necessary immutable snapshots only.",
+    "network": "NetworkMembership and CustomerRelationship are many-to-many, effective-dated and issued per-network/scope; no transitive CRM visibility.",
+    "authorization": "Server-verified IAM grants + selected network/scope + entitlement + domain policy + lawful consent; client fields and role labels cannot authenticate.",
+    "metadata": "Versioned G.Metadata schemas and scoped overlays, platform minimums enforced; no custom field may override canonical identity/KYC/accounting.",
+    "finances": "DCB issuer-owned FinancialAccount/GL/Journal/Posting; cross-network access uses narrow revocable mandate and provider approval.",
+    "evidence": "This adoption manifest does not prove a running integration; all native/SIT/auth-negative/UAT gates remain open."
+  },
+  "context_contract": {
+    "identity": "party_id (stable)",
+    "customer": "customer_relationship_id (per issuer/network/scope)",
+    "membership": "membership_id; network_id; effective_from/to; status; policy_version",
+    "operator": "principal_id and server-verified active tenant/network/scope workspace",
+    "scope": "tenant_id/network_id/scope_id plus authenticated parent/descendant path",
+    "attributes": "schema_key + schema_version + scoped value, no unrestricted raw PII",
+    "authorization": "IAM permission + scoped resource + data-sharing purpose + version + deny-by-default"
+  },
+  "api_providers": {
+    "party": "PartyCustomer (U-SEAS)",
+    "metadata": "G.Metadata",
+    "iam": "Enterprise IAM",
+    "finance": "DCB"
+  },
+  "native_evidence": false,
+  "production_ready": false,
+  "mandatory_negative_tests": [
+    "network_a_cannot_read_network_b_customers",
+    "role_in_network_a_does_not_grant_network_b_access",
+    "expired_membership_revokes_cached_workspace_authorization",
+    "scope_a_branch_cannot_access_sibling_scope_records",
+    "custom_attributes_cannot_weaken_platform_mandatory_constraints",
+    "unauthorized_customer_create_or_export_is_denied",
+    "consent_revocation_blocks_sensitive_profile_projection",
+    "external_party_service_timeout_defaults_to_safe_decision",
+    "financial_account_visibility_requires_issuer_grant_and_mandate",
+    "tenant_RLS_no_context_or_wrong_context_denied"
+  ],
+  "mandatory_gates": {
+    "build": "OPEN",
+    "native_dotnet": "OPEN",
+    "postgres_rls": "OPEN",
+    "IAM_openfga": "OPEN",
+    "consumer_SIT": "OPEN",
+    "E2E": "OPEN",
+    "security": "OPEN",
+    "UAT": "OPEN"
+  },
+  "consumer": "Plus-x",
+  "consumer_canonical_owner": "PulseX / G Engagement",
+  "observed_source_state": "PulseX event participant/visitor may be a guest; authenticated brand/organizer/advertiser can link to U-SEAS PartyId.",
+  "integration_type": "EXTERNAL_PARTY_PROVIDER_PORT_PLANNED",
+  "evidence_state": "ADOPTION_CONTRACT_ONLY",
+  "assets_consumed": [
+    "PTY-MASTER",
+    "PTY-ORG",
+    "PTY-REL",
+    "ENG-METADATA",
+    "ENG-TAXONOMY",
+    "PLT-CONSENT",
+    "PLT-AUDIT",
+    "ID-IAM"
+  ],
+  "party_subfeature_assets": [
+    "PM-01",
+    "PM-02",
+    "PM-03",
+    "PM-04",
+    "PM-05",
+    "PM-06",
+    "PM-07",
+    "PM-08",
+    "PM-09",
+    "PM-10",
+    "PM-11",
+    "PM-12",
+    "PM-13",
+    "PM-14",
+    "PM-15",
+    "PM-16",
+    "PM-17",
+    "PM-18",
+    "PM-19",
+    "PM-20",
+    "PM-21",
+    "PM-22",
+    "PM-23",
+    "PM-24",
+    "PM-25",
+    "PM-26",
+    "PM-27",
+    "PM-28",
+    "PM-29",
+    "PM-30"
+  ],
+  "local_truth_kept": [
+    "experiences",
+    "questions/votes/ratings",
+    "event exposure and engagement telemetry"
+  ],
+  "scenarios": [
+    "QR guest remains unlinked Target until approved identity resolution",
+    "brand organizer can participate in multiple Networks",
+    "offline event data does not bypass revocation/privacy on sync",
+    "dynamic event categories and audience dimensions stay brand scoped"
+  ],
+  "implementation": {
+    "branch": "feature/party-network-asset-consumer-v1",
+    "source_changes_claimed": false,
+    "api_runtime_bound": false,
+    "iam_security_bound": false,
+    "native_tested": false
+  }
+}

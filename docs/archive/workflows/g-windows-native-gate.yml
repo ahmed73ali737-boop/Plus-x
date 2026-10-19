@@ -1,0 +1,82 @@
+name: PulseX - G Windows Native Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "tools/**"
+      - "web/**"
+      - "templates/**"
+      - "sdk/**"
+      - "requirements.txt"
+      - "requirements-qa.txt"
+      - "run.py"
+      - ".github/workflows/g-windows-native-gate.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "tools/**"
+      - "web/**"
+      - "templates/**"
+      - "sdk/**"
+      - "requirements.txt"
+      - "requirements-qa.txt"
+      - "run.py"
+      - ".github/workflows/g-windows-native-gate.yml"
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: '1'
+
+concurrency:
+  group: pulsex-windows-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install application and QA dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (!(Test-Path requirements.txt)) {
+            throw 'requirements.txt is required by this gate'
+          }
+          if (!(Test-Path requirements-qa.txt)) {
+            throw 'requirements-qa.txt is required by this gate'
+          }
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-qa.txt
+          python -m pip check
+
+      - name: Run isolated Windows native acceptance
+        shell: pwsh
+        run: python tests/native_acceptance.py
+
+      - name: Run full Python pytest suite
+        shell: pwsh
+        run: python -m pytest -q
+
+      - name: Evidence boundary
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output 'This workflow proves Windows-hosted application/QA dependencies, isolated native acceptance, and the repository Python pytest suite only.'
+          Write-Output 'PostgreSQL/RLS, real IndexedDB/Service Worker, two-device recovery, 5-day offline soak, remote load/DAST/pentest and field/business UAT remain separate gates.'
