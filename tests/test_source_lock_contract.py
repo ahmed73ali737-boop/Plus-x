@@ -1,5 +1,6 @@
 """Source locks remain separate byte contracts across EOL policies and drift."""
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -9,6 +10,13 @@ from tools.source_lock_diagnostics import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_all_normalized_text_blobs_are_stored_as_lf():
+    """A CRLF blob under text/eol policy becomes dirty immediately on checkout."""
+    entries = subprocess.check_output(["git", "ls-files", "--eol"], cwd=ROOT, text=True).splitlines()
+    invalid = [entry for entry in entries if "attr/text" in entry and entry.startswith(("i/crlf", "i/mixed"))]
+    assert not invalid, "Renormalize tracked text blobs without changing checkout EOL policy: " + repr(invalid)
 
 
 @pytest.fixture
