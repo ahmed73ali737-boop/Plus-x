@@ -36,7 +36,7 @@ jobs:
           set -euo pipefail
           RUN_ID=""
           for attempt in $(seq 1 30); do
-            RUN_ID="$(gh run list --workflow "PulseX CI" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
+            RUN_ID="$(gh run list --workflow "pulsex-ci.yml" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
             if [ -n "$RUN_ID" ]; then
               break
             fi

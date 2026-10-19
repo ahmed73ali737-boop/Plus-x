@@ -13,5 +13,5 @@ def test_browser_smoke_uses_dom_semantic_heading_with_windows_diagnostics():
 
 
 def test_ci_forces_utf8_for_windows_and_linux_python_processes():
-    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github/workflows/pulsex-ci.yml").read_text(encoding="utf-8")
     assert 'PYTHONUTF8: "1"' in workflow

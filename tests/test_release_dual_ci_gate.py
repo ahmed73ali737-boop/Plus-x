@@ -14,9 +14,12 @@ def test_guest_qr_runs_on_same_main_push_as_release():
 
 def test_release_blocks_without_two_exact_sha_push_run_ids():
     source=(ROOT/'.github/workflows/release.yml').read_text()
+    ci=(ROOT/'.github/workflows/pulsex-ci.yml').read_text()
+    assert 'name: PulseX CI' in ci
+    assert re.search(r'(?m)^  push:\n    branches: \[ main \]', ci)
     blocks=re.findall(r'      - name: Require .+?\n.*?(?=      - name: |\Z)',source,re.S)
     assert len(blocks)==2
-    for name in ('PulseX CI','guest-qr-ci'):
+    for name in ('pulsex-ci.yml','guest-qr-ci'):
         matched=[block for block in blocks if f'--workflow "{name}"' in block]
         assert len(matched)==1
         block=matched[0]
