@@ -1,0 +1,15 @@
+(node:13) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public choices and preview download are explicit and same-origin (18.09145ms)
+✔ consent blocks POST; account request remains pending without privileges (8.434254ms)
+✔ participant requires selection from published event options (10.756774ms)
+✔ download failure never invents a working APK link (7.386919ms)
+✔ double submit sends one request (4.442877ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 236.401088
