@@ -1,0 +1,40 @@
+70-child public projection SELECT count: 144
+F
+=================================== FAILURES ===================================
+__________ test_70_children_use_bounded_queries_and_published_content __________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-46/test_70_children_use_bounded_q0')
+
+    def test_70_children_use_bounded_queries_and_published_content(tmp_path):
+        app=create_app('sqlite:///'+str(tmp_path/'seventy.sqlite'),origin='http://testserver',seed_demo=False)
+        with app_client(app) as client:
+            seed_demo_data(app.state.engine,count=70)
+            with app.state.engine.begin() as c:
+                site=dict(c.execute(select(sites).where(sites.c.id=='agency-01')).mappings().one())
+                draft={**site['draft'],'title':'SECRET UNPUBLISHED TITLE'}
+                c.execute(update(sites).where(sites.c.id==site['id']).values(draft=draft))
+            statements=[]
+            def observed(conn,cursor,statement,parameters,context,executemany):
+                if statement.lstrip().upper().startswith('SELECT'):statements.append(statement)
+            event.listen(app.state.engine,'before_cursor_execute',observed)
+            try:response=client.get('/api/public/site/demo')
+            finally:event.remove(app.state.engine,'before_cursor_execute',observed)
+            assert response.status_code==200
+            assert len(response.json()['agencies'])==70
+            assert 'SECRET UNPUBLISHED TITLE' not in response.text
+            print('70-child public projection SELECT count:',len(statements))
+>           assert len(statements)<=12, f'Unbounded child SELECTs: {len(statements)}'
+E           AssertionError: Unbounded child SELECTs: 144
+E           assert 144 <= 12
+E            +  where 144 = len(['SELECT px_sites.id, px_sites.parent_id, px_sites.event_id, px_sites.kind, px_sites.slug, px_sites.draft, px_sites.dr...vent_participations.created_at \nFROM px_event_participations \nWHERE px_event_participations.agency_site_id = ?', ...])
+
+tests/test_public_bundle_query_budget.py:27: AssertionError
+=============================== warnings summary ===============================
+../venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_public_bundle_query_budget.py::test_70_children_use_bounded_queries_and_published_content
+1 failed, 1 warning in 3.88s

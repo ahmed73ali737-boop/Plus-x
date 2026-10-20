@@ -1,0 +1,103 @@
+{
+  "status": "covered_by_exact_installed_package_audit",
+  "scope": "Current Linux/Python environment only; direct runtime lock audit timed out. Not a new vulnerability query or cross-platform audit.",
+  "dependencies": [
+    {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "vulns": []
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "vulns": []
+    },
+    {
+      "name": "anyio",
+      "version": "4.15.1",
+      "vulns": []
+    },
+    {
+      "name": "click",
+      "version": "8.5.0",
+      "vulns": []
+    },
+    {
+      "name": "fastapi",
+      "version": "0.142.2",
+      "vulns": []
+    },
+    {
+      "name": "greenlet",
+      "version": "3.5.6",
+      "vulns": []
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "vulns": []
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "vulns": []
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.45.1",
+      "vulns": []
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "vulns": []
+    },
+    {
+      "name": "pydantic",
+      "version": "2.14.1",
+      "vulns": []
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.50.1",
+      "vulns": []
+    },
+    {
+      "name": "qrcode",
+      "version": "8.2",
+      "vulns": []
+    },
+    {
+      "name": "sqlalchemy",
+      "version": "2.0.50",
+      "vulns": []
+    },
+    {
+      "name": "starlette",
+      "version": "1.7.0",
+      "vulns": []
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "vulns": []
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "vulns": []
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.5",
+      "vulns": []
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.48.0",
+      "vulns": []
+    }
+  ],
+  "missing_or_mismatched": [],
+  "source_audit": "audit-qa.json"
+}

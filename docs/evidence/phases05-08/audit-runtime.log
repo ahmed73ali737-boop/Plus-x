@@ -1,0 +1,73 @@
+WARNING:pip_audit._cli:--no-deps is supported, but users are encouraged to fully hash their pinned dependencies
+WARNING:pip_audit._cli:Consider using a tool like `pip-compile`: https://pip-tools.readthedocs.io/en/latest/#using-hashes
+Traceback (most recent call last):
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connectionpool.py", line 779, in urlopen
+    self._prepare_proxy(conn)
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connectionpool.py", line 1074, in _prepare_proxy
+    conn.connect()
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connection.py", line 844, in connect
+    self._tunnel()
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/http/client.py", line 1019, in _tunnel
+    (version, code, message) = response._read_status()
+                               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/http/client.py", line 304, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py", line 720, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connectionpool.py", line 847, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/util/retry.py", line 510, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connectionpool.py", line 781, in urlopen
+    self._raise_timeout(
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/urllib3/connectionpool.py", line 373, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='pypi.org', port=443): Read timed out. (read timeout=8)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/scratch/4e211908d847/venv/bin/pip-audit", line 8, in <module>
+    sys.exit(audit())
+             ^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/pip_audit/_cli.py", line 554, in audit
+    for spec, vulns in auditor.audit(source):
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/pip_audit/_audit.py", line 68, in audit
+    for dep, vulns in self._service.query_all(specs):
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/pip_audit/_service/interface.py", line 180, in query_all
+    yield self.query(spec)
+          ^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/pip_audit/_service/pypi.py", line 64, in query
+    response: requests.Response = self.session.get(url=url, timeout=self.timeout)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/requests/sessions.py", line 671, in get
+    return self.request("GET", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/cachecontrol/adapter.py", line 76, in send
+    resp = super().send(request, stream, timeout, verify, cert, proxies)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/requests/adapters.py", line 742, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='pypi.org', port=443): Read timed out. (read timeout=8)

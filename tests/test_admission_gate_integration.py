@@ -102,3 +102,33 @@ def test_new_event_local_day_restores_only_that_days_entitlement(admission,monke
     assert scan(scanner,number,'day-two-extra')['error']=='ADMISSION_ALREADY_USED'
     totals=admin.get('/api/admin/events/event-demo/guest-checkins').json()
     assert totals['admitted_people']==6 and totals['total_checkins']==2
+
+
+def test_admin_lost_ack_replay_consumes_exactly_once(admission):
+    app,admin,_,_,number,_=admission
+    body={'guest_number':number,'scan_id':'lost-admin-ack','mode':'entry','quantity':2}
+    first=admin.post('/api/admin/events/event-demo/guest-checkins',json=body)
+    assert first.status_code==200 and first.json()['status']=='accepted'
+    # The client deliberately discards the first committed response.
+    replay=admin.post('/api/admin/events/event-demo/guest-checkins',json=body)
+    assert replay.status_code==200 and replay.json()['status']=='duplicate'
+    with app.state.engine.connect() as c:
+        assert c.execute(select(entitlements.c.consumed)).scalar_one()==2
+        assert c.execute(select(func.count()).select_from(admission_uses)).scalar_one()==1
+        assert c.execute(select(func.count()).select_from(guest_checkins)).scalar_one()==1
+
+
+def test_dashboard_counts_more_than_500_history_rows_and_companions(admission):
+    from sqlalchemy import insert
+    app,admin,_,scanner,number,_=admission
+    assert scan(scanner,number,'group-three',quantity=3)['status']=='accepted'
+    with app.state.engine.begin() as c:
+        template=dict(c.execute(select(guest_checkins)).mappings().one())
+        # Historical exit/entry movements are not additional entitlement uses.
+        for i in range(502):
+            c.execute(insert(guest_checkins).values(**{**template,'id':f'history-{i}','direction':'exit' if i%2==0 else 'entry'}))
+    summary=admin.get('/api/admin/events/event-demo/guest-checkins').json()
+    assert len(summary['checkins'])==500
+    assert summary['total_checkins']==503
+    assert summary['admitted_people']==3
+    assert summary['inside_count']==1

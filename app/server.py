@@ -32,6 +32,7 @@ from .application.publishing import publish_site_version as publish, get_site_ve
 from .infrastructure.seed import seed_demo_data as seed
 from .api.middleware import install_security_middleware
 from .api.routers.health import create_health_router
+from .api.routers.downloads import create_download_router
 from .application.auth_service import identify_request
 from .application.collection_service import validate_submission, build_metrics
 from .application.device_service import create_device, list_devices, update_device, heartbeat as device_heartbeat
@@ -89,6 +90,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     install_security_middleware(app, public_origin)
 
     app.include_router(create_health_router(engine))
+    app.include_router(create_download_router(ROOT))
 
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)

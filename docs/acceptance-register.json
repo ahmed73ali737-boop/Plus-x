@@ -1,0 +1,1103 @@
+{
+  "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+  "status": "blocked",
+  "status_definition": "verified=local declared scope only; accepted requires external/human gates",
+  "issues": [
+    {
+      "id": "R01",
+      "title": "الاختبارات المحلية الستة غير المستردة",
+      "status": "blocked",
+      "scope": "See ops/phase01-baseline.json; no inheritance of160/158",
+      "accepted": false
+    },
+    {
+      "id": "R02",
+      "title": "تثبيت المصدر ونهايات الأسطر",
+      "status": "in_progress",
+      "scope": "Phase01 integrated; current target-OS CI not executed",
+      "accepted": false
+    },
+    {
+      "id": "R03",
+      "title": "هوية الأدلة وإعادة البناء",
+      "status": "in_progress",
+      "scope": "Phase01 integrated; current release CI blocked",
+      "accepted": false
+    },
+    {
+      "id": "R04",
+      "title": "تعافي التطبيق والوكيل",
+      "status": "blocked",
+      "scope": "Docker and in-flight SIGTERM not executed",
+      "accepted": false
+    },
+    {
+      "id": "R05",
+      "title": "ملكية SQLite والعملاء",
+      "status": "verified",
+      "scope": "Linux local ownership/cleanup; Windows acceptance pending",
+      "accepted": false
+    },
+    {
+      "id": "R06",
+      "title": "المخرجات والعزل",
+      "status": "verified",
+      "scope": "Local failure logs and dedicated outputs",
+      "accepted": false
+    },
+    {
+      "id": "R07",
+      "title": "انتقاء الأرشيف",
+      "status": "in_progress",
+      "scope": "Missing local audit patch is not reconstructed",
+      "accepted": false
+    },
+    {
+      "id": "R08",
+      "title": "صيانة الاختبارات وتحذير التوافق",
+      "status": "in_progress",
+      "scope": "Pinned dependencies retained; warning not silenced",
+      "accepted": false
+    },
+    {
+      "id": "R09",
+      "title": "ACK والكميةالمعلقة",
+      "status": "verified",
+      "scope": "Local real HTTP+SQLite+JS; native browser/PG pending",
+      "accepted": false
+    },
+    {
+      "id": "R10",
+      "title": "العدادات ودورةالحياة",
+      "status": "verified",
+      "scope": "JS fake clock and503history totals; field pending",
+      "accepted": false
+    },
+    {
+      "id": "R11",
+      "title": "نقل البطاقات والترحيلات",
+      "status": "in_progress",
+      "scope": "Read-only inventory and isolated rehearsal prepared; native restore blocked",
+      "accepted": false
+    },
+    {
+      "id": "R12",
+      "title": "legacy والأوفلاين والأجهزة",
+      "status": "verified",
+      "scope": "Scoped/corrupt manifest rejects; device/shift/checkpoint local tests",
+      "accepted": false
+    },
+    {
+      "id": "R13",
+      "title": "اتساقالتواريخ",
+      "status": "verified",
+      "scope": "Create-once demo; published projection; independent labelled days",
+      "accepted": false
+    },
+    {
+      "id": "R14",
+      "title": "وضوحالرسائلوالعدادات",
+      "status": "verified",
+      "scope": "DOM/local HTTP only;390px/print pending",
+      "accepted": false
+    },
+    {
+      "id": "R15",
+      "title": "القياسوتفسيرالأخطاء",
+      "status": "verified",
+      "scope": "Query budget, categorized errors and row reconciliation; missing sensors explicit",
+      "accepted": false
+    },
+    {
+      "id": "R16",
+      "title": "PostgreSQL/SLO",
+      "status": "blocked",
+      "scope": "No production SLO and no native load environment",
+      "accepted": false
+    },
+    {
+      "id": "R17",
+      "title": "الأمانوالاعتماداتوالاستعادة",
+      "status": "in_progress",
+      "scope": "QA audit passed; runtime audit and native restore blocked",
+      "accepted": false
+    },
+    {
+      "id": "R18",
+      "title": "توثيقالقبول",
+      "status": "verified",
+      "scope": "Source-bound local evidence and fail-closed release contract",
+      "accepted": false
+    },
+    {
+      "id": "R19",
+      "title": "Ubuntuوالعتادوالمزودون",
+      "status": "blocked",
+      "scope": "Physical and external acceptance not performed",
+      "accepted": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "P05-T01",
+      "requirement": "upgrade/retry قبل008",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/postgres_upgrade_rehearsal.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "PostgreSQL unavailable",
+      "accepted": false
+    },
+    {
+      "id": "P05-T02",
+      "requirement": "فشل ترحيل اصطناعي",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/postgres_upgrade_rehearsal.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Transactional DDL and tracker checks prepared; not executed",
+      "accepted": false
+    },
+    {
+      "id": "P05-T03",
+      "requirement": "legacy guard وجرد لا يكتب",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_upgrade_safety.py",
+        "tests/test_invitations.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Linux/SQLite; no automatic conversion tool",
+      "accepted": false
+    },
+    {
+      "id": "P05-T04",
+      "requirement": "manifest قديمة/جهاز آخر/تلف/نطاقفعالية",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_guest_frontend_security.mjs"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Node VM contract; not browser IndexedDB acceptance",
+      "accepted": false
+    },
+    {
+      "id": "P05-T05",
+      "requirement": "آخرحصة ومسح/RSVP/إبطال",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_admission_gate_integration.py",
+        "tests/postgres_invitations_acceptance.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "SQLite verified; PostgreSQL blocked",
+      "accepted": false
+    },
+    {
+      "id": "P05-T06",
+      "requirement": "heartbeat ومناوبة وقائمةبواباتفارغة",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_device_admission_scope.py",
+        "tests/test_guest_frontend_security.mjs"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Python/SQLite and Node contracts",
+      "accepted": false
+    },
+    {
+      "id": "P05-T07",
+      "requirement": "حدوداليوم وoffsets",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_device_admission_scope.py",
+        "tests/test_admission_gate_integration.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Controlled local clock tests; no physical clock attestation",
+      "accepted": false
+    },
+    {
+      "id": "P05-T08",
+      "requirement": "استعادة وعلاقات وledger",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "البطاقة",
+        "بوابة المسح",
+        "إعدادات الأجهزة",
+        "جرد الترقية"
+      ],
+      "actors_permissions": [
+        "organizer:invitations.manage/policy.manage",
+        "scanner:device token/checkpoints/shift",
+        "operator:read-only inventory"
+      ],
+      "apis": [
+        "GET /api/device/events/{event_id}/guest-manifest",
+        "POST /api/device/heartbeat",
+        "POST /api/admin/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_guests",
+        "px_event_guests",
+        "px_guest_checkins",
+        "px_devices",
+        "px_invitations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_schema_migrations"
+      ],
+      "tests": [
+        "tests/test_upgrade_safety.py",
+        "tests/postgres_upgrade_rehearsal.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "SQLite restore verified; PostgreSQL/PITR blocked",
+      "accepted": false
+    },
+    {
+      "id": "P06-T01",
+      "requirement": "العرضالمنشوردونالمسودة",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/test_public_bundle_query_budget.py",
+        "tests/test_invitations.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "HTTP/SQLite; preserved authorization",
+      "accepted": false
+    },
+    {
+      "id": "P06-T02",
+      "requirement": "demo وأيامالدعوة",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/test_upgrade_safety.py",
+        "tests/invitations_ui_contract.mjs"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Create-once dates and explicit independent schedule labels",
+      "accepted": false
+    },
+    {
+      "id": "P06-T03",
+      "requirement": "UTC/offsets/invalid date",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/invitations_ui_contract.mjs"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "28 total DOM cases, not 28 browser journeys",
+      "accepted": false
+    },
+    {
+      "id": "P06-T04",
+      "requirement": "معلقة/مبطلة/managed offline",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/invitations_ui_contract.mjs",
+        "tests/test_guest_frontend_security.mjs"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "DOM and policy contracts only",
+      "accepted": false
+    },
+    {
+      "id": "P06-T05",
+      "requirement": "390px ولوحةمفاتيحوطباعةوQR",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/invitations_native_acceptance.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Chromium download unavailable; physical devices not tested",
+      "accepted": false
+    },
+    {
+      "id": "P06-T06",
+      "requirement": "الأصولوتحديثshell",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "الدعوة العامة",
+        "تسجيل الحضور",
+        "admission-desk",
+        "admission-live",
+        "PWA"
+      ],
+      "actors_permissions": [
+        "public:invitation bearer",
+        "organizer:published event",
+        "scanner:guests.read/guests.checkin"
+      ],
+      "apis": [
+        "GET /api/public/invitations/{token}",
+        "GET /api/public/events/{slug}/registration",
+        "GET /api/admin/events/{event_id}/guest-checkins",
+        "GET /assets/*"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_admission",
+        "px_invitations",
+        "px_guest_checkins"
+      ],
+      "tests": [
+        "tests/test_pwa_install_contract.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "All precache assets HTTP/MIME verified; live Service Worker transition blocked",
+      "accepted": false
+    },
+    {
+      "id": "P07-T01",
+      "requirement": "RSVP ومسح آخرحصة",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/postgres_invitations_acceptance.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Native workload not executed here",
+      "accepted": false
+    },
+    {
+      "id": "P07-T02",
+      "requirement": "قوائموإحصاءاتوحجمممثل",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/exhibition_scale_smoke.py",
+        "tests/test_public_bundle_query_budget.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "70 entities/700 reads/20 workers pass; SLO undefined; native PG pending",
+      "accepted": false
+    },
+    {
+      "id": "P07-T03",
+      "requirement": "مسحوتدويروإبطالوتعديلرد",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/test_admission_gate_integration.py",
+        "tests/postgres_invitations_acceptance.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "SQLite invariants pass; native race acceptance blocked",
+      "accepted": false
+    },
+    {
+      "id": "P07-T04",
+      "requirement": "أخطاءومهلوصفوفودفعات",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/test_performance_measurement.py",
+        "tests/load_profiles.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Bounded error categories, receipt counts and SQL row reconciliation",
+      "accepted": false
+    },
+    {
+      "id": "P07-T05",
+      "requirement": "أمانواعتمادات",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/security_hardening.py",
+        "tests/test_admission_permissions.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "13 hardening checks and QA audit 55 packages; runtime lock audit timed out",
+      "accepted": false
+    },
+    {
+      "id": "P07-T06",
+      "requirement": "ترقيةواستعادة",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/test_upgrade_safety.py",
+        "tests/postgres_upgrade_rehearsal.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Logical SQLite restore verified; PostgreSQL and restore-time evidence blocked",
+      "accepted": false
+    },
+    {
+      "id": "P07-T07",
+      "requirement": "مقارنةاستعلاماتقبلوبعد",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "العرض العام",
+        "الموافقة",
+        "المسح",
+        "العدادات"
+      ],
+      "actors_permissions": [
+        "organizer/invitations.review",
+        "scanner/device token",
+        "QA:isolated test DB"
+      ],
+      "apis": [
+        "GET /api/public/site/{slug}",
+        "POST /api/public/invitations/{token}/rsvp",
+        "POST /api/device/events/{event_id}/guest-checkins"
+      ],
+      "database": [
+        "px_sites",
+        "px_site_versions",
+        "px_event_participations",
+        "px_admission_entitlements",
+        "px_admission_uses",
+        "px_submissions"
+      ],
+      "tests": [
+        "tests/test_public_bundle_query_budget.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Identical 70-child SELECT count144→5; no production latency/SLO claim",
+      "accepted": false
+    },
+    {
+      "id": "P08-T01",
+      "requirement": "هويةوبصماتالأدلة",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "tools/run_candidate_checks.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Single code SHA with source hashes and artifact hashes; external acceptance remains blocked",
+      "accepted": false
+    },
+    {
+      "id": "P08-T02",
+      "requirement": "رفضمنقوصأوقديمأوfixture",
+      "status": "verified",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "tests/test_acceptance_evidence.py",
+        "tests/test_audit_release_admission.py"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Contract validation; not authenticity proof of field evidence",
+      "accepted": false
+    },
+    {
+      "id": "P08-T03",
+      "requirement": "Ubuntu24/PostgreSQL/SIGTERM",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "tests/runtime_recovery_acceptance.py",
+        ".github/workflows/upgrade-rehearsal.yml"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Target runtime unavailable; workflows unexecuted",
+      "accepted": false
+    },
+    {
+      "id": "P08-T04",
+      "requirement": "هواتفوقارئوطابعةوشبكة",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "docs/acceptance-manifest.example.json"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "No field devices or venue access",
+      "accepted": false
+    },
+    {
+      "id": "P08-T05",
+      "requirement": "حزمةقبولوخطةتراجع",
+      "status": "in_progress",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "docs/UPGRADE_PASSES_OFFLINE_RUNBOOK_AR.md"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Runbook and patch prepared; production acceptance not signed",
+      "accepted": false
+    },
+    {
+      "id": "P08-T06",
+      "requirement": "مزودخارجيشرطالنشر",
+      "status": "blocked",
+      "source_sha": "d533e222bf56899c0d1145c89a06a3b321914e44",
+      "screens": [
+        "حزمة الإصدار",
+        "سجل القبول",
+        "محضر الميدان"
+      ],
+      "actors_permissions": [
+        "release maintainer",
+        "field reviewer",
+        "operator"
+      ],
+      "apis": [
+        "لا endpoint جديدة؛ تحقق CLI/workflow والحزمة"
+      ],
+      "database": [
+        "لا تعديل؛ هوية المصدر والأدلة فقط"
+      ],
+      "tests": [
+        "docs/acceptance-manifest.example.json"
+      ],
+      "evidence": "evidence/phases05-08/integrated-2/candidate.json",
+      "verification_scope": "Deployment integrations not selected/verified; not silently marked N/A",
+      "accepted": false
+    }
+  ]
+}

@@ -123,6 +123,10 @@ jobs:
           assert data['audit_admission']['commit'] == __import__('os').environ['GITHUB_SHA'], 'Audit evidence must match the publishing commit'
           assert data['audit_admission'].get('open_defects') == [], 'Open audit defects cannot be admitted'
           assert data['audit_admission'].get('evidence'), 'Audit evidence references are required'
+          from tools.acceptance_gate import validate_manifest
+          manifest = data['audit_admission'].get('acceptance_manifest')
+          assert manifest, 'Hashed, source-bound acceptance manifest required; fixtures are not evidence'
+          validate_manifest(manifest, __import__('os').environ['GITHUB_SHA'], pathlib.Path('.'))
           assert pathlib.Path('EXHIBITION_CI_EVIDENCE_20261006.md').is_file()
           print('final-release-manifest-ok', version)
           PY

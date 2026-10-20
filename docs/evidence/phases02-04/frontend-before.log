@@ -1,0 +1,124 @@
+(node:14) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ P04-T05 authentication and conflict errors preserve pending identity (18.333729ms)
+✔ P04-T02/T03 lost response freezes quantity until same request is retried (12.24573ms)
+✖ P04-T04 double invocation sends one request while in flight (8.771968ms)
+✖ P04-T06 confirmed POST survives failed dashboard refresh (6.38646ms)
+✔ P04-T04 corrupt or unavailable storage fails closed before POST (11.553481ms)
+✖ P04-T07 refresh calls coalesce and keep one timer (2.799278ms)
+✖ P04-T08 detached panel does not write or rearm after in-flight request (3.894788ms)
+✖ P04-T07 stale visible then recovery and explicit disposal (6.483391ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 2
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 212.319051
+
+✖ failing tests:
+
+test at tests/admission_resilience.mjs:29:1
+✖ P04-T05 authentication and conflict errors preserve pending identity (18.333729ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:30:206)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/admission_resilience.mjs:35:1
+✖ P04-T04 double invocation sends one request while in flight (8.771968ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:36:222)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/admission_resilience.mjs:38:1
+✖ P04-T06 confirmed POST survives failed dashboard refresh (6.38646ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'confirmed'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:39:154)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'confirmed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/admission_resilience.mjs:45:1
+✖ P04-T07 refresh calls coalesce and keep one timer (2.799278ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:46:290)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/admission_resilience.mjs:48:1
+✖ P04-T08 detached panel does not write or rearm after in-flight request (3.894788ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /99/. Input:
+  
+  '     تذاكر داخل الفعالية 99 0   مرات دخول الأشخاص بالدعوات 0 0   حركات الدخول والخروج 0 0  تُحدّث الأعداد كل 10 ثوانٍ. التذكرة قد تضم مرافقين؛ مرات الدخول تشمل الزيارات في أيام مختلفة.'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:49:238)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '     تذاكر داخل الفعالية 99 0   مرات دخول الأشخاص بالدعوات 0 0   حركات الدخول والخروج 0 0  تُحدّث الأعداد كل 10 ثوانٍ. التذكرة قد تضم مرافقين؛ مرات الدخول تشمل الزيارات في أيام مختلفة.',
+    expected: /99/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at tests/admission_resilience.mjs:51:1
+✖ P04-T07 stale visible then recovery and explicit disposal (6.483391ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /تعذر/. Input:
+  
+  '     تذاكر داخل الفعالية  0   مرات دخول الأشخاص بالدعوات  0   حركات الدخول والخروج  0  تُحدّث الأعداد كل 10 ثوانٍ. التذكرة قد تضم مرافقين؛ مرات الدخول تشمل الزيارات في أيام مختلفة.'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/admission_resilience.mjs:52:155)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '     تذاكر داخل الفعالية  0   مرات دخول الأشخاص بالدعوات  0   حركات الدخول والخروج  0  تُحدّث الأعداد كل 10 ثوانٍ. التذكرة قد تضم مرافقين؛ مرات الدخول تشمل الزيارات في أيام مختلفة.',
+    expected: /تعذر/,
+    operator: 'match',
+    diff: 'simple'
+  }

@@ -92,3 +92,22 @@ test('private scanner context uses scoped device endpoint and clears cache after
   assert.equal(await offline.get('bundles','gate-context:private'),undefined);
   assert.equal(await offline.get('guest_manifests','event-a'),undefined);
 });
+
+test('P05-T04 cross-event manifest is rejected online and from cache',async()=>{
+  const {api,offline,setFetch}=await runtime();
+  const other={...goodManifest(),event_id:'event-b'};
+  setFetch(async()=>({ok:true,json:async()=>other}));
+  assert.equal((await api.loadManifest('event-a','token-a')).blocked,true);
+  assert.equal(await offline.get('guest_manifests','event-a'),undefined);
+  await offline.put('guest_manifests',{id:'event-a',data:other,token:'token-a'});
+  setFetch(async()=>{throw TypeError('offline');});
+  assert.equal((await api.loadManifest('event-a','token-a')).blocked,true);
+});
+
+test('P05-T04 malformed manifest fails closed instead of trusting cache',async()=>{
+  const {api,offline,setFetch}=await runtime();
+  await offline.put('guest_manifests',{id:'event-a',data:goodManifest(),token:'token-a'});
+  setFetch(async()=>({ok:true,json:async()=>({...goodManifest(),guests:'corrupt'})}));
+  assert.equal((await api.loadManifest('event-a','token-a')).blocked,true);
+  assert.equal(await offline.get('guest_manifests','event-a'),undefined);
+});

@@ -1,0 +1,14 @@
+{
+  "base_source_sha": "1e1960d765a5e7b300051de8f923b80592363217",
+  "planning_baseline": "f53c206c0d113e6db9c11afab7569fbe868b5dd7",
+  "python": "3.12.14",
+  "os": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "docker_available": false,
+  "native_postgres_available": false,
+  "browser_status": "blocked: Playwright Chromium download returned truncated ZIP / HTTP 400 GatewayExceptionResponse; /tmp/chromium is empty",
+  "windows_status": "not executed locally; dedicated CI matrix added, not published",
+  "caddy_config_change": "none: DNS cause unproven; canonical Caddyfile reused in acceptance stack",
+  "code_status": "local commit; unpublished; source files match manifest hashes",
+  "code_commit_sha": "77eaf49faae27ee711419c17a6a8e56b16e5e759",
+  "tests_used_worktree": true
+}

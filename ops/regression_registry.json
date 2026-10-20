@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-07",
+  "updated": "2026-10-20",
   "policy": "Every confirmed defect must remain covered by a regression check. A green result at one layer never closes another layer.",
   "cases": [
     {
@@ -246,6 +246,188 @@
       "status": "manual_open",
       "invariant": "Production backup encryption, retention and restore/PITR evidence with approved RPO/RTO remain open until exercised on the production-equivalent PostgreSQL environment.",
       "checks": []
+    },
+    {
+      "id": "R04-RUNTIME-RECOVERY",
+      "status": "regression_required",
+      "invariant": "Readiness fails closed on database/schema failure; isolated app/IP/DB recovery must finish within 90 seconds without proxy restart or duplicate sentinel consumption. Container acceptance is a separate gate.",
+      "checks": [
+        {
+          "path": "tests/test_runtime_recovery.py",
+          "markers": [
+            "test_live_independent_of_database_and_ready_recovers"
+          ]
+        },
+        {
+          "path": ".github/workflows/runtime-recovery.yml",
+          "markers": [
+            "runtime_recovery_acceptance.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R05-R08-HARNESS-OWNERSHIP",
+      "status": "regression_required",
+      "invariant": "One lifespan owns the batch; workers join before clients/engine and temporary directory cleanup, including injected failures. Archived assertions remain preserved through current contracts.",
+      "checks": [
+        {
+          "path": "tests/test_harness_reliability.py",
+          "markers": [
+            "test_single_lifespan_closes_sqlite_before_directory_removal",
+            "test_output_created_and_traceback_preserved_on_setup_exception"
+          ]
+        },
+        {
+          "path": ".github/workflows/harness-reliability.yml",
+          "markers": [
+            "windows-latest",
+            "attempt in 1 2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R09-ADMISSION-ACK",
+      "status": "regression_required",
+      "invariant": "A lost response retains scan identity/quantity; committed retry has one ledger use. DOM, HTTP, browser and PostgreSQL each require their own evidence.",
+      "checks": [
+        {
+          "path": "tests/test_admission_http_ack.py",
+          "markers": [
+            "test_real_http_lost_ack_after_commit_has_one_ledger_use"
+          ]
+        },
+        {
+          "path": "tests/invitations_native_acceptance.py",
+          "markers": [
+            "desk_503_lost_ack_reload_replay_one_ledger_and_stale_counters"
+          ]
+        },
+        {
+          "path": "tests/test_harness_reliability.py",
+          "markers": [
+            "test_admission_resilience_javascript_contract"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R10-DASHBOARD-LIFECYCLE",
+      "status": "regression_required",
+      "invariant": "Coalesced counter refresh, visible stale state, timer cleanup and detached-panel protection cannot reverse confirmed admission. Totals are not the 500-row history length.",
+      "checks": [
+        {
+          "path": "tests/admission_resilience.mjs",
+          "markers": [
+            "fake clock",
+            "detached panel",
+            "confirmed POST"
+          ]
+        },
+        {
+          "path": "tests/test_admission_gate_integration.py",
+          "markers": [
+            "test_dashboard_counts_more_than_500_history_rows_and_companions"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R11-R12-UPGRADE-OFFLINE",
+      "status": "regression_required",
+      "invariant": "Inventory must not mutate or expose credentials; historical migrations and ledger survive upgrade/retry/restore; managed admission stays server-authoritative.",
+      "checks": [
+        {
+          "path": "tests/test_upgrade_safety.py",
+          "markers": [
+            "test_inventory_is_read_only_redacted_and_detects_forged_links",
+            "test_sqlite_backup_restore_preserves_ledger_and_detects_post_snapshot_write"
+          ]
+        },
+        {
+          "path": "tests/postgres_upgrade_rehearsal.py",
+          "markers": [
+            "failed_migration_rolls_back_ddl",
+            "restored_all_table_fingerprints_match"
+          ]
+        },
+        {
+          "path": "tests/test_guest_frontend_security.mjs",
+          "markers": [
+            "cross-event manifest",
+            "malformed manifest"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R13-R14-EVENT-PRESENTATION",
+      "status": "regression_required",
+      "invariant": "New demo dates are chosen once; published schedule and invitation validity are distinct and correctly labelled. Invalid/naive dates are not displayed as valid instants.",
+      "checks": [
+        {
+          "path": "tests/test_upgrade_safety.py",
+          "markers": [
+            "test_new_demo_chooses_dates_once_and_does_not_republish_existing"
+          ]
+        },
+        {
+          "path": "tests/invitations_ui_contract.mjs",
+          "markers": [
+            "P06-T02",
+            "P06-T03"
+          ]
+        },
+        {
+          "path": "tests/test_pwa_install_contract.py",
+          "markers": [
+            "test_all_precache_assets_resolve_with_correct_module_mime"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R15-MEASUREMENT-QUERY-BUDGET",
+      "status": "regression_required",
+      "invariant": "70-child projections have bounded SQL query counts while preserving published data; empty receipts never pass and row/batch/transport errors are distinct.",
+      "checks": [
+        {
+          "path": "tests/test_public_bundle_query_budget.py",
+          "markers": [
+            "test_70_children_use_bounded_queries_and_published_content"
+          ]
+        },
+        {
+          "path": "tests/test_performance_measurement.py",
+          "markers": [
+            "empty-is-not-success",
+            "test_transport_failures_do_not_expose_exception_text"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "R18-RELEASE-EVIDENCE",
+      "status": "regression_required",
+      "invariant": "Old, absent, mismatched, fixture or unreviewed evidence cannot certify production; SLO and identified field devices are required.",
+      "checks": [
+        {
+          "path": "tests/test_acceptance_evidence.py",
+          "markers": [
+            "fixture-result",
+            "no-slo",
+            "no-hardware",
+            "old-source"
+          ]
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "markers": [
+            "validate_manifest"
+          ]
+        }
+      ]
     }
   ]
 }

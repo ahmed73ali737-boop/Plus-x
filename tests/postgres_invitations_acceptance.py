@@ -126,6 +126,7 @@ def main():
         with engine.connect() as conn:
             mark('same_scan_one_ledger_row', conn.execute(select(func.count()).select_from(guest_checkins).where(guest_checkins.c.id == shared_scan)).scalar_one() == 1)
             mark('same_scan_one_entitlement_consumption', conn.execute(select(entitlements.c.consumed).where(entitlements.c.invitation_id == winner['id'])).scalar_one() == 1)
+            mark('same_scan_one_admission_use', conn.execute(select(func.count()).select_from(admission_uses).where(admission_uses.c.scan_id == shared_scan)).scalar_one() == 1)
         duplicate_entries = parallel([lambda: checkin(ev, pass_number, str(uuid.uuid4())) for _ in range(4)])
         mark('distinct_scans_cannot_reuse_consumed_ticket', all(not r['ok'] and r['error'] == 'ADMISSION_ALREADY_USED' for r in duplicate_entries))
 
