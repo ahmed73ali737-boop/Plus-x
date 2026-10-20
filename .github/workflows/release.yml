@@ -96,6 +96,60 @@ jobs:
           test "$(gh run view "$RUN_ID" --json headSha -q .headSha)" = "$GITHUB_SHA"
           gh run watch "$RUN_ID" --exit-status
 
+      - name: Require harness reliability CI success for this exact commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID=""
+          for attempt in $(seq 1 30); do
+            RUN_ID="$(gh run list --workflow "harness-reliability.yml" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
+            if [ -n "$RUN_ID" ]; then
+              break
+            fi
+            sleep 10
+          done
+          test -n "$RUN_ID" || { echo "No harness-reliability.yml push run found for $GITHUB_SHA"; exit 1; }
+          test "$(gh run view "$RUN_ID" --json headSha -q .headSha)" = "$GITHUB_SHA"
+          gh run watch "$RUN_ID" --exit-status
+
+      - name: Require runtime recovery CI success for this exact commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID=""
+          for attempt in $(seq 1 30); do
+            RUN_ID="$(gh run list --workflow "runtime-recovery.yml" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
+            if [ -n "$RUN_ID" ]; then
+              break
+            fi
+            sleep 10
+          done
+          test -n "$RUN_ID" || { echo "No runtime-recovery.yml push run found for $GITHUB_SHA"; exit 1; }
+          test "$(gh run view "$RUN_ID" --json headSha -q .headSha)" = "$GITHUB_SHA"
+          gh run watch "$RUN_ID" --exit-status
+
+      - name: Require PostgreSQL upgrade rehearsal CI success for this exact commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID=""
+          for attempt in $(seq 1 30); do
+            RUN_ID="$(gh run list --workflow "upgrade-rehearsal.yml" --commit "$GITHUB_SHA" --limit 10 --json databaseId,event -q '[.[] | select(.event=="push")][0].databaseId // ""')"
+            if [ -n "$RUN_ID" ]; then
+              break
+            fi
+            sleep 10
+          done
+          test -n "$RUN_ID" || { echo "No upgrade-rehearsal.yml push run found for $GITHUB_SHA"; exit 1; }
+          test "$(gh run view "$RUN_ID" --json headSha -q .headSha)" = "$GITHUB_SHA"
+          gh run watch "$RUN_ID" --exit-status
+
       - name: Resolve release metadata
         id: meta
         shell: bash

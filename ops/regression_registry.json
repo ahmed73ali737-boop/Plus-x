@@ -282,7 +282,7 @@
           "path": ".github/workflows/harness-reliability.yml",
           "markers": [
             "windows-latest",
-            "attempt in 1 2"
+            "for attempt in (1, 2):"
           ]
         }
       ]
