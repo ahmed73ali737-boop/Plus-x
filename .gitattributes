@@ -18,3 +18,5 @@ requirements/locks/*.in text eol=lf
 *.xml text eol=lf
 *.bat text eol=crlf
 android/gradlew text eol=lf
+# Withdraw the reported APK from distributable source/candidate archives.
+artifacts/android/*.apk export-ignore

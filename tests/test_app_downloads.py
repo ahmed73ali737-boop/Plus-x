@@ -1,4 +1,4 @@
-import hashlib,json
+import hashlib,json,io,subprocess,zipfile
 from pathlib import Path
 import pytest
 from fastapi import FastAPI
@@ -25,15 +25,15 @@ def test_reported_apk_is_withdrawn_for_anonymous_and_direct_requests(tmp_path):
                 assert response.headers['cache-control']=='no-store'
                 assert response.headers['x-content-type-options']=='nosniff'
         assert client.get('/api/admin/sites').status_code==401
-    # An intact signature/hash is not a security-review verdict.
-    assert verify_preview_artifact(ROOT)['apk_sha256']==data['reported_apk_sha256']
 
 
 @pytest.mark.parametrize('failure',['missing','tampered','wrong-size','untrusted-signing'])
 def test_download_fails_closed_instead_of_serving_wrong_binary(tmp_path,failure):
     folder=tmp_path/'artifacts/android';folder.mkdir(parents=True)
     evidence=json.loads((ROOT/'artifacts/android/BUILD_EVIDENCE.json').read_text())
-    if failure!='missing':(folder/APK_NAME).write_bytes((ROOT/'artifacts/android'/APK_NAME).read_bytes())
+    synthetic=b'synthetic forensic integrity fixture'
+    evidence.update(apk_sha256=hashlib.sha256(synthetic).hexdigest(),apk_bytes=len(synthetic))
+    if failure!='missing':(folder/APK_NAME).write_bytes(synthetic)
     if failure=='tampered':(folder/APK_NAME).write_bytes(b'not the tested APK')
     if failure=='wrong-size':evidence['apk_bytes']+=1
     if failure=='untrusted-signing':evidence['signing']='production'
@@ -80,3 +80,10 @@ def test_public_account_requests_have_separate_bounded_rate_limit(tmp_path):
         assert response.status_code==429
         assert response.headers['Retry-After']=='60'
         assert client.get('/api/downloads/android').status_code==200
+
+
+def test_distributable_git_archive_omits_reported_apk():
+    archive=subprocess.check_output(['git','archive','--worktree-attributes','--format=zip','HEAD'],cwd=ROOT)
+    with zipfile.ZipFile(io.BytesIO(archive)) as packed:
+        assert not any(name.startswith('artifacts/android/') and name.endswith('.apk') for name in packed.namelist())
+        assert 'artifacts/android/BUILD_EVIDENCE.json' in packed.namelist()
