@@ -142,9 +142,14 @@ def test_validation_expiry_and_integrity_fail_closed(system):
     assert client.get('/api/public/certificates/access/'+token+'/image.svg').status_code==410
 
 
-def test_server_exports_and_private_image_snapshot(system):
+@pytest.mark.parametrize('mode', ['auto', 'portable'])
+def test_server_exports_and_private_image_snapshot(system, monkeypatch, mode):
     import base64, io
     from PIL import Image
+    from app.application import certificate_rendering as rendering
+    if mode == 'portable':
+        actual_check = rendering.features.check
+        monkeypatch.setattr(rendering.features, 'check', lambda name: False if name == 'raqm' else actual_check(name))
     app,client,headers,event,_=system
     base,body=setup(system)
     seal=Image.new('RGBA',(90,50),(0,150,120,200));buffer=io.BytesIO();seal.save(buffer,'PNG')

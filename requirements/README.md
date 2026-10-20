@@ -68,3 +68,9 @@ versions. All seven profiles were regenerated with the same uv 0.12.23 resolver;
 reviewed version comparisons show no other package version changes. The local
 strict audit of the QA/PostgreSQL and installer locks reported zero known
 vulnerabilities. Clean Windows/Linux and native acceptance remain CI gates.
+
+Portable certificate rendering adds arabic-reshaper 3.0.1 and python-bidi 0.6.12
+to the runtime profiles. Pillow wheels without native RAQM use these to shape
+Arabic and apply Unicode BiDi before drawing; native RAQM stays preferred when
+available. Both native and forced-portable paths are covered by certificate
+journey tests; Windows CI also runs an early PNG/PDF export probe.

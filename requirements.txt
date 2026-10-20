@@ -8,3 +8,7 @@ pillow==13.0.0
 # IANA time zones are required on Windows and minimal container images.
 tzdata==2026.5
 # PostgreSQL adapter is installed separately for the container deployment:
+
+# Portable Arabic shaping for platforms whose Pillow wheel lacks RAQM.
+arabic-reshaper==3.0.1
+python-bidi==0.6.12

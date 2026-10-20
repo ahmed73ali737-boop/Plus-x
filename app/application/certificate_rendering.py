@@ -24,16 +24,37 @@ def font_hash():
     return sha256(font_bytes()).hexdigest()
 
 
+def text_layout(content, layer, size):
+    """Use native shaping when present, with a portable Windows fallback.
+
+    BASIC alone does not shape Arabic. The fallback explicitly shapes Arabic
+    presentation forms and applies Unicode BiDi before drawing visual glyphs.
+    Neither path changes the logical text stored in the certificate snapshot.
+    """
+    direction = layer['direction']
+    native = features.check('raqm')
+    if native:
+        engine, options = ImageFont.Layout.RAQM, {'direction': direction}
+    else:
+        from arabic_reshaper import ArabicReshaper
+        from bidi import get_display
+        reshaper = ArabicReshaper(configuration={'delete_harakat': False, 'shift_harakat_position': True})
+        content = get_display(reshaper.reshape(content), base_dir='R' if direction == 'rtl' else 'L')
+        engine, options = ImageFont.Layout.BASIC, {}
+    align = layer['align']
+    anchor = 'ms' if align == 'middle' else ('rs' if (align == 'start') == (direction == 'rtl') else 'ls')
+    font = ImageFont.truetype(io.BytesIO(font_bytes()), max(1, round(size)), layout_engine=engine)
+    return content, font, {'anchor': anchor, **options}
+
+
 def validate_layout(design, data):
     from app.application.certificate_service import PLACEHOLDER, ALIASES
-    if not features.check('raqm'): fail('CERTIFICATE_ARABIC_RENDERER_UNAVAILABLE', 503)
     draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
     for layer in design['layers']:
         if layer.get('kind') == 'image': continue
         content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
-        font = ImageFont.truetype(io.BytesIO(font_bytes()), round(layer['size']), layout_engine=ImageFont.Layout.RAQM)
-        anchor = {'middle':'ms','start':'ls','end':'rs'}[layer['align']]
-        left, top, right, bottom = draw.textbbox((layer['x'], layer['y']), content, font=font, anchor=anchor, direction=layer['direction'])
+        content, font, options = text_layout(content, layer, layer['size'])
+        left, top, right, bottom = draw.textbbox((layer['x'], layer['y']), content, font=font, **options)
         if left < 0 or top < 0 or right > design['width'] or bottom > design['height']:
             fail('CERTIFICATE_TEXT_OVERFLOW')
 
@@ -59,7 +80,6 @@ def image_data(raw):
 def render(row, verification_url, output_format='PNG'):
     from app.application.certificate_service import state, PLACEHOLDER, ALIASES
     if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', 410)
-    if not features.check('raqm'): fail('CERTIFICATE_ARABIC_RENDERER_UNAVAILABLE', 503)
     if row['snapshot'].get('font_hash', font_hash()) != font_hash(): fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', 503)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     # 3508px across a 297mm landscape page is approximately 300 DPI.
@@ -81,9 +101,8 @@ def render(row, verification_url, output_format='PNG'):
             paint_image(layer['image_data'], layer['x'], layer['y'], layer['width'], layer['height'])
             continue
         content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
-        font = ImageFont.truetype(io.BytesIO(font_bytes()), round(layer['size'] * scale), layout_engine=ImageFont.Layout.RAQM)
-        anchor = {'middle': 'ms', 'start': 'ls', 'end': 'rs'}[layer['align']]
-        draw.text((layer['x']*scale, layer['y']*scale), content, font=font, fill=layer['color'], anchor=anchor, direction=layer['direction'])
+        content, font, options = text_layout(content, layer, layer['size'] * scale)
+        draw.text((layer['x']*scale, layer['y']*scale), content, font=font, fill=layer['color'], **options)
     pos = design['qr']
     qr = qrcode.make(verification_url).convert('RGB').resize((round(pos['size']*scale),)*2, Image.Resampling.NEAREST)
     page.paste(qr, (round(pos['x']*scale), round(pos['y']*scale)))
