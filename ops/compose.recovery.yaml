@@ -50,3 +50,8 @@ services:
         condition: service_healthy
 volumes:
   recovery_db:
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${RECOVERY_SUBNET:?Dedicated test network required}

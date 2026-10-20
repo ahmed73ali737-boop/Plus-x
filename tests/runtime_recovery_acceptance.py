@@ -4,7 +4,7 @@ Recovery deadline is fixed BEFORE measurement. Never restarts the proxy. Forces
 an app IP change by reserving its previous address in a temporary container.
 """
 from pathlib import Path
-import json, os, secrets, subprocess, sys, time, uuid
+import ipaddress, json, os, secrets, subprocess, sys, time, uuid
 import httpx
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -16,7 +16,14 @@ CYCLES=5
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     project='px-recovery-'+uuid.uuid4().hex[:10]
+    network_ids=subprocess.check_output(['docker','network','ls','-q'],text=True).split()
+    existing=json.loads(subprocess.check_output(['docker','network','inspect',*network_ids],text=True)) if network_ids else []
+    occupied=[ipaddress.ip_network(config['Subnet']) for network in existing for config in network.get('IPAM',{}).get('Config',[]) if config.get('Subnet')]
+    candidates=[ipaddress.ip_network(f'10.233.{index}.0/24') for index in range(256)]
+    available=[network for network in candidates if not any(network.overlaps(other) for other in occupied if other.version==4)]
+    if not available:raise RuntimeError('NO_ISOLATED_RECOVERY_SUBNET')
     env={**os.environ,'RECOVERY_DB_PASSWORD':secrets.token_hex(24),
+         'RECOVERY_SUBNET':str(secrets.choice(available)),
          'PULSEX_SOURCE_SHA':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()}
     command=['docker','compose','-p',project,'-f',str(ROOT/'ops/compose.recovery.yaml')]
     report={'status':'failed','source_sha':env['PULSEX_SOURCE_SHA'],'project':project,
