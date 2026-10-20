@@ -227,6 +227,7 @@ def ensure_compat_schema(engine):
 
 # Register additive admission tables for both application and migration entrypoints.
 from app import invitations_db as _invitations_db  # noqa: E402,F401
+from app import certificates_db as _certificates_db  # noqa: E402,F401
 
 # Account preferences and an owner-isolated inbox; delivery is durable in the DB.
 preferences=Table('px_preferences',metadata,

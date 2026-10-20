@@ -14,6 +14,7 @@ from app.infrastructure.repository import get_site
 EVENT_PERMISSIONS = frozenset({
     'guests.read', 'guests.register', 'guests.export', 'guests.checkin',
     'invitations.manage', 'invitations.review', 'policy.manage', 'committee.manage',
+    'certificates.manage', 'certificates.issue', 'certificates.revoke',
 })
 EVENT_ROLE_PERMISSIONS = {
     'event_manager': EVENT_PERMISSIONS,
@@ -109,7 +110,7 @@ def can_manage(conn, user, site) -> bool:
 
 
 def event_permissions(conn, user, event_id: str) -> frozenset[str]:
-    """Return only admission permissions for this event and current shift."""
+    """Return event capabilities for this scope and current shift."""
     event = get_site(conn, event_id)
     if event['kind'] != 'event':
         fail('EVENT_REQUIRED', 422)

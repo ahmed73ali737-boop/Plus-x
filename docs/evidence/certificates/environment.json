@@ -1,0 +1,18 @@
+{
+  "python": "3.12.14",
+  "fastapi": "0.142.2",
+  "sqlalchemy": "2.0.50",
+  "database": "SQLite temporary files",
+  "baseline": "60d873932b3da714ab84864c511ee8a6ea1b1cea",
+  "checks": {
+    "python_compile": "passed",
+    "javascript_syntax": "passed",
+    "diff_whitespace": "passed"
+  },
+  "not_verified": [
+    "native PostgreSQL migrations/concurrency",
+    "real browser/mobile/PNG export",
+    "external delivery providers",
+    "production deployment"
+  ]
+}

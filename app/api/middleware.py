@@ -43,6 +43,10 @@ def install_security_middleware(app, public_origin: str) -> None:
         if path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-PulseX-API-Version"] = "1"
+        if path.startswith(('/certificate/', '/verify/certificate/', '/api/public/certificates/')):
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         return response
 
     @app.middleware("http")
@@ -86,6 +90,8 @@ def install_security_middleware(app, public_origin: str) -> None:
                 if path in ("/api/signup-request", "/api/access-request")
                 else "guest"
                 if path.startswith("/api/public/events/") and "/guests" in path
+                else "certificate"
+                if path.startswith('/api/public/certificates/')
                 else "api"
             )
             key = (ip, bucket)
@@ -93,7 +99,7 @@ def install_security_middleware(app, public_origin: str) -> None:
             current = time.monotonic()
             while queue and current - queue[0] > 60:
                 queue.popleft()
-            limit = 20 if bucket == "auth" else 10 if bucket == "signup" else 300 if bucket == "guest" else 12000
+            limit = 20 if bucket == "auth" else 10 if bucket == "signup" else 300 if bucket in ("guest", "certificate") else 12000
             if len(queue) >= limit:
                 return harden(
                     JSONResponse({"detail": "RATE_LIMIT"}, 429, headers={"Retry-After": "60"}),

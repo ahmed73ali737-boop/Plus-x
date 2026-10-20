@@ -57,9 +57,10 @@ jobs:
           node --check web/offline.mjs
           node --check web/preferences.mjs
           node --check web/admin.mjs
+          node --check web/certificates.mjs
           node --check web/sw.js
       - name: Guest QR and offline regression
-        run: python -m pytest -q --junitxml=qa/ci/guest-identity-and-offline-contract/junit.xml tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py tests/test_invitations_ui_contract.py tests/test_account_preferences_notifications.py
+        run: python -m pytest -q --junitxml=qa/ci/guest-identity-and-offline-contract/junit.xml tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py tests/test_invitations_ui_contract.py tests/test_account_preferences_notifications.py tests/test_certificates.py
       - name: Offline runtime authorization and receipt contracts
         run: |
           npm ci --prefix tests/offline-runtime --ignore-scripts

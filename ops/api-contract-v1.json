@@ -22,6 +22,23 @@
     "get",
     "put"
   ],
+  "/api/admin/events/{event_id}/certificate-templates": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/preview": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/{certificate_id}/access-link": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/{certificate_id}/revoke": [
+    "post"
+  ],
   "/api/admin/events/{event_id}/committee": [
     "get",
     "post"
@@ -204,6 +221,15 @@
     "get"
   ],
   "/api/health/ready": [
+    "get"
+  ],
+  "/api/public/certificates/access/{token}": [
+    "get"
+  ],
+  "/api/public/certificates/access/{token}/image.svg": [
+    "get"
+  ],
+  "/api/public/certificates/verify/{serial}": [
     "get"
   ],
   "/api/public/events/{event_slug}/guest-config": [
