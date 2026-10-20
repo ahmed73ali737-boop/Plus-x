@@ -11,7 +11,7 @@ let authorized=false,revokeCalls=0,cleared=0;
 const root={children:[],replaceChildren(...parts){this.children=parts;},append(...parts){this.children.push(...parts);}};
 const h=(tag,attrs,...children)=>({tag,attrs,children,addEventListener(){}});
 const button=(label,fn)=>({tag:'button',label,fn});
-const ctx={root,h,button,field:label=>({node:{tag:'input',label},input:{value:''}}),
+const ctx={root,h,button,passwordPair:()=>({node:{tag:'div'},password:{input:{value:''}},confirmation:{input:{value:''}}}),field:label=>({node:{tag:'input',label},input:{value:''}}),
   api:async(path,body)=>{assert.equal(path,'/api/auth/sessions/revoke-all');assert.equal(Object.keys(body).length,0);revokeCalls++;return{ok:true};},
   confirm:()=>authorized,location:{href:'initial'},setCSRF:()=>{cleared++;},
   toast:()=>{},msg:x=>x};

@@ -58,6 +58,8 @@ jobs:
           node --check web/preferences.mjs
           node --check web/admin.mjs
           node --check web/certificates.mjs
+          node --check web/certificate-editor.mjs
+          node --check web/certificate-import.mjs
           node --check web/sw.js
       - name: Guest QR and offline regression
         run: python -m pytest -q --junitxml=qa/ci/guest-identity-and-offline-contract/junit.xml tests/test_guest_identity.py tests/test_windows11.py tests/test_windows12_guests.py tests/test_invitations_ui_contract.py tests/test_account_preferences_notifications.py tests/test_certificates.py
@@ -72,6 +74,8 @@ jobs:
       - name: Install Chromium guest-journey dependencies
         run: |
           python -m playwright install --with-deps chromium
+      - name: Run certificate issuance and download browser journey
+        run: python tests/browser_certificates.py
       - name: Run account settings and admin inbox journey
         run: python -m tests.browser_account_settings
       - name: Run guest browser journey
@@ -92,6 +96,7 @@ jobs:
             qa/windows12-guest-browser.json
             qa/guest-capacity-smoke.json
             qa/openapi.generated.json
+            qa/certificates-browser/
             qa/guest-browser-server.log
             qa/exhibition-brands.json
             qa/exhibition-browser-server.log

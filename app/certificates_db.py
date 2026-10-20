@@ -30,3 +30,24 @@ certificates = Table('px_certificates', metadata,
     UniqueConstraint('event_id', 'recipient_key', 'award_key', name='uq_px_certificate_award'),
     CheckConstraint("status IN ('issued', 'revoked')", name='ck_px_certificate_status'))
 Index('px_certificates_event_time', certificates.c.event_id, certificates.c.issued_at)
+
+certificate_imports = Table('px_certificate_imports', metadata,
+    Column('id', String(64), primary_key=True),
+    Column('event_id', String(64), ForeignKey('px_sites.id'), nullable=False),
+    Column('user_id', String(64), ForeignKey('px_users.id'), nullable=False),
+    Column('rows', JSON, nullable=False), Column('errors', JSON, nullable=False),
+    Column('created_at', String(64), nullable=False), Column('committed_at', String(64)))
+certificate_jobs = Table('px_certificate_jobs', metadata,
+    Column('id', String(64), primary_key=True),
+    Column('import_id', String(64), ForeignKey('px_certificate_imports.id'), nullable=False),
+    Column('event_id', String(64), ForeignKey('px_sites.id'), nullable=False),
+    Column('user_id', String(64), ForeignKey('px_users.id'), nullable=False),
+    Column('body', JSON, nullable=False), Column('state', String(16), nullable=False),
+    Column('available_at', String(64), nullable=False), Column('certificate_id', String(64), ForeignKey('px_certificates.id')),
+    Column('error', String(160)), Column('created_at', String(64), nullable=False))
+Index('px_certificate_jobs_pending', certificate_jobs.c.state, certificate_jobs.c.available_at)
+
+certificate_replacements = Table('px_certificate_replacements', metadata,
+    Column('previous_id', String(64), ForeignKey('px_certificates.id'), primary_key=True),
+    Column('replacement_id', String(64), ForeignKey('px_certificates.id'), unique=True, nullable=False),
+    Column('reason', String(500), nullable=False), Column('created_at', String(64), nullable=False))

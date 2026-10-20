@@ -72,7 +72,8 @@ def test_issue_verify_download_rotate_revoke_and_persist(system):
     assert conflict.status_code==409
     # Another template version never changes an issued certificate.
     client.post(base+'/certificate-templates',json={'name':'نسخة أخرى','design':default_design()},headers=headers)
-    assert client.get(base+'/certificates').json()['items'][0]['snapshot']==original_snapshot
+    listed=client.get(base+'/certificates').json()['items'][0]['snapshot']
+    assert listed['data']==original_snapshot['data'] and 'design' not in listed
     rotated=client.post(base+'/certificates/'+cid+'/access-link',json={},headers=headers).json()['access_url'].split('/')[-1]
     assert public.get('/api/public/certificates/access/'+token).status_code==404
     assert public.get('/api/public/certificates/access/'+rotated+'/image.svg').status_code==200
@@ -127,6 +128,8 @@ def test_validation_expiry_and_integrity_fail_closed(system):
     for payload in ({**body,'data':{'participant_name':'x'}},{**body,'expires_at':'2020-01-01T00:00:00Z'},
                     {**body,'expires_at':'2099-01-01T00:00:00'},{**body,'data':{**body['data'],'serial':'fake'}}):
         assert client.post(base+'/certificates',json=payload,headers=headers).status_code==422
+    overflow=client.post(base+'/certificates',json={**body,'data':{**body['data'],'participant_name':'أحمد '*40}},headers=headers)
+    assert overflow.status_code==422 and overflow.json()['detail']=='CERTIFICATE_TEXT_OVERFLOW'
     result=client.post(base+'/certificates',json=body,headers=headers).json()
     cid=result['certificate']['id'];serial=result['certificate']['serial'];token=result['access_url'].split('/')[-1]
     with app.state.engine.begin() as conn:
@@ -137,3 +140,111 @@ def test_validation_expiry_and_integrity_fail_closed(system):
         conn.execute(update(certificates).where(certificates.c.id==cid).values(expires_at=None,snapshot_hash='0'*64))
     assert client.get('/api/public/certificates/verify/'+serial).json()['status']=='integrity_error'
     assert client.get('/api/public/certificates/access/'+token+'/image.svg').status_code==410
+
+
+def test_server_exports_and_private_image_snapshot(system):
+    import base64, io
+    from PIL import Image
+    app,client,headers,event,_=system
+    base,body=setup(system)
+    seal=Image.new('RGBA',(90,50),(0,150,120,200));buffer=io.BytesIO();seal.save(buffer,'PNG')
+    uri='data:image/png;base64,'+base64.b64encode(buffer.getvalue()).decode()
+    design=default_design();design['layers'].append({'kind':'image','image_data':uri,'x':800,'y':580,'width':180,'height':90})
+    response=client.post(base+'/certificate-templates',json={'name':'قالب مختوم','design':design},headers=headers)
+    assert response.status_code==200,response.text
+    body['template_id']=response.json()['id'];body['data']['participant_name']='أحمد علي محمد'
+    issued=client.post(base+'/certificates',json=body,headers=headers).json()
+    token=issued['access_url'].split('/')[-1]
+    prefix='/api/public/certificates/access/'+token
+    pdf=client.get(prefix+'/download.pdf');assert pdf.status_code==200,pdf.text[:100]
+    assert pdf.content.startswith(b'%PDF-') and 'attachment' in pdf.headers['content-disposition']
+    png=client.get(prefix+'/download.png');assert png.status_code==200
+    im=Image.open(io.BytesIO(png.content));assert im.width==3508 and im.height>2000
+    svg=client.get(prefix+'/image.svg')
+    assert svg.status_code==200 and uri not in svg.text  # No separately extractable stamp PNG.
+    embedded=ElementTree.fromstring(svg.text).find('{http://www.w3.org/2000/svg}image').get('href')
+    assert Image.open(io.BytesIO(base64.b64decode(embedded.split(',')[1]))).width==3508
+    assert issued['certificate']['snapshot']['font_hash']
+    client.post(base+'/certificates/'+issued['certificate']['id']+'/revoke',json={'reason':'مراجعة'},headers=headers)
+    assert client.get(prefix+'/download.pdf').status_code==410
+    assert client.get(prefix+'/download.png').status_code==410
+    design['layers'][-1]['image_data']='https://evil.test/signature.svg'
+    assert client.post(base+'/certificate-templates',json={'name':'bad','design':design},headers=headers).status_code==422
+
+
+def import_body(template_id, rows=None):
+    import base64
+    content=rows or 'person,course,issuer,identity,award\nأحمد,دورة,المعهد,person-1,course-1\nليلى,دورة,المعهد,person-2,course-1\n'
+    return {'filename':'participants.csv','content_base64':base64.b64encode(content.encode()).decode(),
+            'template_id':template_id,'mapping':{'participant_name':'person','course_title':'course','issuer_name':'issuer','recipient_key':'identity','award_key':'award'}}
+
+
+def test_preview_commit_background_issuance_restart_and_schedule(system):
+    from app.application.certificate_batches import process_pending
+    from app.certificates_db import certificate_jobs
+    app,client,headers,event,url=system;base,body=setup(system)
+    upload=import_body(body['template_id'])
+    inspect=client.post(base+'/certificates/import/preview',json={k:v for k,v in upload.items() if k!='mapping'},headers=headers)
+    assert inspect.json()['headers']==['person','course','issuer','identity','award']
+    preview=client.post(base+'/certificates/import/preview',json=upload,headers=headers)
+    assert preview.status_code==200,preview.text
+    assert preview.json()['valid_count']==2 and not preview.json()['errors']
+    queue=client.post(base+'/certificates/import/commit',json={'import_id':preview.json()['import_id'],'available_at':'2099-01-01T10:00:00+03:00'},headers=headers)
+    assert queue.status_code==200,queue.text
+    assert process_pending(app.state.engine)==0
+    retry=client.post(base+'/certificates/import/commit',json={'import_id':preview.json()['import_id']},headers=headers)
+    assert retry.json()['replayed'] is True
+    with app.state.engine.begin() as conn:conn.execute(update(certificate_jobs).values(available_at='2020-01-01T00:00:00+00:00'))
+    # A fresh worker resumes the durable pending rows.
+    restarted=create_app(url,origin='http://testserver',seed_demo=False)
+    assert process_pending(restarted.state.engine)==2
+    assert process_pending(restarted.state.engine)==0
+    with restarted.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(certificates)).scalar_one()==2
+        rows=conn.execute(select(certificate_jobs)).mappings().all()
+        assert all(r['state']=='done' and r['certificate_id'] for r in rows)
+        assert all('access_url' not in r['body'] for r in rows)
+    assert client.get(base+'/certificates/batches').json()['items'][0]['count']==2
+    restarted.state.engine.dispose()
+
+
+def test_bulk_errors_and_revoked_authority_never_issue(system):
+    from app.application.certificate_batches import process_pending
+    from app.certificates_db import certificate_jobs
+    app,client,headers,event,_=system;base,body=setup(system)
+    duplicate=import_body(body['template_id'],'person,course,issuer,identity,award\nأحمد,دورة,المعهد,same,course\nأحمد,دورة,المعهد,same,course\n')
+    bad=client.post(base+'/certificates/import/preview',json=duplicate,headers=headers).json()
+    assert bad['errors'][0]['row']==3
+    assert client.post(base+'/certificates/import/commit',json={'import_id':bad['import_id']},headers=headers).status_code==409
+    preview=client.post(base+'/certificates/import/preview',json=import_body(body['template_id']),headers=headers).json()
+    assert client.post(base+'/certificates/import/commit',json={'import_id':preview['import_id']},headers=headers).status_code==200
+    with app.state.engine.begin() as conn:
+        admin_id=conn.execute(select(certificate_jobs.c.user_id).limit(1)).scalar_one()
+        conn.execute(update(users).where(users.c.id==admin_id).values(active=0))
+    assert process_pending(app.state.engine)==2
+    with app.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(certificates)).scalar_one()==0
+        assert all(r=='failed' for r in conn.execute(select(certificate_jobs.c.state)).scalars())
+
+
+def test_replacement_is_atomic_new_serial_linked_and_idempotent(system):
+    from app.certificates_db import certificate_replacements
+    app,client,headers,event,_=system;base,body=setup(system)
+    original=client.post(base+'/certificates',json=body,headers=headers).json()['certificate']
+    endpoint=base+'/certificates/'+original['id']+'/replace'
+    payload={'request_key':'correction-1','reason':'تصحيح الاسم','data':{**body['data'],'participant_name':'الاسم المصحح'}}
+    invalid=client.post(endpoint,json={**payload,'data':{}},headers=headers)
+    assert invalid.status_code==422
+    assert client.get('/api/public/certificates/verify/'+original['serial']).json()['status']=='valid'
+    corrected=client.post(endpoint,json=payload,headers=headers)
+    assert corrected.status_code==200,corrected.text
+    corrected=corrected.json()['certificate']
+    assert corrected['serial']!=original['serial']
+    check=client.get('/api/public/certificates/verify/'+original['serial']).json()
+    assert check['status']=='revoked' and check['superseded'] is True
+    assert client.get('/api/public/certificates/verify/'+corrected['serial']).json()['status']=='valid'
+    replay=client.post(endpoint,json=payload,headers=headers)
+    assert replay.status_code==200 and replay.json()['created'] is False
+    with app.state.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(certificate_replacements)).scalar_one()==1
+        assert conn.execute(select(func.count()).select_from(certificates)).scalar_one()==2

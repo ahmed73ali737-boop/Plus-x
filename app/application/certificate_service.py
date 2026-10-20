@@ -13,10 +13,12 @@ import qrcode
 import qrcode.image.svg
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
-from app.certificates_db import certificate_templates, certificates
+from app.certificates_db import certificate_templates, certificates, certificate_replacements
 from app.core.serialization import canonical_json
 from app.application.audit_service import new_id
 from app.domain import fail, now, text, number, stamp
+from app.application.certificate_rendering import image_data, font_hash, font_bytes, validate_layout
+import base64
 
 FIELDS = ('participant_name', 'course_title', 'issuer_name', 'grade', 'training_hours', 'issue_date', 'serial')
 ALIASES = {'اسم_المشارك': 'participant_name', 'اسم_المتدرب': 'participant_name',
@@ -55,22 +57,32 @@ def normalize_design(raw):
     clean = []
     for layer in layers:
         if not isinstance(layer, dict): fail('CERTIFICATE_LAYER_INVALID')
+        if layer.get('kind') == 'image':
+            iw = number(layer.get('width'), 160, 10, w)
+            ih = number(layer.get('height'), 80, 10, h)
+            clean.append({'kind': 'image', 'image_data': image_data(layer.get('image_data')),
+                          'x': number(layer.get('x'), 0, 0, w-iw), 'y': number(layer.get('y'), 0, 0, h-ih),
+                          'width': iw, 'height': ih})
+            continue
         content = text(layer.get('text'), 600, True)
         for variable in PLACEHOLDER.findall(content):
             if ALIASES.get(variable, variable) not in FIELDS: fail('CERTIFICATE_VARIABLE_UNKNOWN')
         font = layer.get('font', 'Arial')
-        if font not in ('Arial', 'Times New Roman', 'serif', 'sans-serif'): fail('CERTIFICATE_FONT_INVALID')
+        if font not in ('DejaVu Sans', 'Arial', 'Times New Roman', 'serif', 'sans-serif'): fail('CERTIFICATE_FONT_INVALID')
         align = layer.get('align', 'middle')
         direction = layer.get('direction', 'rtl')
         if align not in ('start', 'middle', 'end') or direction not in ('rtl', 'ltr'): fail('CERTIFICATE_ALIGNMENT_INVALID')
         clean.append({'text': content, 'x': number(layer.get('x'), w/2, 0, w),
                       'y': number(layer.get('y'), h/2, 0, h), 'size': number(layer.get('size'), 28, 10, 100),
-                      'color': color(layer.get('color', '#17313b')), 'font': font, 'align': align, 'direction': direction})
+                      'color': color(layer.get('color', '#17313b')), 'font': 'DejaVu Sans', 'align': align, 'direction': direction})
     qr = raw.get('qr', {})
     if not isinstance(qr, dict): fail('CERTIFICATE_QR_INVALID')
     size = number(qr.get('size'), 130, 100, min(w, h)/2)
-    return {'width': w, 'height': h, 'background': color(raw.get('background', '#fffdf6')), 'layers': clean,
+    result = {'width': w, 'height': h, 'background': color(raw.get('background', '#fffdf6')), 'layers': clean,
             'qr': {'x': number(qr.get('x'), 40, 0, w-size), 'y': number(qr.get('y'), h-size-40, 0, h-size), 'size': size}}
+    if raw.get('background_image'): result['background_image'] = image_data(raw['background_image'])
+    if len(canonical_json(result).encode()) > 3*1024*1024: fail('CERTIFICATE_DESIGN_SIZE_LIMIT')
+    return result
 
 
 def create_template(conn, event_id, body):
@@ -112,7 +124,8 @@ def issue(conn, event_id, body):
     serial = 'CERT-' + secrets.token_hex(16).upper()
     issued_at = now()
     data.update(serial=serial, issue_date=issued_at[:10])
-    snapshot = {'design': template['design'], 'data': data, 'template_id': template_id}
+    validate_layout(template['design'], data)
+    snapshot = {'design': template['design'], 'data': data, 'template_id': template_id, 'font_hash': font_hash(), 'renderer': 'certificate-raster-v1'}
     token = secrets.token_urlsafe(32)
     row = {'id': new_id(), 'event_id': event_id, 'template_id': template_id, 'request_key': request_key,
            'request_hash': request_hash, 'recipient_key': recipient_key, 'award_key': award_key,
@@ -153,17 +166,42 @@ def revoke(conn, event_id, certificate_id, reason):
     return get_certificate(conn, event_id, certificate_id)
 
 
+def replace(conn, event_id, certificate_id, body):
+    original = get_certificate(conn, event_id, certificate_id)
+    reason = text(body.get('reason'), 500, True)
+    # This internal award key represents a correction of this exact issue, not
+    # another independent award. The immutable source snapshot remains intact.
+    row, token, created = issue(conn, event_id, {**body, 'recipient_key': original['recipient_key'],
+        'award_key': 'replacement/'+original['id'], 'template_id': body.get('template_id', original['template_id'])})
+    link = conn.execute(select(certificate_replacements).where(certificate_replacements.c.previous_id == certificate_id)).mappings().first()
+    if link:
+        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', 409)
+        return row, token, created
+    try:
+        with conn.begin_nested():
+            conn.execute(insert(certificate_replacements).values(previous_id=certificate_id, replacement_id=row['id'], reason=reason, created_at=now()))
+    except IntegrityError: fail('CERTIFICATE_ALREADY_REPLACED', 409)
+    revoke(conn, event_id, certificate_id, reason)
+    return row, token, created
+
+
 def render_svg(row, verification_url):
     if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', 410)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     w, h = design['width'], design['height']
     output = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">',
-              f'<rect width="{w}" height="{h}" fill="{design["background"]}"/>',
-              f'<rect x="24" y="24" width="{w-48}" height="{h-48}" fill="none" stroke="#b88a44" stroke-width="3"/>']
+              '<defs><style>@font-face{font-family:CertificateSans;src:url(data:font/ttf;base64,' + base64.b64encode(font_bytes()).decode() + ')}</style></defs>',
+              f'<rect width="{w}" height="{h}" fill="{design["background"]}"/>']
+    if design.get('background_image'):
+        output.append(f'<image width="{w}" height="{h}" href="{design["background_image"]}"/>')
+    output.append(f'<rect x="24" y="24" width="{w-48}" height="{h-48}" fill="none" stroke="#b88a44" stroke-width="3"/>')
     for layer in design['layers']:
+        if layer.get('kind') == 'image':
+            output.append(f'<image x="{layer["x"]}" y="{layer["y"]}" width="{layer["width"]}" height="{layer["height"]}" href="{layer["image_data"]}"/>')
+            continue
         content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
         output.append(f'<text x="{layer["x"]}" y="{layer["y"]}" font-size="{layer["size"]}" '
-                      f'fill="{layer["color"]}" font-family="{layer["font"]}" text-anchor="{layer["align"]}" '
+                      f'fill="{layer["color"]}" font-family="CertificateSans" text-anchor="{layer["align"]}" '
                       f'direction="{layer["direction"]}" unicode-bidi="plaintext">{escape(content)}</text>')
     qr = qrcode.make(verification_url, image_factory=qrcode.image.svg.SvgPathImage)
     buffer = io.BytesIO(); qr.save(buffer)

@@ -133,7 +133,7 @@ try:
         mark("mobile_layout_no_overflow")
 
         page.goto(URL + "/admin")
-        page.get_by_label("البريد الإلكتروني", exact=True).fill(creds[2]["email"])
+        page.get_by_label("رقم الهاتف", exact=True).fill(creds[2]["email"])
         page.get_by_label("كلمة المرور", exact=True).fill(creds[2]["password"])
         page.get_by_role("button", name="تسجيل الدخول", exact=True).click()
         page.get_by_role("heading", name="نظرة عامة", exact=True).wait_for()

@@ -85,11 +85,13 @@ def install_security_middleware(app, public_origin: str) -> None:
             ip = request.client.host if request.client else "unknown"
             bucket = (
                 "auth"
-                if path.startswith("/api/auth/login")
+                if path.startswith("/api/auth/") and request.method != "GET"
                 else "signup"
                 if path in ("/api/signup-request", "/api/access-request")
                 else "guest"
                 if path.startswith("/api/public/events/") and "/guests" in path
+                else "certificate-render"
+                if path.startswith('/api/public/certificates/') and ('/download.' in path or path.endswith('/image.svg'))
                 else "certificate"
                 if path.startswith('/api/public/certificates/')
                 else "api"
@@ -99,7 +101,7 @@ def install_security_middleware(app, public_origin: str) -> None:
             current = time.monotonic()
             while queue and current - queue[0] > 60:
                 queue.popleft()
-            limit = 20 if bucket == "auth" else 10 if bucket == "signup" else 300 if bucket in ("guest", "certificate") else 12000
+            limit = 20 if bucket == "auth" else 10 if bucket == "signup" else 15 if bucket == "certificate-render" else 300 if bucket in ("guest", "certificate") else 12000
             if len(queue) >= limit:
                 return harden(
                     JSONResponse({"detail": "RATE_LIMIT"}, 429, headers={"Retry-After": "60"}),

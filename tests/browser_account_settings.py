@@ -40,7 +40,7 @@ def run():
             page.set_viewport_size({'width':1440,'height':1000})
             page.goto('http://127.0.0.1:4387/admin')
             page.get_by_role('button',name='الإعدادات والإشعارات',exact=True).click()
-            page.get_by_label('بريد المستلم',exact=True).fill(admin['email'])
+            page.get_by_label('رقم الهاتف أو بريد حساب قديم',exact=True).fill(admin['email'])
             page.get_by_label('العنوان',exact=True).fill('رسالة الاختبار')
             page.get_by_label('الرسالة',exact=True).fill('تم إرسال هذه الرسالة من لوحة الإدارة')
             page.get_by_role('button',name='إرسال إلى صندوق الحساب').click()

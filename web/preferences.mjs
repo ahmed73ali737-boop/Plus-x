@@ -37,11 +37,11 @@ export async function preferencePanel(host,{authenticated=false,user=null}={}){
   }
   try{await refresh();}catch{inbox.append(h('p',{role:'alert'},'تعذر تحميل الرسائل. تحقق من الاتصال.'),button('إعادة المحاولة',refresh));}
   if(user?.role==='platform'){
-    const email=h('input',{type:'email',required:true,maxlength:200,autocomplete:'off'}),title=h('input',{required:true,maxlength:160}),body=h('textarea',{required:true,maxlength:2000,rows:4});
+    const email=h('input',{type:'text',inputmode:'tel',required:true,maxlength:200,autocomplete:'off'}),title=h('input',{required:true,maxlength:160}),body=h('textarea',{required:true,maxlength:2000,rows:4});
     const output=h('p',{role:'status','aria-live':'polite'}),send=h('button',{type:'submit',class:'btn'},'إرسال إلى صندوق الحساب');
-    const form=h('form',{class:'card preference-card'},h('h2',{},'رسالة من الإدارة'),h('label',{class:'field'},'بريد المستلم',email),h('label',{class:'field'},'العنوان',title),h('label',{class:'field'},'الرسالة',body),send,output);
+    const form=h('form',{class:'card preference-card'},h('h2',{},'رسالة من الإدارة'),h('label',{class:'field'},'رقم الهاتف أو بريد حساب قديم',email),h('label',{class:'field'},'العنوان',title),h('label',{class:'field'},'الرسالة',body),send,output);
     let sending=false;
-    form.addEventListener('submit',async e=>{e.preventDefault();if(sending||!form.reportValidity())return;sending=true;send.disabled=true;try{await api('/api/admin/notifications',{email:email.value.trim(),title:title.value.trim(),body:body.value.trim()});output.textContent='وصلت الرسالة إلى صندوق الحساب.';form.reset();try{await refresh();}catch{output.textContent='وصلت الرسالة إلى صندوق الحساب. تعذر تحديث العرض؛ استخدم تحديث الرسائل.';}}catch{output.textContent='تعذر الإرسال. تحقق من بريد الحساب والاتصال.';}finally{sending=false;send.disabled=false;}});
+    form.addEventListener('submit',async e=>{e.preventDefault();if(sending||!form.reportValidity())return;sending=true;send.disabled=true;try{await api('/api/admin/notifications',{...(email.value.includes('@')?{email:email.value.trim()}:{phone:email.value.trim()}),title:title.value.trim(),body:body.value.trim()});output.textContent='وصلت الرسالة إلى صندوق الحساب.';form.reset();try{await refresh();}catch{output.textContent='وصلت الرسالة إلى صندوق الحساب. تعذر تحديث العرض؛ استخدم تحديث الرسائل.';}}catch{output.textContent='تعذر الإرسال. راجع رقم الحساب والاتصال.';}finally{sending=false;send.disabled=false;}});
     host.append(form);
   }
 }

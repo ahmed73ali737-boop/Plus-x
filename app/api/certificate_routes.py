@@ -1,12 +1,15 @@
 """Scoped certificate administration and deliberately minimal public verification."""
 from hashlib import sha256
+import base64
 import secrets
 from fastapi import Request
 from fastapi.responses import Response
 from sqlalchemy import select, update
 from app.application import certificate_service as svc
+from app.application.certificate_rendering import render as render_document
+from app.application import certificate_batches as batches
 from app.application.access import require_event_permission
-from app.certificates_db import certificates, certificate_templates
+from app.certificates_db import certificates, certificate_templates, certificate_replacements
 from app.domain import fail, text
 
 
@@ -58,6 +61,26 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
         row = {'status': 'issued', 'expires_at': None, 'snapshot': snapshot, 'snapshot_hash': svc.fingerprint(snapshot)}
         return {'svg': svc.render_svg(row, f'{origin}/verify/certificate/PREVIEW-NOT-ISSUED')}
 
+    @app.post('/api/admin/events/{event_id}/certificates/import/preview')
+    def import_preview(event_id: str, body: dict, request: Request):
+        with engine.begin() as conn:
+            user = permission(conn, request, event_id, 'certificates.issue', True)
+            return batches.preview(conn, event_id, user['id'], body)
+
+    @app.post('/api/admin/events/{event_id}/certificates/import/commit')
+    def import_commit(event_id: str, body: dict, request: Request):
+        with engine.begin() as conn:
+            user = permission(conn, request, event_id, 'certificates.issue', True)
+            result = batches.commit(conn, event_id, user['id'], body)
+            log(conn, user, event_id, 'certificate_batch_queued', {'import_id': result['import_id']})
+            return result
+
+    @app.get('/api/admin/events/{event_id}/certificates/batches')
+    def batch_progress(event_id: str, request: Request):
+        with engine.connect() as conn:
+            permission(conn, request, event_id, 'certificates.manage')
+            return {'items': batches.progress(conn, event_id)}
+
     @app.get('/api/admin/events/{event_id}/certificates')
     def listing(event_id: str, request: Request, offset: int = 0, limit: int = 100):
         if offset < 0 or limit < 1 or limit > 200: fail('CERTIFICATE_PAGE_INVALID')
@@ -65,7 +88,8 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
             permission(conn, request, event_id, 'certificates.manage')
             rows = conn.execute(select(certificates).where(certificates.c.event_id == event_id)
                                 .order_by(certificates.c.issued_at.desc(), certificates.c.id).offset(offset).limit(limit)).mappings()
-            return {'items': [{**staff(dict(r)), 'validity': svc.state(r)} for r in rows]}
+            return {'items': [{**staff(dict(r)), 'snapshot': {'data': r['snapshot']['data'], 'template_id': r['template_id']},
+                               'validity': svc.state(r)} for r in rows]}
 
     @app.post('/api/admin/events/{event_id}/certificates')
     def issue(event_id: str, body: dict, request: Request):
@@ -85,6 +109,15 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
             log(conn, user, event_id, 'certificate_revoked', {'certificate_id': row['id']})
             return staff(row)
 
+    @app.post('/api/admin/events/{event_id}/certificates/{certificate_id}/replace')
+    def replace(event_id: str, certificate_id: str, body: dict, request: Request):
+        with engine.begin() as conn:
+            user = permission(conn, request, event_id, 'certificates.issue', True)
+            permission(conn, request, event_id, 'certificates.revoke', True)
+            row, token, created = svc.replace(conn, event_id, certificate_id, body)
+            if created: log(conn, user, event_id, 'certificate_replaced', {'previous_id': certificate_id, 'replacement_id': row['id']})
+            return {'certificate': staff(row), 'created': created, 'access_url': f'{origin}/certificate/{token}' if token else None}
+
     @app.post('/api/admin/events/{event_id}/certificates/{certificate_id}/access-link')
     def access_link(event_id: str, certificate_id: str, body: dict, request: Request):
         with engine.begin() as conn:
@@ -99,7 +132,12 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
     @app.get('/api/public/certificates/verify/{serial}')
     def verify(serial: str):
         with engine.connect() as conn:
-            return svc.public_view(lookup(conn, certificates.c.serial, serial))
+            row = lookup(conn, certificates.c.serial, serial)
+            result = svc.public_view(row)
+            replaced = conn.execute(select(certificate_replacements.c.replacement_id).where(certificate_replacements.c.previous_id == row['id'])).first()
+            # Keep the new access token and recipient's download link private.
+            if replaced: result['superseded'] = True
+            return result
 
     @app.get('/api/public/certificates/access/{token}')
     def access(token: str):
@@ -111,6 +149,26 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
     def image(token: str):
         with engine.connect() as conn:
             row = lookup(conn, certificates.c.access_hash, sha256(token.encode()).hexdigest())
-            return Response(svc.render_svg(row, f'{origin}/verify/certificate/{row["serial"]}'), media_type='image/svg+xml',
+        link = f'{origin}/verify/certificate/{row["serial"]}'
+        design = row['snapshot']['design']
+        if design.get('background_image') or any(layer.get('kind') == 'image' for layer in design['layers']):
+            # Recipient downloads must not disclose the original transparent
+            # signature/stamp as a separately extractable embedded asset.
+            png = render_document(row, link, 'PNG')
+            uri = base64.b64encode(png).decode()
+            w, h = design['width'], design['height']
+            content = f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}"><image width="{w}" height="{h}" href="data:image/png;base64,{uri}"/></svg>'
+        else:
+            content = svc.render_svg(row, link)
+        return Response(content, media_type='image/svg+xml',
                             headers={'Content-Disposition': 'inline; filename="certificate.svg"', 'Cache-Control': 'no-store',
                                      'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow'})
+
+    @app.get('/api/public/certificates/access/{token}/download.{extension}')
+    def download(token: str, extension: str):
+        if extension not in ('png', 'pdf'): fail('CERTIFICATE_FORMAT_UNSUPPORTED', 404)
+        with engine.connect() as conn:
+            row = lookup(conn, certificates.c.access_hash, sha256(token.encode()).hexdigest())
+        content = render_document(row, f'{origin}/verify/certificate/{row["serial"]}', extension.upper())
+        return Response(content, media_type='application/pdf' if extension == 'pdf' else 'image/png',
+                        headers={'Content-Disposition': f'attachment; filename="{row["serial"]}.{extension}"'})

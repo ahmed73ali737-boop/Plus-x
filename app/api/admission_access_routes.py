@@ -8,14 +8,18 @@ from sqlalchemy.exc import IntegrityError
 
 from app.application.access import EVENT_ROLE_PERMISSIONS, event_permissions, require_event_permission
 from app.application.audit_service import new_id, write_audit
-from app.db import assignments, sites, users
+from app.db import assignments, sites, users, user_phones
+from app.application.phone_accounts import bind_phone, contact_identity
 from app.core.security import hash_password, new_temporary_password
 from app.domain import fail, now, stamp, text
 
 
 def install_admission_access_routes(app, engine, identify):
     def assignment_view(row):
-        return {key: row[key] for key in ('id', 'user_id', 'site_id', 'role', 'status', 'valid_from', 'valid_until', 'name', 'email', 'active') if key in row}
+        result = {key: row[key] for key in ('id', 'user_id', 'site_id', 'role', 'status', 'valid_from', 'valid_until', 'name', 'email', 'phone', 'active') if key in row}
+        if (result.get('email') or '').startswith('tel:'):
+            result['email'] = None
+        return result
 
     def validated_window(body, old=None):
         old = old or {}
@@ -48,9 +52,9 @@ def install_admission_access_routes(app, engine, identify):
         with engine.connect() as conn:
             user, _ = identify(request, conn)
             require_event_permission(conn, user, event_id, 'committee.manage')
-            rows = conn.execute(select(assignments, users.c.name, users.c.email, users.c.active).join(
+            rows = conn.execute(select(assignments, users.c.name, users.c.email, users.c.active, user_phones.c.phone).join(
                 users, users.c.id == assignments.c.user_id,
-            ).where(assignments.c.site_id == event_id, assignments.c.role.in_(EVENT_ROLE_PERMISSIONS))).mappings()
+            ).outerjoin(user_phones, user_phones.c.user_id == users.c.id).where(assignments.c.site_id == event_id, assignments.c.role.in_(EVENT_ROLE_PERMISSIONS))).mappings()
             return {'assignments': [assignment_view(row) for row in rows], 'roles': sorted(EVENT_ROLE_PERMISSIONS)}
 
     @app.post('/api/admin/events/{event_id}/committee')
@@ -65,13 +69,12 @@ def install_admission_access_routes(app, engine, identify):
             # always a member: event actions come only from its assignment.
             temporary_password = None
             account_created = False
+            phone = None
             if body.get('user_id'):
                 query = select(users).where(users.c.id == text(body['user_id'], 64, True))
             else:
-                email = text(body.get('email'), 200, True).lower()
-                if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
-                    fail('EMAIL_INVALID')
-                query = select(users).where(users.c.email == email)
+                email, phone = contact_identity(body)
+                query = select(users).join(user_phones, users.c.id == user_phones.c.user_id).where(user_phones.c.phone == phone) if phone else select(users).where(users.c.email == email)
             target = conn.execute(query).mappings().first()
             if target is None and body.get('create_account') is True and not body.get('user_id'):
                 temporary_password = new_temporary_password()
@@ -81,11 +84,14 @@ def install_admission_access_routes(app, engine, identify):
                 try:
                     with conn.begin_nested():
                         conn.execute(insert(users).values(**target))
+                        if phone: bind_phone(conn, target['id'], phone)
                 except IntegrityError:
                     fail('USER_CONCURRENT_CHANGE', 409)
                 account_created = True
             if not target or not target['active']:
                 fail('ACTIVE_USER_NOT_FOUND', 404)
+            if target['role'] == 'attendee':
+                conn.execute(update(users).where(users.c.id == target['id']).values(role='member'))
             existing = conn.execute(select(assignments).where(assignments.c.user_id == target['id'], assignments.c.site_id == event_id, assignments.c.role == role)).mappings().first()
             values = {'status': 'active', **validated_window(body, existing)}
             assignment_id = existing['id'] if existing else new_id()
@@ -98,7 +104,7 @@ def install_admission_access_routes(app, engine, identify):
                 except IntegrityError:
                     fail('ASSIGNMENT_CONCURRENT_CHANGE', 409)
             write_audit(conn, actor, event_id, 'committee_assigned', {'assignment_id': assignment_id, 'user_id': target['id'], 'role': role, 'account_created': account_created, **values})
-            return {'id': assignment_id, 'user_id': target['id'], 'site_id': event_id, 'name': target['name'], 'email': target['email'], 'role': role,
+            return {'id': assignment_id, 'user_id': target['id'], 'site_id': event_id, 'name': target['name'], 'email': None if target['email'].startswith('tel:') else target['email'], 'phone': phone, 'role': role,
                     'account_created': account_created, 'temporary_password': temporary_password,
                     'must_change_password': bool(target.get('must_change_password')), **values}
 

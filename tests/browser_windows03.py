@@ -123,7 +123,7 @@ with sync_playwright() as p:
         page.set_viewport_size({'width':1440,'height':1000})
         setup('admin');page.evaluate('PXAdmin.adminPage()')
         account=ACCOUNTS[2]
-        page.get_by_label('البريد الإلكتروني',exact=True).fill(account['email'])
+        page.get_by_label('رقم الهاتف',exact=True).fill(account['email'])
         page.get_by_label('كلمة المرور',exact=True).fill(account['password'])
         page.get_by_role('button',name='تسجيل الدخول',exact=True).click()
         page.get_by_role('heading',level=1,name='نظرة عامة').wait_for()
@@ -176,7 +176,7 @@ with sync_playwright() as p:
         client.post('/api/access-request',json={'site_id':'event-demo','name':'UI Request','email':'ui-request@example.test'})
         setup('admin');page.evaluate('PXAdmin.adminPage()')
         organizer=ACCOUNTS[1]
-        page.get_by_label('البريد الإلكتروني',exact=True).fill(organizer['email'])
+        page.get_by_label('رقم الهاتف',exact=True).fill(organizer['email'])
         page.get_by_label('كلمة المرور',exact=True).fill(organizer['password'])
         page.get_by_role('button',name='تسجيل الدخول',exact=True).click()
         page.get_by_role('heading',level=1,name='نظرة عامة').wait_for()

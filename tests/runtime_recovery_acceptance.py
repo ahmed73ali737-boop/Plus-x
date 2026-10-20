@@ -31,6 +31,7 @@ def main():
     report={'status':'failed','source_sha':env['PULSEX_SOURCE_SHA'],'project':project,
             'deadline_seconds':DEADLINE,'cycles_per_scenario':CYCLES,'cycles':[]}
     blocker=None
+    last_readiness={}
     def run(*args,timeout=300):
         try:
             return subprocess.check_output([*command,*args],cwd=ROOT,env=env,text=True,stderr=subprocess.STDOUT,timeout=timeout)
@@ -48,7 +49,9 @@ def main():
             start=time.monotonic() if start is None else start
             while time.monotonic()-start<DEADLINE:
                 try:
-                    if all(client.get(base+'/api/health/ready').status_code==200 for base in ('http://127.0.0.1:14310','http://127.0.0.1:18080')):
+                    responses=[client.get(base+'/api/health/ready') for base in ('http://127.0.0.1:14310','http://127.0.0.1:18080')]
+                    last_readiness.update({key:{'status':r.status_code,'body':r.text[:1000]} for key,r in zip(('direct','proxy'),responses)})
+                    if all(r.status_code==200 for r in responses):
                         return round(time.monotonic()-start,3)
                 except httpx.HTTPError:pass
                 time.sleep(.5)
@@ -77,7 +80,12 @@ def main():
                     report['cycles'].append(cycle)
                     started=time.monotonic()
                     if scenario=='app-stop-start':
-                        run('stop','-t','30','app');run('start','app')
+                        app_id=cid('app')
+                        run('stop','-t','30','app')
+                        # Start the exact stopped container. Compose's service
+                        # convergence is exercised separately by the recreate case.
+                        subprocess.check_output(['docker','start',app_id],text=True,timeout=30)
+                        assert cid('app')==app_id,'STOP_START_CHANGED_CONTAINER'
                     elif scenario=='app-recreate-new-ip':
                         old=inspect(cid('app'));network,net=next(iter(old['NetworkSettings']['Networks'].items()))
                         run('stop','app');run('rm','-f','app')
@@ -102,6 +110,13 @@ def main():
             report['status']='passed'
         except Exception as error:
             report['error']=str(error).replace(env['RECOVERY_DB_PASSWORD'],'[redacted]')
+            report['last_readiness']=last_readiness
+            try:
+                report['failure_containers']=snapshot()
+                activity=run('exec','-T','postgres','psql','-U','pulsex','-d','pulsex','-Atc',
+                    'SELECT state, wait_event_type, wait_event FROM pg_stat_activity WHERE datname = current_database()')
+                report['database_wait_states']=activity.splitlines()
+            except Exception:pass
         finally:
             try:
                 logs=run('logs','--no-color').replace(env['RECOVERY_DB_PASSWORD'],'[redacted]')

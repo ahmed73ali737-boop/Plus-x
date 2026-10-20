@@ -114,4 +114,5 @@ def test_normal_host_login_rate_limit_still_applies(tmp_path):
 
 
 def test_postgres_migration_chain_includes_event_guest_pass_number():
-    assert {"009_invitations.sql", "010_account_preferences_notifications.sql"}.issubset({path.name for path in MIGRATIONS})
+    assert {"007_event_guest_pass_number.sql", "009_invitations.sql", "010_account_preferences_notifications.sql",
+            "011_phone_accounts.sql", "011_certificates.sql", "012_certificate_batches.sql"}.issubset({path.name for path in MIGRATIONS})
