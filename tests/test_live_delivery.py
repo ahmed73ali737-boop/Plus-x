@@ -105,7 +105,10 @@ def test_shared_edge_effective_compose_configuration(monkeypatch):
         monkeypatch.setenv(key,value)
     output=subprocess.check_output(['docker','compose','-f','compose.yaml','-f','ops/compose.shared-edge.yaml','config','--format','json'],cwd=ROOT,text=True)
     services=json.loads(output)['services']
-    assert services['proxy']['profiles']==['dedicated-edge']
+    # Compose omits services with inactive profiles from the effective config.
+    # Their absence proves the existing edge will not compete with project Caddy.
+    assert set(services)=={'app','postgres'}
+    assert set(services['app']['depends_on'])=={'postgres'}
     port=services['app']['ports'][0]
     assert port['host_ip']=='127.0.0.1' and str(port['published'])=='14310' and port['target']==4310
     assert services['app']['environment']['PUBLIC_ORIGIN']=='https://eventna.app'
