@@ -81,7 +81,7 @@ def install_security_middleware(app, public_origin: str) -> None:
             ip = request.client.host if request.client else "unknown"
             bucket = (
                 "auth"
-                if path.startswith("/api/auth/login")
+                if path.startswith("/api/auth/") and request.method != "GET"
                 else "signup"
                 if path in ("/api/signup-request", "/api/access-request")
                 else "guest"

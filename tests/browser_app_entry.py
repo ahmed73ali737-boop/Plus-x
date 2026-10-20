@@ -35,7 +35,7 @@ def main():
                     mark('download_link_returns_pinned_apk_bytes')
                     page.get_by_label('اسم الجهة أو المؤسسة',exact=True).fill('Synthetic browser org')
                     page.get_by_label('اسم المسؤول',exact=True).fill('Synthetic browser owner')
-                    page.get_by_label('البريد الإلكتروني',exact=True).fill('browser-entry@example.test')
+                    page.get_by_label('رقم الهاتف',exact=True).fill('777991234')
                     page.get_by_role('button',name='إرسال طلب المراجعة',exact=True).click()
                     page.get_by_text('يلزم الموافقة على إرسال البيانات قبل تقديم الطلب.',exact=True).wait_for()
                     page.get_by_label('أوافق على إرسال هذه البيانات للمنظم لمراجعة طلب الحساب.',exact=True).check()
@@ -47,8 +47,8 @@ def main():
                     assert page.url==base+'/'
                     page.goto(base+'/start')
                     page.get_by_role('link',name='تسجيل الدخول',exact=True).click()
-                    page.get_by_label('البريد الإلكتروني',exact=True).wait_for()
-                    assert page.get_by_role('link',name='إنشاء طلب حساب جهة',exact=True).count()==1
+                    page.get_by_label('رقم الهاتف',exact=True).wait_for()
+                    assert page.get_by_role('link',name='إنشاء حساب برقم الهاتف',exact=True).count()==1
                     mark('guest_and_registered_routes_reach_canonical_surfaces')
                     page.goto(base+'/start');page.set_viewport_size({'width':1440,'height':1000})
                     page.get_by_role('link',name='تحميل Android',exact=False).wait_for()

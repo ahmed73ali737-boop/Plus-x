@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, update, insert, delete, func
 from sqlalchemy.exc import IntegrityError
-from .db import make_engine, metadata, ensure_compat_schema, sites, versions, users, sessions, imports, submissions, requests, audit, organizations, organization_people, memberships, event_participations, assignments, devices, signup_requests
+from .db import make_engine, metadata, ensure_compat_schema, sites, versions, users, user_phones, sessions, imports, submissions, requests, audit, organizations, organization_people, memberships, event_participations, assignments, devices, signup_requests
 from .domain import fail, now, text, number, boolean, normalize_config, normalize_record, default_config, survey_answers, answer_value, stamp, KINDS, QTYPES, SECTIONS
 from .imports import parse as parse_import
 from .core.security import digest, hash_password as password_hash, verify_password as password_ok, new_session_token, new_csrf_token, new_temporary_password
@@ -34,6 +34,8 @@ from .api.middleware import install_security_middleware
 from .api.routers.health import create_health_router
 from .api.routers.downloads import create_download_router
 from .application.auth_service import identify_request
+from .application.phone_accounts import account_phone, bind_phone, find_by_phone, principal, public_user, contact_identity, find_contact_user
+from .api.auth_routes import install_auth_routes, session_response
 from .application.collection_service import validate_submission, build_metrics
 from .application.device_service import create_device, list_devices, update_device, heartbeat as device_heartbeat
 from .application.access_request_service import list_requests, set_request_status
@@ -96,10 +98,13 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     def identify(req,c,write=False):
         u,sess=identify_request(req,c,write)
         path=req.scope.get('path') or '/'
+        if u['role']=='attendee' and path.startswith('/api/admin/'):
+            fail('FORBIDDEN_ROLE',403)
         if u.get('must_change_password') and path not in ('/api/auth/me','/api/auth/password','/api/auth/logout','/api/auth/sessions','/api/auth/sessions/revoke-all'):
             fail('PASSWORD_CHANGE_REQUIRED',428)
         return u,sess
 
+    install_auth_routes(app, engine, identify)
     install_guest_routes(app, engine, public_origin, identify=identify, site_row=site_row, log=log)
     install_invitation_routes(app, engine, public_origin, identify=identify, log=log, authorize=require_event_permission)
     install_admission_access_routes(app, engine, identify=identify)
@@ -108,22 +113,22 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
 
     @app.post('/api/auth/login')
     def login(body:dict,request:Request):
-        email=text(body.get('email'),200).lower()
         with engine.begin() as c:
-            u=row(c,users,'email',email)
+            if body.get('phone'):
+                try:u=find_by_phone(c,body.get('phone'))
+                except HTTPException:u=None
+            else:
+                email=text(body.get('email'),200).lower()
+                # Retain existing email accounts; internal tel principals are not emails.
+                u=None if email.startswith('tel:') else row(c,users,'email',email)
             valid=password_ok(body.get('password'),u['password_hash'] if u else dummy)
             if not u or not valid or not u['active']:fail('INVALID_CREDENTIALS',401)
-            token=new_session_token();csrf=new_csrf_token()
-            c.execute(insert(sessions).values(token_hash=digest(token),user_id=u['id'],csrf=csrf,expires_at=(datetime.now(timezone.utc)+timedelta(hours=8)).isoformat()))
-            log(c,u,u['scope_id'],'login')
-            response=JSONResponse({'user':{**{k:u[k] for k in ('id','email','name','role','scope_id')},'must_change_password':bool(u.get('must_change_password'))},'csrf':csrf})
-            response.set_cookie('px_session',token,httponly=True,secure=app.state.cookie_secure,samesite='strict',max_age=28800,path='/')
-            return response
+            return session_response(app,c,u)
 
     @app.get('/api/auth/me')
     def me(request:Request):
         with engine.connect() as c:
-            u,s=identify(request,c);return {'user':{**{k:u[k] for k in ('id','email','name','role','scope_id')},'must_change_password':bool(u.get('must_change_password'))},'csrf':s['csrf']}
+            u,s=identify(request,c);return {'user':public_user(c,u),'csrf':s['csrf']}
 
     @app.post('/api/auth/logout')
     def logout(request:Request):
@@ -162,7 +167,12 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
         with engine.begin() as c:
             u,s=identify(request,c,True)
             if not password_ok(body.get('current'),u['password_hash']):fail('INVALID_CREDENTIALS',401)
-            hashed=password_hash(body.get('password'));c.execute(update(users).where(users.c.id==u['id']).values(password_hash=hashed,must_change_password=0));c.execute(delete(sessions).where(sessions.c.user_id==u['id']));log(c,u,u['scope_id'],'password_changed')
+            if body.get('password') == body.get('current'):fail('PASSWORD_MUST_DIFFER')
+            if 'confirmation' in body and body['confirmation'] != body.get('password'):fail('PASSWORD_CONFIRMATION_MISMATCH')
+            hashed=password_hash(body.get('password'))
+            changed=c.execute(update(users).where(users.c.id==u['id'],users.c.password_hash==u['password_hash'],users.c.active==1).values(password_hash=hashed,must_change_password=0)).rowcount
+            if changed != 1:fail('INVALID_CREDENTIALS',401)
+            c.execute(delete(sessions).where(sessions.c.user_id==u['id']));log(c,u,u['scope_id'],'password_changed')
         r=JSONResponse({'ok':True});r.delete_cookie('px_session',path='/');return r
 
     @app.post('/api/access-request')
@@ -180,22 +190,24 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             require_public_event(c,event_id_for_site(c,site))
             role=body.get('requested_role')
             if role not in ('organizer','participant'):fail('REQUESTED_ROLE_INVALID')
-            email=text(body.get('email'),200,True).lower()
-            if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):fail('EMAIL_INVALID')
+            email,phone=contact_identity(body)
             org_name=text(body.get('organization_name'),200,True)
             contact=text(body.get('contact_name') or org_name,160,True)
-            phone=text(body.get('phone'),60)
+            phone=phone or ''
             ptype=body.get('participation_type') if body.get('participation_type') in ('exhibitor','sponsor','partner','speaker','media','vendor') else 'exhibitor'
             event_id=site['id'] if site['kind']=='event' else site.get('event_id') if role=='participant' else None
             rid=uid()
-            c.execute(insert(signup_requests).values(id=rid,site_id=sid,event_id=event_id,requested_role=role,organization_name=org_name,contact_name=contact,email=email,phone=phone,participation_type=ptype,wants_account=1 if boolean(body.get('wants_account',True)) else 0,status='pending',details={'message':text(body.get('message'),1500)},created_at=now()))
+            existing=c.execute(select(signup_requests.c.id).where(signup_requests.c.site_id==sid,signup_requests.c.email==email,signup_requests.c.requested_role==role,signup_requests.c.organization_name==org_name,signup_requests.c.status=='pending')).scalar()
+            if existing:
+                return {'id':existing,'status':'pending','requested_role':role,'grants_access':False,'already_pending':True}
+            c.execute(insert(signup_requests).values(id=rid,site_id=sid,event_id=event_id,requested_role=role,organization_name=org_name,contact_name=contact,email=email,phone=phone,participation_type=ptype,wants_account=1 if boolean(body.get('wants_account',True)) else 0,status='pending',details={'message':text(body.get('message'),1500),'verification_required':False},created_at=now()))
         return {'id':rid,'status':'pending','requested_role':role,'grants_access':False}
 
     @app.get('/api/admin/signup-requests')
     def admin_signup_requests(request:Request, site_id:str|None=None):
         with engine.connect() as c:
             u,_=identify(request,c)
-            if u['role']=='agency':fail('FORBIDDEN_ROLE',403)
+            if u['role'] not in ('platform','organizer'):fail('FORBIDDEN_ROLE',403)
             q=select(signup_requests).order_by(signup_requests.c.created_at.desc())
             rows=[dict(x) for x in c.execute(q).mappings()]
             if u['role']=='organizer':rows=[x for x in rows if x.get('event_id')==u['scope_id']]
@@ -208,8 +220,11 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             u,_=identify(request,c,True)
             req=c.execute(select(signup_requests).where(signup_requests.c.id==rid)).mappings().first()
             if not req:fail('SIGNUP_REQUEST_NOT_FOUND',404)
-            if u['role']=='agency' or (u['role']=='organizer' and req.get('event_id')!=u['scope_id']):fail('FORBIDDEN_ROLE',403)
+            if u['role'] not in ('platform','organizer') or (u['role']=='organizer' and req.get('event_id')!=u['scope_id']):fail('FORBIDDEN_ROLE',403)
             action=body.get('status')
+            if action not in ('approved','rejected'):fail('REQUEST_STATUS_INVALID')
+            changed=c.execute(update(signup_requests).where(signup_requests.c.id==rid,signup_requests.c.status=='pending').values(status=action)).rowcount
+            if changed != 1:fail('REQUEST_ALREADY_REVIEWED',409)
             if action=='rejected':
                 c.execute(update(signup_requests).where(signup_requests.c.id==rid).values(status='rejected'));log(c,u,req['site_id'],'signup_request_rejected',{'request_id':rid});return {'status':'rejected'}
             if action!='approved':fail('REQUEST_STATUS_INVALID')
@@ -226,10 +241,15 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
                 c.execute(insert(event_participations).values(id=uid(),event_id=event['id'],organization_id=oid,agency_site_id=agency_sid,participation_type=req['participation_type'],status='active',booth='',summary='',services=[],valid_from=event['draft'].get('start') or '',valid_until=event['draft'].get('end') or '',created_at=now()))
             temp=None; account_deferred=False
             if req['wants_account'] and agency_sid:
-                existing=row(c,users,'email',req['email'])
-                if existing:uid_user=existing['id']
+                existing=(find_by_phone(c,req['phone']) if req['phone'] else row(c,users,'email',req['email']))
+                if existing:
+                    uid_user=existing['id']
+                    if not existing['active']:fail('ACCOUNT_SUSPENDED',409)
+                    if existing['role']=='attendee':
+                        c.execute(update(users).where(users.c.id==uid_user).values(role='member',scope_id=agency_sid))
                 else:
                     temp=new_temporary_password();uid_user=uid();c.execute(insert(users).values(id=uid_user,email=req['email'],name=req['contact_name'],role='agency',scope_id=agency_sid,password_hash=password_hash(temp),active=1,must_change_password=1))
+                if req['phone']:bind_phone(c,uid_user,account_phone(req['phone']))
                 if not c.execute(select(memberships).where(memberships.c.user_id==uid_user,memberships.c.organization_id==oid)).first():c.execute(insert(memberships).values(user_id=uid_user,organization_id=oid,role='owner',status='active',created_at=now()))
             elif req['wants_account']:
                 account_deferred=True
@@ -301,7 +321,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
         with engine.connect() as c:
             u,_=identify(request,c);s=require_scope(c,u,sid)
             if u['role']=='agency':fail('FORBIDDEN_ROLE',403)
-            return {'users':[dict(x) for x in c.execute(select(users.c.id,users.c.email,users.c.name,users.c.role,users.c.scope_id,users.c.active).where(users.c.scope_id==sid)).mappings()], 'requests':list_requests(c,sid)}
+            entries=c.execute(select(users.c.id,users.c.email,users.c.name,users.c.role,users.c.scope_id,users.c.active,user_phones.c.phone).outerjoin(user_phones,users.c.id==user_phones.c.user_id).where(users.c.scope_id==sid)).mappings()
+            return {'users':[{**dict(x),'email':None if x['email'].startswith('tel:') else x['email']} for x in entries], 'requests':list_requests(c,sid)}
 
     @app.post('/api/admin/sites/{sid}/users')
     def add_user(sid:str,body:dict,request:Request):
@@ -310,14 +331,16 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             if u['role']=='agency' or s['kind']=='platform':fail('FORBIDDEN_ROLE',403)
             role='organizer' if s['kind']=='event' else 'agency'
             if role=='organizer' and u['role']!='platform':fail('FORBIDDEN_ROLE',403)
-            email=text(body.get('email'),200,True).lower()
-            if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):fail('EMAIL_INVALID')
+            email,phone=contact_identity(body)
+            if phone and find_by_phone(c,phone):fail('PHONE_ALREADY_REGISTERED',409)
             if row(c,users,'email',email):fail('EMAIL_EXISTS',409)
             pw=new_temporary_password()
-            c.execute(insert(users).values(id=uid(),email=email,name=text(body.get('name'),160,True),role=role,scope_id=sid,password_hash=password_hash(pw),active=1,must_change_password=1))
+            user_id=uid()
+            c.execute(insert(users).values(id=user_id,email=email,name=text(body.get('name'),160,True),role=role,scope_id=sid,password_hash=password_hash(pw),active=1,must_change_password=1))
+            if phone:bind_phone(c,user_id,phone)
             c.execute(update(requests).where(requests.c.site_id==sid,requests.c.email==email).values(status='approved'))
             log(c,u,sid,'user_created',{'email':email})
-        return {'email':email,'temporary_password':pw,'role':role,'change_password_required_by_operator':True}
+        return {'email':None if email.startswith('tel:') else email,'phone':phone,'temporary_password':pw,'role':role,'change_password_required_by_operator':True}
 
     @app.patch('/api/admin/sites/{sid}/access-requests/{rid}')
     def review_access_request(sid:str,rid:str,body:dict,request:Request):
@@ -370,7 +393,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             active=body.get('active')
             if active not in (True,False,0,1):fail('USER_STATUS_INVALID')
             c.execute(update(users).where(users.c.id==user_id).values(active=1 if active else 0))
-            if not active:c.execute(delete(sessions).where(sessions.c.user_id==user_id))
+            if not active:
+                c.execute(delete(sessions).where(sessions.c.user_id==user_id))
             log(c,actor,sid,'user_status_changed',{'user_id':user_id,'active':bool(active)})
             return {'id':user_id,'active':bool(active),'sessions_revoked':not bool(active)}
 
@@ -477,18 +501,21 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             if not _can_manage_org_people(c,u,oid):fail('FORBIDDEN_ROLE',403)
             if person['user_id']:
                 existing=row(c,users,'id',person['user_id']);return {'email':existing['email'],'temporary_password':None,'already_linked':True,'organization_id':oid}
-            email=text(body.get('email') or person['email'],200,True).lower()
-            if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):fail('EMAIL_INVALID')
-            existing=row(c,users,'email',email);pw=None
-            if existing:user_id=existing['id']
+            email,phone=contact_identity({'phone':body.get('phone') or person['phone'],'email':body.get('email') or person['email']},preserve_email=True)
+            existing=find_contact_user(c,email,phone);pw=None
+            if existing:
+                if not existing['active']:fail('ACCOUNT_SUSPENDED',409)
+                user_id=existing['id']
+                if existing['role']=='attendee':c.execute(update(users).where(users.c.id==user_id).values(role='member'))
             else:
                 pw=new_temporary_password();user_id=uid();scope=c.execute(select(event_participations.c.agency_site_id).where(event_participations.c.organization_id==oid,event_participations.c.status=='active').order_by(event_participations.c.created_at.desc())).scalar()
                 c.execute(insert(users).values(id=user_id,email=email,name=person['name'],role='agency',scope_id=scope,password_hash=password_hash(pw),active=1,must_change_password=1))
+            if phone:bind_phone(c,user_id,phone)
             role=body.get('role') if body.get('role') in ('owner','admin','editor','analyst') else 'editor'
             if not c.execute(select(memberships).where(memberships.c.user_id==user_id,memberships.c.organization_id==oid)).first():c.execute(insert(memberships).values(user_id=user_id,organization_id=oid,role=role,status='active',created_at=now()))
-            c.execute(update(organization_people).where(organization_people.c.id==pid).values(user_id=user_id,email=email))
+            c.execute(update(organization_people).where(organization_people.c.id==pid).values(user_id=user_id,**({'email':email} if not email.startswith('tel:') else {})))
             log(c,u,u['scope_id'],'organization_person_account_created',{'organization_id':oid,'person_id':pid,'email':email,'new_account':bool(pw)})
-            return {'email':email,'temporary_password':pw,'already_linked':False,'organization_id':oid,'permanent_membership':True}
+            return {'email':None if email.startswith('tel:') else email,'phone':phone,'temporary_password':pw,'already_linked':False,'organization_id':oid,'permanent_membership':True}
 
     @app.post('/api/admin/organizations/{oid}/users')
     def add_organization_user(oid:str,body:dict,request:Request):
@@ -496,16 +523,19 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             u,_=identify(request,c,True);org=row(c,organizations,'id',oid)
             if not org or not organization_visible(c,u,oid):fail('ORGANIZATION_NOT_FOUND',404)
             if u['role']=='agency' and not c.execute(select(memberships).where(memberships.c.user_id==u['id'],memberships.c.organization_id==oid,memberships.c.role=='owner')).first():fail('FORBIDDEN_ROLE',403)
-            email=text(body.get('email'),200,True).lower()
-            if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):fail('EMAIL_INVALID')
-            existing=row(c,users,'email',email);pw=None
-            if existing:user_id=existing['id']
+            email,phone=contact_identity(body,preserve_email=True)
+            existing=find_contact_user(c,email,phone);pw=None
+            if existing:
+                if not existing['active']:fail('ACCOUNT_SUSPENDED',409)
+                user_id=existing['id']
+                if existing['role']=='attendee':c.execute(update(users).where(users.c.id==user_id).values(role='member'))
             else:
                 pw=new_temporary_password();user_id=uid();scope=c.execute(select(event_participations.c.agency_site_id).where(event_participations.c.organization_id==oid).order_by(event_participations.c.created_at.desc())).scalar()
                 c.execute(insert(users).values(id=user_id,email=email,name=text(body.get('name'),160,True),role='agency',scope_id=scope,password_hash=password_hash(pw),active=1,must_change_password=1))
+            if phone:bind_phone(c,user_id,phone)
             if not c.execute(select(memberships).where(memberships.c.user_id==user_id,memberships.c.organization_id==oid)).first():c.execute(insert(memberships).values(user_id=user_id,organization_id=oid,role=body.get('role') if body.get('role') in ('owner','admin','editor','analyst') else 'admin',status='active',created_at=now()))
             log(c,u,u['scope_id'],'organization_user_added',{'organization_id':oid,'email':email})
-            return {'email':email,'temporary_password':pw,'organization_id':oid,'permanent_membership':True}
+            return {'email':None if email.startswith('tel:') else email,'phone':phone,'temporary_password':pw,'organization_id':oid,'permanent_membership':True}
 
     @app.get('/api/admin/organizations/{oid}/members')
     def list_organization_members(oid:str,request:Request):

@@ -158,6 +158,15 @@
   "/api/admin/sites/{sid}/users/{user_id}": [
     "patch"
   ],
+  "/api/admin/users": [
+    "get"
+  ],
+  "/api/admin/users/{user_id}": [
+    "patch"
+  ],
+  "/api/admin/users/{user_id}/password/reset": [
+    "post"
+  ],
   "/api/auth/login": [
     "post"
   ],
@@ -167,7 +176,19 @@
   "/api/auth/me": [
     "get"
   ],
+  "/api/auth/options": [
+    "get"
+  ],
   "/api/auth/password": [
+    "post"
+  ],
+  "/api/auth/password/reset": [
+    "post"
+  ],
+  "/api/auth/phone": [
+    "post"
+  ],
+  "/api/auth/register": [
     "post"
   ],
   "/api/auth/sessions": [

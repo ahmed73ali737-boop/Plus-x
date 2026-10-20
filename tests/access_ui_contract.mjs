@@ -14,13 +14,13 @@ const text=n=>n instanceof Element?n.children.map(text).join(' '):String(n??'');
 async function runtime(failDownload=false){
  const h=(t,a,...c)=>new Element(t,a,c),root=h('main',{}),head=h('head',{}),calls=[];let pending=null;
  const ctx=vm.createContext({document:{head,documentElement:{},querySelector:()=>null},Number,Error});
- const ui={h,root,brand:()=>h('a',{href:'/'},'PulseX'),
+ const ui={h,root,msg:e=>e.message,brand:()=>h('a',{href:'/'},'PulseX'),
   field:(label,type,value,attrs)=>{const input=h('input',{label,type,value,...attrs});return{input,node:h('label',{},input)};},
   selectField:(label,options,value)=>{const input=h('select',{label,value},options.map(([v,l])=>h('option',{value:v},l)));return{input,node:h('label',{},input)};},
   check:label=>{const input=h('input',{type:'checkbox',label});return{input,node:h('label',{},input)};},
   api:async(path,body)=>{calls.push({path,body});if(path==='/api/downloads/android'){if(failDownload)throw Error('offline');return{channel:'preview',download_url:'/downloads/eventna-android-preview.apk',bytes:299736,sha256:'a'.repeat(64),min_android:8};}if(path==='/api/public/site/platform')return{events:[{id:'event-demo',title:'Event'}]};if(path==='/api/signup-request')return pending?pending:{status:'pending',grants_access:false};throw Error(path);}};
  const mod=new vm.SourceTextModule(await readFile(new URL('../web/access.mjs',import.meta.url),'utf8'),{context:ctx});
- await mod.link(()=>new vm.SyntheticModule(Object.keys(ui),function(){for(const[k,v]of Object.entries(ui))this.setExport(k,v);},{context:ctx}));await mod.evaluate();await mod.namespace.accessPage();
+ await mod.link(specifier=>{const exports=ui;return new vm.SyntheticModule(Object.keys(exports),function(){for(const[k,v]of Object.entries(exports))this.setExport(k,v);},{context:ctx});});await mod.evaluate();await mod.namespace.accessPage();
  return{root,calls,form:()=>walk(root).find(x=>x.tag==='form'),field:label=>walk(root).find(x=>x.attrs.label===label),setPending(p){pending=p;}};
 }
 test('public choices and preview download are explicit and same-origin',async()=>{

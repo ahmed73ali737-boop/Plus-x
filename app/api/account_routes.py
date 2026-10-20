@@ -2,6 +2,7 @@
 from fastapi import Request
 from sqlalchemy import select, insert, update
 from app.db import preferences, notifications, users
+from app.application.phone_accounts import find_by_phone
 from app.domain import fail, text, now
 from app.application.audit_service import new_id, write_audit
 
@@ -58,9 +59,12 @@ def install_account_routes(app, engine, *, identify):
             user, _ = identify(request, c, True)
             if user['role'] != 'platform':
                 fail('FORBIDDEN_ROLE', 403)
-            email = text(body.get('email'), 200, True).lower()
-            target = c.execute(select(users).where(users.c.email == email, users.c.active == 1)).mappings().first()
-            if not target:
+            if body.get('phone'):
+                target = find_by_phone(c, body['phone'])
+            else:
+                email = text(body.get('email'), 200, True).lower()
+                target = c.execute(select(users).where(users.c.email == email)).mappings().first()
+            if not target or not target['active']:
                 fail('ACCOUNT_NOT_FOUND', 404)
             nid = new_id()
             c.execute(insert(notifications).values(id=nid, user_id=target['id'], sender_id=user['id'],
