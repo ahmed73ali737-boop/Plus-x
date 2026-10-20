@@ -51,6 +51,9 @@ def main():
                     assert page.get_by_role('link',name='إنشاء طلب حساب جهة',exact=True).count()==1
                     mark('guest_and_registered_routes_reach_canonical_surfaces')
                     page.goto(base+'/start');page.set_viewport_size({'width':1440,'height':1000})
+                    page.get_by_role('link',name='تحميل Android',exact=False).wait_for()
+                    assert page.evaluate("""() => {const box=document.querySelector('.access-download>[role=status]');const b=box.getBoundingClientRect();return [...box.children].every(el=>{const r=el.getBoundingClientRect();return r.left>=b.left-1&&r.right<=b.right+1;});}""")
+                    mark('desktop_download_copy_stays_in_its_column')
                     page.screenshot(path=str(OUT/'desktop-entry.png'),full_page=True)
                     assert not errors,errors
                     report['status']='passed'
