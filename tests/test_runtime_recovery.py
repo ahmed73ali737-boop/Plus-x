@@ -40,3 +40,14 @@ def test_probe_fails_on_transport_error(monkeypatch):
     def down(*a,**k):raise OSError('down')
     monkeypatch.setattr(app_healthcheck.urllib.request,'urlopen',down)
     assert app_healthcheck.main()==1
+
+
+def test_recovery_subnet_handles_null_ipam_and_excludes_existing_networks():
+    import ipaddress
+    from runtime_recovery_acceptance import recovery_subnet
+    networks=[{'IPAM':{'Config':None}},{'IPAM':None},
+              {'IPAM':{'Config':[{'Subnet':'10.233.0.0/17'},{'Subnet':'fd00::/64'}]}}]
+    chosen=ipaddress.ip_network(recovery_subnet(networks))
+    assert chosen.subnet_of(ipaddress.ip_network('10.233.128.0/17'))
+    with pytest.raises(RuntimeError,match='NO_ISOLATED_RECOVERY_SUBNET'):
+        recovery_subnet([{'IPAM':{'Config':[{'Subnet':'10.233.0.0/16'}]}}])

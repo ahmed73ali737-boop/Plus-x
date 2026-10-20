@@ -13,17 +13,19 @@ DEADLINE=90
 CYCLES=5
 
 
+def recovery_subnet(existing):
+    occupied=[ipaddress.ip_network(config['Subnet']) for network in existing
+              for config in ((network.get('IPAM') or {}).get('Config') or []) if config.get('Subnet')]
+    available=[ipaddress.ip_network(f'10.233.{index}.0/24') for index in range(256)]
+    available=[network for network in available if not any(network.overlaps(other) for other in occupied if other.version==4)]
+    if not available:raise RuntimeError('NO_ISOLATED_RECOVERY_SUBNET')
+    return str(secrets.choice(available))
+
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     project='px-recovery-'+uuid.uuid4().hex[:10]
-    network_ids=subprocess.check_output(['docker','network','ls','-q'],text=True).split()
-    existing=json.loads(subprocess.check_output(['docker','network','inspect',*network_ids],text=True)) if network_ids else []
-    occupied=[ipaddress.ip_network(config['Subnet']) for network in existing for config in network.get('IPAM',{}).get('Config',[]) if config.get('Subnet')]
-    candidates=[ipaddress.ip_network(f'10.233.{index}.0/24') for index in range(256)]
-    available=[network for network in candidates if not any(network.overlaps(other) for other in occupied if other.version==4)]
-    if not available:raise RuntimeError('NO_ISOLATED_RECOVERY_SUBNET')
     env={**os.environ,'RECOVERY_DB_PASSWORD':secrets.token_hex(24),
-         'RECOVERY_SUBNET':str(secrets.choice(available)),
          'PULSEX_SOURCE_SHA':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()}
     command=['docker','compose','-p',project,'-f',str(ROOT/'ops/compose.recovery.yaml')]
     report={'status':'failed','source_sha':env['PULSEX_SOURCE_SHA'],'project':project,
@@ -52,6 +54,10 @@ def main():
                 time.sleep(.5)
             raise RuntimeError('RECOVERY_DEADLINE_EXCEEDED')
         try:
+            network_ids=subprocess.check_output(['docker','network','ls','-q'],text=True).split()
+            existing=json.loads(subprocess.check_output(['docker','network','inspect',*network_ids],text=True)) if network_ids else []
+            env['RECOVERY_SUBNET']=recovery_subnet(existing)
+            report['subnet']=env['RECOVERY_SUBNET']
             run('up','-d','--build',timeout=900)
             wait_ready()
             run('exec','-T','proxy','caddy','validate','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
