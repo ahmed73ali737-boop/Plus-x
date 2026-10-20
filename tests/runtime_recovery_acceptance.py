@@ -23,7 +23,11 @@ def main():
             'deadline_seconds':DEADLINE,'cycles_per_scenario':CYCLES,'cycles':[]}
     blocker=None
     def run(*args,timeout=300):
-        return subprocess.check_output([*command,*args],cwd=ROOT,env=env,text=True,stderr=subprocess.STDOUT,timeout=timeout)
+        try:
+            return subprocess.check_output([*command,*args],cwd=ROOT,env=env,text=True,stderr=subprocess.STDOUT,timeout=timeout)
+        except subprocess.CalledProcessError as error:
+            (OUT/'command-failure.log').write_text((error.output or '').replace(env['RECOVERY_DB_PASSWORD'],'[redacted]'),encoding='utf-8')
+            raise
     def cid(service):return run('ps','-q',service).strip()
     def inspect(container):return json.loads(subprocess.check_output(['docker','inspect',container],text=True))[0]
     def snapshot():

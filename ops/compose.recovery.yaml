@@ -21,7 +21,8 @@ services:
     command: ["sh", "-c", "python -m tools.migrate_postgres && exec python run.py"]
     environment:
       DATABASE_URL: postgresql+psycopg://pulsex:${RECOVERY_DB_PASSWORD}@postgres:5432/pulsex
-      REQUIRE_POSTGRES: "true"
+      # Test environment uses a PostgreSQL URL without claiming production acceptance.
+      REQUIRE_POSTGRES: "false"
       PULSEX_ENV: test
       PUBLIC_ORIGIN: http://127.0.0.1:18080
       SEED_DEMO: "true"
