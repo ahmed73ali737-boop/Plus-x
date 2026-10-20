@@ -1,0 +1,16 @@
+{
+  "source_sha": "5b116cc9b93ec746be4860ab1a87feb354fe288c",
+  "baseline": "8541dbc58d508bc7db32d4aa86399dd63ee8a818",
+  "local_tests": {
+    "passed": 35,
+    "skipped": 1,
+    "skip_reason": "No local Docker; required Compose validation added to CI"
+  },
+  "live_domain_verified": false,
+  "ssh_available": false,
+  "files": {
+    "targeted.xml": "1973d730bbb1870c0e9d1983f38353d5981dcc48a57887202f1c34b8f8053d5f",
+    "targeted.log": "100db74aa9b771d3f71106b2c06cda4ad26dfe26f89d0cf223f12d7f772ebbae",
+    "eventna-observed.json": "e01ad29c320199aa3045ca0352eb07a3b67f3ef0b5bb19993bbe806f3e5400ce"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "scope": "read_only_delivery_smoke",
+  "production_accepted": false,
+  "physical_device_tested": false,
+  "checks": [],
+  "expected_source": "8541dbc58d508bc7db32d4aa86399dd63ee8a818",
+  "origin": "https://eventna.app",
+  "local_test": false,
+  "error_type": "ConnectError",
+  "reason": "DELIVERY_PROBE_FAILED"
+}

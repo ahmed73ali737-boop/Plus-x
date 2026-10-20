@@ -35,6 +35,10 @@ jobs:
         run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
       - name: Install hash-locked acceptance dependencies
         run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
+      - name: Validate shared-edge overlay without starting services
+        run: python -m pytest -q tests/test_live_delivery.py::test_shared_edge_effective_compose_configuration
+        env:
+          PX_REQUIRE_COMPOSE_CHECK: 'YES'
       - name: Run disposable Compose recovery acceptance
         shell: bash
         run: |
