@@ -154,7 +154,7 @@ async function renderPass(page,slug,g){
   host.append(h('section',{class:'guest-pass-wrap'},
     h('div',{class:'guest-pass'},
       h('div',{class:'guest-pass-glow'}),
-      h('div',{class:'guest-pass-head'},h('div',{},h('span',{class:'eyebrow'},'PULSEX GUEST PASS'),h('h1',{},g.name||'زائر')),h('span',{class:'live-pill'},g.synced?'مسجّلة بالخادم':'محفوظة محليًا')),
+      h('div',{class:'guest-pass-head'},h('div',{},h('span',{class:'eyebrow'},'EVENTNA GUEST PASS'),h('h1',{},g.name||'زائر')),h('span',{class:'live-pill'},g.synced?'مسجّلة بالخادم':'محفوظة محليًا')),
       h('p',{class:'guest-event'},page.config.title),
       h('div',{class:'guest-number'},h('span',{},g.provisional?'رقم محلي مؤقت':'رقم الزائر'),h('strong',{},g.guest_number)),
       g.qr_data_url?h('img',{src:g.qr_data_url,alt:'QR '+g.guest_number,class:'guest-qr'}):h('div',{class:'qr-pending'},h('strong',{},g.provisional?'بانتظار خادم الفعالية لإنشاء QR النهائي':'QR ينتظر المزامنة'),h('small',{},g.provisional?'هذا الرقم المحلي لا يكشف هاتفك ولا يُستخدم كبطاقة دخول نهائية. عند الاتصال بخادم الفعالية سيستبدل برقم QR آمن.':'عند الوصول لخادم الفعالية سيظهر QR تلقائيًا.')),

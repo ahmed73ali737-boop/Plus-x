@@ -44,7 +44,7 @@ export async function liveWallPage(slug) {
   }, 'livewall-button');
   root.replaceChildren(h('div', {class: 'livewall-shell'},
     h('header', {class: 'livewall-header'},
-      h('div', {}, h('p', {class: 'livewall-kicker'}, 'PULSEX · LIVE WALL'), headline, summary),
+      h('div', {}, h('p', {class: 'livewall-kicker'}, 'EVENTNA · LIVE WALL'), headline, summary),
       h('div', {class: 'livewall-actions'}, fullscreen,
         h('a', {class: 'livewall-button', href: '/e/' + encodeURIComponent(slug)}, 'العودة للفعالية'))),
     content,
