@@ -24,7 +24,7 @@ def test_anonymous_download_matches_pinned_apk_and_headers(tmp_path):
         assert response.headers['content-type']=='application/vnd.android.package-archive'
         assert response.headers['x-content-type-options']=='nosniff'
         assert 'attachment' in response.headers['content-disposition']
-        assert len(response.content)==data['bytes']==299736
+        assert len(response.content)==data['bytes']==(ROOT/'artifacts/android'/APK_NAME).stat().st_size
         assert hashlib.sha256(response.content).hexdigest()==data['sha256']
         assert client.head(data['download_url']).content==b''
         assert client.get('/api/admin/sites').status_code==401

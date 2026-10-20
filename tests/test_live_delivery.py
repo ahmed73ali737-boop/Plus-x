@@ -49,7 +49,7 @@ def synthetic_site(path):
         return httpx.Response(200, json={'download_url':'/downloads/pulsex-android-preview.apk',
             'channel':'preview', 'production_signed':False, 'bytes':evidence['apk_bytes'], 'sha256':evidence['apk_sha256']})
     if path == '/downloads/pulsex-android-preview.apk':
-        return httpx.Response(200, content=(ROOT/'artifacts/android/PulseX-Android-Preview-1.0.2.apk').read_bytes(),
+        return httpx.Response(200, content=(ROOT/'artifacts/android/Eventna-Android-Preview-1.0.3.apk').read_bytes(),
             headers={'content-type':'application/vnd.android.package-archive',
                      'content-disposition':'attachment; filename=preview.apk', 'x-content-type-options':'nosniff'})
     name=path.rsplit('/',1)[1]

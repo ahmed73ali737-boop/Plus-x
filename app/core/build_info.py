@@ -1,4 +1,4 @@
-"""Central build metadata for PulseX.
+"""Central build metadata for Eventna إيفنتنا.
 
 VERSION is the source release number. Environment overrides are reserved for
 packaged deployments and CI build labels.
@@ -19,7 +19,7 @@ def _source_version() -> str:
         return "0.0.0-dev"
 
 
-APP_NAME = "PulseX"
+APP_NAME = "Eventna إيفنتنا"
 APP_VERSION = os.environ.get("PULSEX_APP_VERSION") or _source_version()
 BUILD_LABEL = os.environ.get("PULSEX_BUILD_LABEL") or f"source-v{APP_VERSION}"
 API_VERSION = os.environ.get("PULSEX_API_VERSION", "1")

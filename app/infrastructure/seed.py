@@ -21,7 +21,7 @@ def seed_demo_data(engine, credentials_path=None, count=10, *, demo_day: date | 
         with engine.begin() as c:
             if c.execute(select(func.count()).select_from(sites)).scalar():
                 return []
-            platform = default_config('PulseX — مساحة التجارب الحيّة', 'platform')
+            platform = default_config('Eventna إيفنتنا — مساحة التجارب الحيّة', 'platform')
             platform['subtitle'] = 'منصة واحدة. فعاليات متصلة. تجارب تستحق المشاركة.'
             platform['description'] = 'استكشف الفعاليات والجهات والخدمات وشارك برأيك. هذه بيانات عرض تجريبية وليست معرضًا فعليًا.'
             platform['welcome'] = False

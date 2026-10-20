@@ -1,4 +1,4 @@
-/** Stable, immutable ordering of existing PulseX records.
+/** Stable, immutable ordering of existing Eventna إيفنتنا records.
  * This is a draft organizer, not the future conditional experience builder.
  */
 export const STORYBOARD_PAGE_SIZE = 25;

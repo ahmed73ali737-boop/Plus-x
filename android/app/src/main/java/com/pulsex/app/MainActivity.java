@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Android host for the canonical PulseX application. No copied backend or identity store. */
+/** Android host for the canonical Eventna إيفنتنا application. No copied backend or identity store. */
 public final class MainActivity extends Activity {
     private static final int INK=0xff102c34, TEAL=0xff11796f, MUTED=0xff5a7178, BG=0xfff4f8f7;
     private static final int FILE_PICK=40, FILE_SAVE=41, CAMERA=42, QR_SCAN=43, MAX_EXPORT=8*1024*1024;
@@ -68,16 +68,16 @@ public final class MainActivity extends Activity {
         home=true;if(web!=null){stopCameraTracks();web.onPause();}root.removeAllViews();
         ScrollView scroll=new ScrollView(this);content=column();content.setPadding(dp(22),dp(22),dp(22),dp(12));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout hero=column();hero.setPadding(dp(24),dp(24),dp(24),dp(26));hero.setBackground(rounded(INK,28));
-        TextView brand=label("P U L S E X",16,0xff70dfc1,true);brand.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);hero.addView(brand);addSpace(hero,20);
+        TextView brand=label("Eventna إيفنتنا",16,0xff70dfc1,true);brand.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);hero.addView(brand);addSpace(hero,20);
         hero.addView(label("حضورك يصنع\nالتجربة.",34,Color.WHITE,true));addSpace(hero,12);
         hero.addView(label("فعاليات حيّة، تفاعل أقرب، وإدارة في مكان واحد.",15,0xffbfd5d8,false));
         content.addView(hero);addSpace(content,22);
         content.addView(label("مساحتك التفاعلية",23,INK,true));addSpace(content,8);
         content.addView(label(server.isEmpty()?"اربط خادم مؤسستك لبدء الاستخدام.":"الخادم: "+Uri.parse(server).getAuthority(),14,MUTED,false));addSpace(content,18);
-        if(server.isEmpty())content.addView(card("ربط خادم PulseX","أدخل عنوان HTTPS الخاص بمؤسستك. لا توجد بيانات عرض أو نتائج مصطنعة.",this::settings));
+        if(server.isEmpty())content.addView(card("ربط خادم Eventna إيفنتنا","أدخل عنوان HTTPS الخاص بمؤسستك. لا توجد بيانات عرض أو نتائج مصطنعة.",this::settings));
         content.addView(card("اكتشف الفعاليات","الجهات المشاركة، الخدمات، الاستبيانات والتصويت.",()->open("/","الفعاليات")));
         content.addView(card("بطاقتي ورمز QR","التسجيل في الفعالية والوصول إلى بطاقة الزائر.",()->openEvent("/guest","بطاقة الزائر")));
-        content.addView(card("الإدارة والاستوديو","المحتوى، الدعوات وRSVP، الحسابات، التقارير والصلاحيات.",()->open("/admin","PulseX Studio")));
+        content.addView(card("الإدارة والاستوديو","المحتوى، الدعوات وRSVP، الحسابات، التقارير والصلاحيات.",()->open("/admin","Eventna إيفنتنا Studio")));
         content.addView(card("بوابة الدخول","فحص الجاهزية والتحقق من الزوار عبر جهاز مصرح.",()->openEvent("/scan","بوابة الدخول")));
         content.addView(card("شاشة النتائج","عرض التصويت والنتائج التي وافق المنظم على نشرها.",()->{try{ServerPolicy.eventPath(slug,"");open("/live/"+slug,"شاشة النتائج");}catch(Exception e){note(e.getMessage());}}));
         TextView offline=label("دون اتصال: جهّز صفحات الفعالية والجهاز من داخل التطبيق أولًا. أول اتصال وتسجيل الدخول والمزامنة تحتاج الخادم.",13,MUTED,false);content.addView(offline);addSpace(content,16);
@@ -93,8 +93,8 @@ public final class MainActivity extends Activity {
         EditText url=new EditText(this);url.setSingleLine();url.setHint("https://events.your-domain.com");url.setText(server);url.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);url.setTextDirection(View.TEXT_DIRECTION_LTR);fields.addView(url);
         fields.addView(label("رمز الفعالية للبطاقة والبوابة وشاشة النتائج",14,MUTED,false));
         EditText event=new EditText(this);event.setSingleLine();event.setText(slug);event.setHint("demo");event.setTextDirection(View.TEXT_DIRECTION_LTR);fields.addView(event);
-        fields.addView(label("لا تُدخل كلمة المرور في العنوان. تسجيل الدخول يتم داخل واجهة PulseX. تغيير الخادم يمسح جلسة وبيانات WebView المحلية بعد موافقتك.",13,MUTED,false));
-        AlertDialog d=new AlertDialog.Builder(this).setTitle("إعداد PulseX").setView(fields).setPositiveButton("فحص وحفظ",null).setNegativeButton("إلغاء",null).create();
+        fields.addView(label("لا تُدخل كلمة المرور في العنوان. تسجيل الدخول يتم داخل واجهة Eventna إيفنتنا. تغيير الخادم يمسح جلسة وبيانات WebView المحلية بعد موافقتك.",13,MUTED,false));
+        AlertDialog d=new AlertDialog.Builder(this).setTitle("إعداد Eventna إيفنتنا").setView(fields).setPositiveButton("فحص وحفظ",null).setNegativeButton("إلغاء",null).create();
         d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{
             if(checking)return;
             try{
@@ -111,7 +111,7 @@ public final class MainActivity extends Activity {
             try{
                 HttpURLConnection c=(HttpURLConnection)new URL(candidate+"/api/health").openConnection();c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setInstanceFollowRedirects(false);
                 try{if(c.getResponseCode()!=200)throw new IOException();JSONObject health=new JSONObject(new String(readBounded(c.getInputStream(),65536),StandardCharsets.UTF_8));if(!health.has("version")||!health.has("api_version")||!health.has("database"))throw new IOException();}finally{c.disconnect();}
-            }catch(Exception e){error="تعذر التحقق من خادم PulseX. تأكد من HTTPS والعنوان والاتصال.";}
+            }catch(Exception e){error="تعذر التحقق من خادم Eventna إيفنتنا. تأكد من HTTPS والعنوان والاتصال.";}
             final String result=error;runOnUiThread(()->{
                 checking=false;if(isFinishing()||isDestroyed())return;
                 if(result!=null){dialog.getButton(-1).setEnabled(true);dialog.getButton(-1).setText("إعادة الفحص");note(result);return;}
@@ -136,7 +136,7 @@ public final class MainActivity extends Activity {
     }
     @SuppressWarnings("deprecation") private void createWeb(){
         web=new WebView(this);web.setBackgroundColor(BG);WebSettings s=web.getSettings();
-        s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setAllowFileAccessFromFileURLs(false);s.setAllowUniversalAccessFromFileURLs(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setGeolocationEnabled(false);s.setSafeBrowsingEnabled(true);s.setMediaPlaybackRequiresUserGesture(true);s.setSupportMultipleWindows(false);s.setJavaScriptCanOpenWindowsAutomatically(false);s.setUserAgentString(s.getUserAgentString()+" PulseXAndroid/"+BuildConfig.VERSION_NAME);
+        s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setAllowFileAccessFromFileURLs(false);s.setAllowUniversalAccessFromFileURLs(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);s.setGeolocationEnabled(false);s.setSafeBrowsingEnabled(true);s.setMediaPlaybackRequiresUserGesture(true);s.setSupportMultipleWindows(false);s.setJavaScriptCanOpenWindowsAutomatically(false);s.setUserAgentString(s.getUserAgentString()+" EventnaAndroid/"+BuildConfig.VERSION_NAME);
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
         ServiceWorkerController.getInstance().getServiceWorkerWebSettings().setAllowFileAccess(false);
         ServiceWorkerController.getInstance().getServiceWorkerWebSettings().setAllowContentAccess(false);
@@ -144,7 +144,7 @@ public final class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){
                 String url=request.getUrl().toString();if(ServerPolicy.sameOrigin(server,url))return false;
-                if(request.isForMainFrame()&&request.hasGesture()&&"https".equals(request.getUrl().getScheme()))new AlertDialog.Builder(MainActivity.this).setTitle("رابط خارجي").setMessage("سيُفتح في المتصفح خارج جلسة PulseX.").setPositiveButton("فتح",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,request.getUrl()).addCategory(Intent.CATEGORY_BROWSABLE));}catch(Exception e){note("لا يوجد متصفح متاح.");}}).setNegativeButton("إلغاء",null).show();return true;
+                if(request.isForMainFrame()&&request.hasGesture()&&"https".equals(request.getUrl().getScheme()))new AlertDialog.Builder(MainActivity.this).setTitle("رابط خارجي").setMessage("سيُفتح في المتصفح خارج جلسة Eventna إيفنتنا.").setPositiveButton("فتح",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,request.getUrl()).addCategory(Intent.CATEGORY_BROWSABLE));}catch(Exception e){note("لا يوجد متصفح متاح.");}}).setNegativeButton("إلغاء",null).show();return true;
             }
             @Override public void onReceivedSslError(WebView v,android.webkit.SslErrorHandler handler,android.net.http.SslError error){handler.cancel();note("شهادة الاتصال غير موثوقة. لم يتم تجاوزها.");}
             @Override public void onReceivedError(WebView v,WebResourceRequest r,WebResourceError e){if(r.isForMainFrame())showNetworkError();}
@@ -180,12 +180,12 @@ public final class MainActivity extends Activity {
                 final String cookie=CookieManager.getInstance().getCookie(url);io.execute(()->{
                     HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(20000);c.setInstanceFollowRedirects(false);if(cookie!=null)c.setRequestProperty("Cookie",cookie);if(c.getResponseCode()!=200)throw new IOException();byte[] data=readBounded(c.getInputStream(),MAX_EXPORT);runOnUiThread(()->saveDocument(data,name,mime));}catch(Exception e){runOnUiThread(()->note("تعذر التنزيل. تحقق من الصلاحيات والاتصال وحجم الملف."));}finally{if(c!=null)c.disconnect();}
                 });
-            }else note("التنزيل متاح من خادم PulseX الموثوق فقط.");
+            }else note("التنزيل متاح من خادم Eventna إيفنتنا الموثوق فقط.");
         });
     }
     private void grantCamera(){if(cameraRequest!=null){if(!home&&web!=null&&ServerPolicy.sameOrigin(server,web.getUrl())&&ServerPolicy.sameOrigin(server,cameraRequest.getOrigin().toString()))cameraRequest.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});else cameraRequest.deny();cameraRequest=null;}}
     @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==CAMERA){if(g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)grantCamera();else{if(cameraRequest!=null)cameraRequest.deny();cameraRequest=null;note("يمكن استخدام البحث اليدوي أو قارئ QR خارجي دون الكاميرا.");}}}
-    private void showNetworkError(){if(home||webHolder==null)return;LinearLayout error=column();error.setPadding(dp(28),dp(38),dp(28),dp(20));error.setBackgroundColor(BG);error.addView(label("الاتصال غير متاح",25,INK,true));addSpace(error,12);error.addView(label("لا توجد استجابة من الخادم لهذه الصفحة. الصفحات والعمليات المجهزة دون اتصال تديرها واجهة PulseX؛ لا تمسح بيانات التطبيق قبل المزامنة.",16,MUTED,false));error.addView(action("إعادة المحاولة",()->open(currentPath,"PulseX")));error.addView(action("العودة للرئيسية",this::showHome));webHolder.addView(error,new LinearLayout.LayoutParams(-1,-1));web.setVisibility(View.GONE);}
+    private void showNetworkError(){if(home||webHolder==null)return;LinearLayout error=column();error.setPadding(dp(28),dp(38),dp(28),dp(20));error.setBackgroundColor(BG);error.addView(label("الاتصال غير متاح",25,INK,true));addSpace(error,12);error.addView(label("لا توجد استجابة من الخادم لهذه الصفحة. الصفحات والعمليات المجهزة دون اتصال تديرها واجهة Eventna إيفنتنا؛ لا تمسح بيانات التطبيق قبل المزامنة.",16,MUTED,false));error.addView(action("إعادة المحاولة",()->open(currentPath,"Eventna إيفنتنا")));error.addView(action("العودة للرئيسية",this::showHome));webHolder.addView(error,new LinearLayout.LayoutParams(-1,-1));web.setVisibility(View.GONE);}
     private void saveDocument(byte[] data,String name,String mime){
         if(isFinishing()||isDestroyed())return;if(pendingExport!=null){note("أكمل عملية الحفظ الحالية أولًا.");return;}
         pendingExport=data;Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType(mime==null||mime.isEmpty()?"application/octet-stream":mime);i.putExtra(Intent.EXTRA_TITLE,name.replaceAll("[\\\\/\\r\\n]","_"));

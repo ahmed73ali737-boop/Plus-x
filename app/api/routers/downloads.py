@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-APK_NAME='PulseX-Android-Preview-1.0.2.apk'
+APK_NAME='Eventna-Android-Preview-1.0.3.apk'
 
 
 def create_download_router(root: Path):
@@ -28,11 +28,12 @@ def create_download_router(root: Path):
     @router.get('/api/downloads/android')
     def android_metadata():
         e=verified()
-        return {'available':True,'version':'1.0.2','channel':'preview','production_signed':False,
-                'download_url':'/downloads/pulsex-android-preview.apk','bytes':e['apk_bytes'],
+        return {'available':True,'version':'1.0.3','channel':'preview','production_signed':False,
+                'download_url':'/downloads/eventna-android-preview.apk','bytes':e['apk_bytes'],
                 'sha256':e['apk_sha256'],'min_android':8,'source_revision':e['source_revision'],
                 'device_tested':e.get('device_tested') is True,'server_included':False}
 
+    @router.api_route('/downloads/eventna-android-preview.apk',methods=['GET','HEAD'],include_in_schema=False)
     @router.api_route('/downloads/pulsex-android-preview.apk',methods=['GET','HEAD'],include_in_schema=False)
     def download_android():
         e=verified()

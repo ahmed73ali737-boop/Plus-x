@@ -1,8 +1,10 @@
-# PulseX — Live Experience & Insights Platform
+# Eventna إيفنتنا
+
+Website: https://eventna.app | [Deployment guide](ops/eventna/README.md)
 
 ## Unified application source — test candidate
 
-هذا المستودع يجمع مصدر تطبيق PulseX ولوحة إدارته للمعارض والفعاليات. تجميع المصدر لا يعني اعتماد الإنتاج؛ راجع [تقرير التوحيد والتحقق](docs/UNIFICATION_20261019_AR.md).
+هذا المستودع يجمع مصدر تطبيق Eventna إيفنتنا ولوحة إدارته للمعارض والفعاليات. تجميع المصدر لا يعني اعتماد الإنتاج؛ راجع [تقرير التوحيد والتحقق](docs/UNIFICATION_20261019_AR.md).
 
 ### النطاق الموحّد
 - إدارة Platform / Organization / Event / Experience / participating entities.
@@ -16,7 +18,7 @@
 - Analytics / reports / exports.
 - API + Python SDK + JavaScript SDK.
 - PostgreSQL migrations، health/readiness، security hardening، Docker/Compose.
-- مواقع وتجارب معرض مستقلة بصريًا ووظيفيًا لـ **Tharawat / Easy / RTS** فوق محرك PulseX المشترك.
+- مواقع وتجارب معرض مستقلة بصريًا ووظيفيًا لـ **Tharawat / Easy / RTS** فوق محرك Eventna إيفنتنا المشترك.
 
 ### التشغيل على Windows
 شغّل:
@@ -67,4 +69,4 @@ chmod +x Start-Linux.sh
 | ماسح البوابة (يتطلب جهازًا مصرحًا) | `/e/demo/scan` |
 | شاشة النتائج العامة | `/live/demo` |
 
-التطبيق Web/PWA قابل للتثبيت من المتصفح المدعوم. يوجد الآن مشروع Android وحزمة APK معاينة بواجهة بدء عربية وماسح QR محلي، تتصل بخادم PulseX الحالي؛ راجع [دليل Android](android/README_AR.md). لا توجد حزمة MSI مؤكدة. حسابات التشغيل التجريبي تُنشأ محليًا في ملف credentials المحدد؛ لا تستخدمها للإنتاج. أدوار الإدارة الحالية: المنصة والمنظم والجهة وصلاحيات البوابة واللجان المحددة، مع صلاحيات نطاقية؛ وجودها لا يثبت اكتمال جميع الأدوار المستقبلية.
+التطبيق Web/PWA قابل للتثبيت من المتصفح المدعوم. يوجد الآن مشروع Android وحزمة APK معاينة بواجهة بدء عربية وماسح QR محلي، تتصل بخادم Eventna إيفنتنا الحالي؛ راجع [دليل Android](android/README_AR.md). لا توجد حزمة MSI مؤكدة. حسابات التشغيل التجريبي تُنشأ محليًا في ملف credentials المحدد؛ لا تستخدمها للإنتاج. أدوار الإدارة الحالية: المنصة والمنظم والجهة وصلاحيات البوابة واللجان المحددة، مع صلاحيات نطاقية؛ وجودها لا يثبت اكتمال جميع الأدوار المستقبلية.

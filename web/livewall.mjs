@@ -1,5 +1,5 @@
 /**
- * PulseX Live Wall v1: read-only public wall of supervisor-published polls.
+ * Eventna إيفنتنا Live Wall v1: read-only public wall of supervisor-published polls.
  * Never read private metrics, raw submissions, guest identities, or draft data.
  */
 import {h, root, api, button} from './ui.mjs';
@@ -33,7 +33,7 @@ function pollCard(record, result) {
 
 export async function liveWallPage(slug) {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) throw new Error('رابط شاشة العرض غير صالح.');
-  document.title = 'شاشة النتائج الحية | PulseX';
+  document.title = 'شاشة النتائج الحية | Eventna إيفنتنا';
   document.body.classList.add('livewall-mode');
   const headline = h('h1', {}, 'شاشة النتائج الحية');
   const summary = h('p', {class: 'livewall-muted', 'aria-live': 'polite'}, 'جاري التحقق من البيانات المنشورة…');

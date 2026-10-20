@@ -49,13 +49,13 @@ def main():
     run(tools / "aapt2", "compile", "--dir", ANDROID / "app/src/main/res", "-o", out / "res.zip")
     run(tools / "aapt2", "link", "-I", platform, "--manifest", out / "AndroidManifest.xml",
         "--java", gen, "--min-sdk-version", "26", "--target-sdk-version", "35",
-        "--version-code", "10002", "--version-name", "1.0.2-android-preview-debug",
+        "--version-code", "10003", "--version-name", "1.0.3-android-preview-debug",
         "--rename-manifest-package", "com.pulsex.app.preview", "--debug-mode",
         "-o", out / "resources.apk", out / "res.zip")
     build_config = gen / "com/pulsex/app/BuildConfig.java"
     build_config.parent.mkdir(parents=True, exist_ok=True)
     build_config.write_text('package com.pulsex.app; public final class BuildConfig { '
-        'public static final boolean DEBUG=true; public static final String VERSION_NAME="1.0.2-android-preview-debug"; '
+        'public static final boolean DEBUG=true; public static final String VERSION_NAME="1.0.3-android-preview-debug"; '
         'public static final String SOURCE_SHA=' + json.dumps(revision) + '; }\n')
     sources = sorted((ANDROID / "app/src/main/java").rglob("*.java")) + sorted(gen.rglob("*.java"))
     bootclasspath = os.pathsep.join((str(platform), str(tools / "core-lambda-stubs.jar")))
@@ -70,12 +70,12 @@ def main():
             for name in dependency.namelist():
                 if name.startswith("META-INF/") and ("LICENSE" in name or "NOTICE" in name):
                     archive.writestr(name, dependency.read(name))
-    aligned, apk = out / "aligned.apk", out / "PulseX-Android-preview.apk"
+    aligned, apk = out / "aligned.apk", out / "Eventna-Android-preview.apk"
     run(tools / "zipalign", "-f", "4", unsigned, aligned)
     key = out / "preview-debug.keystore"
     if not key.exists():
         run(jdk / "bin/keytool", "-genkeypair", "-keystore", key, "-storepass", "android", "-keypass", "android",
-            "-alias", "androiddebugkey", "-dname", "CN=PulseX Preview,O=Development,C=YE", "-keyalg", "RSA",
+            "-alias", "androiddebugkey", "-dname", "CN=Eventna Preview,O=Development,C=YE", "-keyalg", "RSA",
             "-keysize", "2048", "-validity", "3650")
         key.chmod(0o600)
     run(tools / "apksigner", "sign", "--ks", key, "--ks-pass", "pass:android", "--out", apk, aligned)

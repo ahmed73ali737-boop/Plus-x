@@ -1,0 +1,16 @@
+# Import these sites into the existing edge configuration. Caddy obtains and
+# renews public HTTPS certificates for both names automatically.
+eventna.app {
+    encode gzip
+    reverse_proxy eventna-app:4310
+}
+
+www.eventna.app {
+    redir https://eventna.app{uri} 308
+}
+
+# Within the existing HTTPS IP server, replace the old Eventna proxy block:
+# redir /eventna https://eventna.app/ 308
+# handle_path /eventna/* {
+#     redir https://eventna.app{uri} 308
+# }

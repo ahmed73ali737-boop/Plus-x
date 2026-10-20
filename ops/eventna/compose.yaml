@@ -1,0 +1,66 @@
+name: eventna
+services:
+  postgres:
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eventna
+      POSTGRES_USER: eventna
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U eventna -d eventna]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [database]
+    logging: &logging
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+  app:
+    image: eventna:${EVENTNA_RELEASE:?Required}
+    build:
+      context: ./source
+      dockerfile: ops/Dockerfile
+      args:
+        PULSEX_SOURCE_SHA: ${EVENTNA_SOURCE_SHA:?Required}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    # This candidate has no signed production acceptance reports. Keep test mode
+    # explicit and leave the production gate and all evidence flags unchanged.
+    command: [sh, -c, "python -m tools.migrate_postgres && python -m tools.bootstrap_production && python -m tools.rebrand_eventna --apply && exec python run.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://eventna:${POSTGRES_PASSWORD}@postgres:5432/eventna
+      PULSEX_ENV: test
+      SEED_DEMO: "false"
+      PUBLIC_ORIGIN: https://eventna.app
+      HOST: 0.0.0.0
+      WEB_WORKERS: "2"
+      GUEST_ID_SECRET: ${GUEST_ID_SECRET:?Required}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@eventna.app}
+      BOOTSTRAP_ADMIN_NAME: Eventna Administrator
+      BOOTSTRAP_CREDENTIALS_PATH: /app/data/bootstrap-admin.json
+    volumes:
+      - app_data:/app/data
+    networks:
+      database:
+      edge:
+        aliases: [eventna-app]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4310/api/health/ready', timeout=5)"]
+      interval: 20s
+      timeout: 6s
+      retries: 5
+      start_period: 60s
+    logging: *logging
+networks:
+  database:
+    internal: true
+  edge:
+    external: true
+    name: forgejo_default
+volumes:
+  postgres_data:
+  app_data:

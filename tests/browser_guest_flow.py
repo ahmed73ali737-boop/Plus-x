@@ -107,7 +107,7 @@ try:
             page.get_by_role("heading",name=title,exact=True,level=1).wait_for()
             assert page.locator(selector).count()==1
             assert title in page.locator(".site-topbar .brand").inner_text()
-            assert "Powered by PulseX" in page.locator(".platform-attribution").inner_text()
+            assert "Powered by Eventna إيفنتنا" in page.locator(".platform-attribution").inner_text()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
             mark("brand_exhibition_"+slug)
         page.screenshot(path=str(ROOT/"qa/rts-live.png"),full_page=False)

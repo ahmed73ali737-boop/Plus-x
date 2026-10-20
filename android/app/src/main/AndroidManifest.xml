@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <application android:label="PulseX" android:icon="@mipmap/ic_launcher" android:theme="@style/PulseXTheme"
+    <application android:label="Eventna إيفنتنا" android:icon="@mipmap/ic_launcher" android:theme="@style/PulseXTheme"
         android:supportsRtl="true" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false">
         <activity android:name="com.pulsex.app.MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden">

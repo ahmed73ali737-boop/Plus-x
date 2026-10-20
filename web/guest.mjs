@@ -109,7 +109,7 @@ async function registerGuestOfflineFirst(slug,values){
   return reconciled||local;
 }
 function guestHeader(page,slug){
-  const title=page.config?.title||'PulseX';const mark=title.trim().slice(0,1).toUpperCase()||'P';
+  const title=page.config?.title||'Eventna إيفنتنا';const mark=title.trim().slice(0,1).toUpperCase()||'E';
   return h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(title,mark,'/e/'+slug),h('nav',{class:'toplinks'},h('a',{href:'/e/'+slug},'الفعالية'),h('a',{href:'/e/'+slug+'/guest'},'بطاقة الزائر'),h('a',{href:'/e/'+slug+'/scan'},'المسح')),h('span',{class:'tag'},navigator.onLine?'متصل':'دون اتصال')));
 }
 async function reconcileGuestPass(slug,g){

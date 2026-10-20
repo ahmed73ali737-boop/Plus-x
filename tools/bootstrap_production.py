@@ -31,7 +31,7 @@ def bootstrap(engine, *, email: str, name: str, credentials_path: Path) -> dict:
                 raise RuntimeError("BOOTSTRAP_PARTIAL_DATABASE_REQUIRES_MANUAL_REVIEW")
             if target.exists() or target.is_symlink():
                 raise RuntimeError("BOOTSTRAP_CREDENTIALS_FILE_ALREADY_EXISTS")
-            cfg=default_config("PulseX — Live Experience Platform","platform")
+            cfg=default_config("Eventna إيفنتنا","platform")
             cfg["subtitle"]="منصة الفعاليات والتجارب التفاعلية"
             cfg["description"]="تم إنشاء مساحة المنصة الأساسية. أكمل الهوية والفعاليات والجهات من لوحة الإدارة."
             cfg["welcome"]=False
