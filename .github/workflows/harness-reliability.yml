@@ -63,7 +63,7 @@ jobs:
               'tests/test_device_admission_scope.py', 'tests/test_harness_reliability.py',
               'tests/test_runtime_recovery.py', 'tests/test_admission_http_ack.py',
               'tests/test_admission_gate_integration.py', 'tests/test_linux_standalone_contract.py',
-              'tests/test_acceptance_workflow_provenance.py',
+              'tests/test_acceptance_workflow_provenance.py', 'tests/test_regression_registry.py',
           ]
           failed = False
           for attempt in (1, 2):
