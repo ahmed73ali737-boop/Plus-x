@@ -2,6 +2,16 @@
   "/api/access-request": [
     "post"
   ],
+  "/api/account/notifications": [
+    "get"
+  ],
+  "/api/account/notifications/{notification_id}/read": [
+    "post"
+  ],
+  "/api/account/preferences": [
+    "get",
+    "put"
+  ],
   "/api/admin/admission/events": [
     "get"
   ],
@@ -65,6 +75,9 @@
     "get"
   ],
   "/api/admin/media": [
+    "post"
+  ],
+  "/api/admin/notifications": [
     "post"
   ],
   "/api/admin/organizations": [

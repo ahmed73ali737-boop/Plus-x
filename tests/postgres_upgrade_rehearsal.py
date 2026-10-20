@@ -65,7 +65,7 @@ def main():
             new_pass=c.execute(select(event_guests.c.pass_number)).scalar_one()
             mark('old_pass_rejected',event_guest_by_number(c,ev['id'],'G-1111-2222-3333-4444') is None)
             mark('new_pass_resolves',bool(event_guest_by_number(c,ev['id'],new_pass)))
-            mark('eight_exact_migrations',c.execute(text('SELECT count(*) FROM px_schema_migrations')).scalar_one()==8 and not inventory(c)['migration_mismatch'])
+            mark('all_expected_migrations',set(c.execute(text('SELECT migration_id FROM px_schema_migrations')).scalars())==set(expected_migration_checksums()) and not inventory(c)['migration_mismatch'])
         again=runner.apply_migrations(source)
         with source.connect() as c:mark('replay_no_rotation_or_effect',state_fingerprints(c)==after and not again['applied'])
         from fastapi import HTTPException

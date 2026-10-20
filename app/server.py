@@ -41,6 +41,7 @@ from .application.public_service import build_public_bundle, build_public_poll_r
 from .api.guest_routes import install_guest_routes
 from .api.invitation_routes import install_invitation_routes
 from .api.admission_access_routes import install_admission_access_routes
+from .api.account_routes import install_account_routes
 from tools.production_gate import assert_production_ready
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -102,6 +103,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     install_guest_routes(app, engine, public_origin, identify=identify, site_row=site_row, log=log)
     install_invitation_routes(app, engine, public_origin, identify=identify, log=log, authorize=require_event_permission)
     install_admission_access_routes(app, engine, identify=identify)
+    install_account_routes(app, engine, identify=identify)
 
 
     @app.post('/api/auth/login')
