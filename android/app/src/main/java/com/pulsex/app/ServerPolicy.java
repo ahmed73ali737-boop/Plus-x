@@ -4,6 +4,7 @@ import java.net.URI;
 
 /** Pure Java boundary shared by the activity and executable JVM checks. */
 public final class ServerPolicy {
+    public static final String DEFAULT_SERVER = "https://eventna.app";
     private ServerPolicy() {}
     public static String normalize(String value) {
         try {

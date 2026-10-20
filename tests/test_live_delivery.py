@@ -29,7 +29,7 @@ def test_actual_http_delivery_checks_local_mode_and_detects_old_build(tmp_path, 
         result = verify_delivery(origin, SHA, allow_local_test=True)
         assert result['status'] == 'passed', result
         assert result['local_test'] and result['production_accepted'] is False
-        assert len(result['checks']) == 4 and result['apk_bytes'] == APK_BYTES
+        assert len(result['checks']) == 4 and result['android_distribution'] == 'withdrawn_pending_review'
         stale = verify_delivery(origin, 'b'*40, allow_local_test=True)
         assert stale['status'] == 'failed' and stale['reason'] == 'SOURCE_BUILD_MISMATCH'
 
@@ -46,13 +46,9 @@ def synthetic_site(path):
     if path == '/api/admin/sites':
         return httpx.Response(401, json={'detail':'AUTH_REQUIRED'})
     if path == '/api/downloads/android':
-        evidence=json.loads((ROOT/'artifacts/android/BUILD_EVIDENCE.json').read_text())
-        return httpx.Response(200, json={'download_url':'/downloads/eventna-android-preview.apk',
-            'channel':'preview', 'production_signed':False, 'bytes':evidence['apk_bytes'], 'sha256':evidence['apk_sha256']})
-    if path == '/downloads/eventna-android-preview.apk':
-        return httpx.Response(200, content=(ROOT/'artifacts/android/Eventna-Android-Preview-1.0.3.apk').read_bytes(),
-            headers={'content-type':'application/vnd.android.package-archive',
-                     'content-disposition':'attachment; filename=preview.apk', 'x-content-type-options':'nosniff'})
+        return httpx.Response(200, json={'available':False,'channel':'withdrawn','security_status':'review_required','web_url':'/'})
+    if path in ('/downloads/eventna-android-preview.apk','/downloads/pulsex-android-preview.apk'):
+        return httpx.Response(410,json={'detail':'ANDROID_SECURITY_REVIEW_REQUIRED'},headers={'cache-control':'no-store'})
     name=path.rsplit('/',1)[1]
     mime='application/manifest+json' if name.endswith('.webmanifest') else 'text/css' if name.endswith('.css') else 'text/javascript'
     return httpx.Response(200, content=(ROOT/'web'/name).read_bytes(), headers={'content-type':mime})
@@ -62,10 +58,10 @@ def synthetic_site(path):
     ('none', None), ('redirect','HTTP_302:/api/health'),
     ('stale_asset','ASSET_DOES_NOT_MATCH_CHECKOUT:/assets/app.mjs'),
     ('exposed_admin','HTTP_200:/api/admin/sites'),
-    ('tampered_apk','APK_BYTES_DO_NOT_MATCH_CHECKOUT'),
-    ('remote_apk','APK_METADATA_DOES_NOT_MATCH_CHECKOUT'),
+    ('tampered_apk','HTTP_200:/downloads/eventna-android-preview.apk'),
+    ('remote_apk','ANDROID_QUARANTINE_METADATA_REQUIRED'),
     ('sqlite','POSTGRES_MIGRATIONS_REQUIRED'),
-    ('oversize','BODY_LIMIT:/downloads/eventna-android-preview.apk'),
+    ('oversize','HTTP_200:/downloads/eventna-android-preview.apk'),
     ('network','DELIVERY_PROBE_FAILED'),
 ])
 def test_external_delivery_never_accepts_stale_unsafe_or_partial_response(fault, reason):

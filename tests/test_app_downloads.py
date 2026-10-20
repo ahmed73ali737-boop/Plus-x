@@ -6,28 +6,27 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func,select
 from app.server import create_app
 from app.db import users,signup_requests
-from app.api.routers.downloads import create_download_router,APK_NAME
+from app.api.routers.downloads import create_download_router,APK_NAME,verify_preview_artifact
 from harness_support import app_client
 
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def test_anonymous_download_matches_pinned_apk_and_headers(tmp_path):
+def test_reported_apk_is_withdrawn_for_anonymous_and_direct_requests(tmp_path):
     app=create_app('sqlite:///'+str(tmp_path/'download.sqlite'),origin='http://testserver',seed_demo=False)
     with app_client(app) as client:
-        meta=client.get('/api/downloads/android')
-        assert meta.status_code==200
-        data=meta.json()
-        assert data['channel']=='preview' and not data['production_signed'] and not data['device_tested']
-        response=client.get(data['download_url'])
-        assert response.status_code==200
-        assert response.headers['content-type']=='application/vnd.android.package-archive'
-        assert response.headers['x-content-type-options']=='nosniff'
-        assert 'attachment' in response.headers['content-disposition']
-        assert len(response.content)==data['bytes']==(ROOT/'artifacts/android'/APK_NAME).stat().st_size
-        assert hashlib.sha256(response.content).hexdigest()==data['sha256']
-        assert client.head(data['download_url']).content==b''
+        data=client.get('/api/downloads/android').json()
+        assert data['available'] is False and data['security_status']=='review_required'
+        assert 'download_url' not in data and data['web_url']=='/'
+        for path in ['/downloads/eventna-android-preview.apk','/downloads/pulsex-android-preview.apk']:
+            for method in ('GET','HEAD'):
+                response=client.request(method,path)
+                assert response.status_code==410
+                assert response.headers['cache-control']=='no-store'
+                assert response.headers['x-content-type-options']=='nosniff'
         assert client.get('/api/admin/sites').status_code==401
+    # An intact signature/hash is not a security-review verdict.
+    assert verify_preview_artifact(ROOT)['apk_sha256']==data['reported_apk_sha256']
 
 
 @pytest.mark.parametrize('failure',['missing','tampered','wrong-size','untrusted-signing'])
@@ -39,13 +38,11 @@ def test_download_fails_closed_instead_of_serving_wrong_binary(tmp_path,failure)
     if failure=='wrong-size':evidence['apk_bytes']+=1
     if failure=='untrusted-signing':evidence['signing']='production'
     (folder/'BUILD_EVIDENCE.json').write_text(json.dumps(evidence))
-    app=FastAPI();app.include_router(create_download_router(tmp_path))
-    with TestClient(app) as client:
-        for endpoint in ['/api/downloads/android','/downloads/pulsex-android-preview.apk']:
-            response=client.get(endpoint)
-            assert response.status_code==503
-            assert response.json()['detail']=='ANDROID_PREVIEW_UNAVAILABLE'
-        assert client.get('/downloads/BUILD_EVIDENCE.json').status_code==404
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        verify_preview_artifact(tmp_path)
+    assert error.value.status_code==503
+    assert error.value.detail=='ANDROID_PREVIEW_UNAVAILABLE'
 
 
 def test_account_request_creates_pending_only_and_no_user_or_permissions(tmp_path):

@@ -23,12 +23,13 @@ async function runtime(failDownload=false){
  await mod.link(()=>new vm.SyntheticModule(Object.keys(ui),function(){for(const[k,v]of Object.entries(ui))this.setExport(k,v);},{context:ctx}));await mod.evaluate();await mod.namespace.accessPage();
  return{root,calls,form:()=>walk(root).find(x=>x.tag==='form'),field:label=>walk(root).find(x=>x.attrs.label===label),setPending(p){pending=p;}};
 }
-test('public choices and preview download are explicit and same-origin',async()=>{
+test('public entry withdraws reported APK and offers web access',async()=>{
  const r=await runtime();const links=walk(r.root).filter(x=>x.tag==='a');
  assert.ok(links.some(x=>x.attrs.href==='/'&&text(x).includes('ضيف')));
  assert.ok(links.some(x=>x.attrs.href==='/admin'));
- assert.ok(links.some(x=>x.attrs.href==='/downloads/eventna-android-preview.apk'));
- assert.match(text(r.root),/نسخة معاينة/);assert.equal(r.calls.length,1);
+ assert.equal(links.filter(x=>String(x.attrs.href).endsWith('.apk')).length,0);
+ assert.ok(links.some(x=>x.attrs.href==='/'&&text(x).includes('نسخة الويب')));
+ assert.match(text(r.root),/تنزيل Android متوقف مؤقتًا/);assert.equal(r.calls.length,0);
 });
 test('consent blocks POST; account request remains pending without privileges',async()=>{
  const r=await runtime();await r.form().handlers.submit({preventDefault(){}});assert.equal(r.calls.filter(x=>x.body).length,0);

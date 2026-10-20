@@ -54,9 +54,6 @@ def verify_delivery(origin, expected_source, *, allow_local_test=False, client=N
         origin = origin_value(origin, allow_local_test)
         report.update(origin=origin, local_test=allow_local_test)
         require(bool(re.fullmatch(r'[a-f0-9]{40}', expected_source)), 'FULL_SOURCE_SHA_REQUIRED')
-        artifact = json.loads((ROOT/'artifacts/android/BUILD_EVIDENCE.json').read_text())
-        expected_hash, expected_bytes = artifact['apk_sha256'], artifact['apk_bytes']
-        require(0 < expected_bytes <= MAX_BODY, 'INVALID_LOCAL_APK_MANIFEST')
         context = nullcontext(client) if client is not None else httpx.Client(
             timeout=12, trust_env=False, follow_redirects=False, verify=True)
         with context as http:
@@ -105,19 +102,16 @@ def verify_delivery(origin, expected_source, *, allow_local_test=False, client=N
             require(isinstance(json.loads(raw).get('detail'), str), 'UNEXPECTED_AUTH_DENIAL')
             report['checks'].append('anonymous_administration_denied')
             meta = data('/api/downloads/android')
-            require(meta.get('download_url') == '/downloads/eventna-android-preview.apk'
-                    and meta.get('sha256') == expected_hash and meta.get('bytes') == expected_bytes,
-                    'APK_METADATA_DOES_NOT_MATCH_CHECKOUT')
-            require(meta.get('channel') == 'preview' and meta.get('production_signed') is False,
-                    'PREVIEW_LABEL_MISMATCH')
-            raw, headers = get(meta['download_url'], mime={'application/vnd.android.package-archive'},
-                               limit=expected_bytes)
-            require(len(raw) == expected_bytes and hashlib.sha256(raw).hexdigest() == expected_hash,
-                    'APK_BYTES_DO_NOT_MATCH_CHECKOUT')
-            require(headers.get('x-content-type-options') == 'nosniff'
-                    and 'attachment' in headers.get('content-disposition', ''), 'APK_DOWNLOAD_HEADERS_MISSING')
-            report['checks'].append('android_download_matches_checkout_bytes_and_preview_contract')
-            report.update(apk_bytes=expected_bytes, apk_sha256=expected_hash, status='passed')
+            require(meta.get('available') is False and meta.get('channel')=='withdrawn'
+                    and meta.get('security_status')=='review_required' and meta.get('web_url')=='/'
+                    and not meta.get('download_url'), 'ANDROID_QUARANTINE_METADATA_REQUIRED')
+            for path in ('/downloads/eventna-android-preview.apk','/downloads/pulsex-android-preview.apk'):
+                raw, headers = get(path,status=410,mime={'application/json'})
+                require(json.loads(raw).get('detail')=='ANDROID_SECURITY_REVIEW_REQUIRED'
+                        and headers.get('cache-control')=='no-store', 'ANDROID_QUARANTINE_REQUIRED')
+            report['checks'].append('reported_android_apk_withdrawn_both_aliases')
+            report.update(android_distribution='withdrawn_pending_review', status='passed')
+
     except Exception as error:
         report['error_type'] = type(error).__name__
         report['reason'] = str(error) if isinstance(error, DeliveryFailure) else 'DELIVERY_PROBE_FAILED'

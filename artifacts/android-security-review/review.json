@@ -1,0 +1,61 @@
+{
+  "status": "investigation_open",
+  "reported_warning": "harmful_or_dangerous_user_report",
+  "exact_warning_provider": "not_yet_supplied",
+  "served_sha256": "6d1b47087f1e93c29917e6a8a482dc8fc9af4db056c8b42d2c2d96b753f66e87",
+  "served_matches_repository": true,
+  "served_certificate_sha256": "78ca4f1380fecc51bb47987d9f0f3a2e61931aa2a20e83989e028438d3feadad",
+  "served_debuggable": true,
+  "hardened_internal_build": {
+    "source_revision": "65779a25acdbba595af7b98b3bfec78867e1d445-working-tree",
+    "source_dirty": true,
+    "package": "com.pulsex.app.preview",
+    "min_sdk": 26,
+    "target_sdk": 35,
+    "build_tools": "35.0.0",
+    "signing": "disposable_debug_key_not_production",
+    "qr_decoder": {
+      "artifact": "com.google.zxing:core:3.5.3",
+      "sha256": "8d8064c1636fdaef7189dd9055c7d59950a8940a12f2293956446ec3c109fd82"
+    },
+    "apk_sha256": "f73972320c807f6aea1a5f5b9acd35dce6ec8631392a15f21660d48c4e250f57",
+    "apk_bytes": 303832,
+    "device_tested": false,
+    "server_included": false,
+    "debuggable": false,
+    "distribution": "internal_review_only",
+    "malware_scanned": false,
+    "certificate_sha256": "673fea7023a1aec91869a5ae2721697abe45fa0e088a853624e6d1f416d5d7da",
+    "permissions": [
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.CAMERA",
+      "android.permission.INTERNET"
+    ],
+    "static_checks": "signature_alignment_permission_allowlist_no_debug_passed"
+  },
+  "public_download_policy_in_source": "withdrawn_410_both_aliases",
+  "live_download_withdrawn": false,
+  "live_deployment_blocker": "SSH unreachable and deployment identity unavailable in session",
+  "malware_scanned": false,
+  "play_protect_verdict_obtained": false,
+  "physical_device_tested": false,
+  "permissions_reviewed": [
+    "INTERNET",
+    "ACCESS_NETWORK_STATE",
+    "CAMERA"
+  ],
+  "policy_jvm_checks": 25,
+  "pytest": {
+    "passed": 562,
+    "skipped": 1,
+    "subtests_passed": 14
+  },
+  "emulator_startup": {
+    "status": "blocked",
+    "physical_device": false,
+    "play_protect_verdict": false,
+    "checks": [],
+    "error_type": "RuntimeError",
+    "reason": "software boot timeout"
+  }
+}

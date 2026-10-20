@@ -11,17 +11,10 @@ export async function accessPage(){
     h('article',{class:'access-choice'},h('span',{class:'access-number'},'01'),h('h2',{},'أنا زائر'),h('p',{},'تصفح الفعاليات وشارك في الاستبيانات والتصويت دون إنشاء حساب. بطاقة الحضور تخضع لسياسة كل فعالية.'),h('a',{href:'/',class:'text-btn'},'تصفح كضيف ←')),
     h('article',{class:'access-choice'},h('span',{class:'access-number'},'02'),h('h2',{},'لدي حساب'),h('p',{},'ادخل بالبريد وكلمة المرور. الأدوات المتاحة لك يحددها دورك وصلاحياتك.'),h('a',{href:'/admin',class:'text-btn'},'الدخول إلى مساحتي ←')),
     h('article',{class:'access-choice'},h('span',{class:'access-number'},'03'),h('h2',{},'أريد إنشاء مساحة'),h('p',{},'قدّم طلب حساب لجهة منظمة أو مشاركة. إنشاء الفعالية أو الصفحة يتم بعد اعتماد الحساب وبحسب صلاحياته.'),h('a',{href:'#account',class:'text-btn'},'طلب حساب جهة ←')));
-  const downloadState=h('div',{role:'status','aria-live':'polite'},'جارٍ التحقق من ملف Android…');
-  const downloads=h('section',{class:'access-download',id:'download'},h('div',{},h('span',{class:'access-kicker'},'خذ التجربة معك'),h('h2',{},'Eventna إيفنتنا على Android'),h('p',{},'تطبيق خفيف يفتح منصة مؤسستك الآمنة، مع بطاقة الزائر وبوابة QR. يلزم عنوان HTTPS لخادم Eventna إيفنتنا عند أول استخدام.')),downloadState);
+  const downloadState=h('div',{role:'status','aria-live':'polite'},h('h3',{},'تنزيل Android متوقف مؤقتًا'),h('p',{class:'notice'},'أُوقف توزيع حزمة المعاينة بعد بلاغ تحذير أمني على الهاتف، حتى اكتمال التحقيق والمراجعة. لا تتجاوز تحذير الحماية.'),h('a',{href:'/',class:'btn secondary'},'استخدم نسخة الويب'),h('p',{class:'muted small'},'يمكنك فتح الموقع في المتصفح واختيار إضافة إلى الشاشة الرئيسية إن كان الخيار متاحًا.'));
+  const downloads=h('section',{class:'access-download',id:'download'},h('div',{},h('span',{class:'access-kicker'},'خذ التجربة معك'),h('h2',{},'Eventna إيفنتنا على Android'),h('p',{},'تتوفر الفعاليات وبطاقة الزائر من المتصفح أثناء مراجعة حزمة Android.')),downloadState);
   const formHost=h('section',{class:'access-account',id:'account'},h('span',{class:'access-kicker'},'مساحتك القادمة'),h('h2',{},'إنشاء طلب حساب جهة'),h('p',{},'هذا طلب مراجعة؛ لا ينشئ حسابًا نشطًا ولا يمنح صلاحية إدارة فورًا. الزائر يستطيع المشاركة كضيف دون هذا الطلب.'));
   main.append(hero,choices,downloads,formHost);
-  async function loadDownload(){
-    try{
-      const file=await api('/api/downloads/android');
-      if(file.channel!=='preview'||file.download_url!=='/downloads/eventna-android-preview.apk'||!Number.isInteger(file.bytes)||file.bytes<=0||!/^[a-f0-9]{64}$/.test(file.sha256))throw new Error('INVALID_DOWNLOAD_METADATA');
-      downloadState.replaceChildren(h('span',{class:'access-preview'},'نسخة معاينة · Android '+file.min_android+' فأحدث'),h('a',{href:file.download_url,class:'btn',download:'Eventna-Android-Preview-1.0.3.apk'},'تحميل Android · '+(file.bytes/1024).toFixed(0)+' كيلوبايت'),h('p',{class:'muted small'},'معاينة بتوقيع اختبار؛ لم تُعتمد كتطبيق إنتاجي أو تُختبر على هاتف فعلي. التنزيل يحتاج اتصالًا.'),h('details',{},h('summary',{},'بصمة الملف والتحقق'),h('code',{class:'access-hash',dir:'ltr'},file.sha256)));
-    }catch{downloadState.replaceChildren(h('p',{class:'notice'},'التنزيل غير متاح الآن. تحقق من الاتصال ثم أعد المحاولة.'),h('button',{type:'button',class:'btn secondary',onclick:loadDownload},'إعادة التحقق'));}
-  }
   const role=selectField('نوع الحساب',[['organizer','جهة منظمة لفعالية'],['participant','جهة مشاركة في فعالية']],'organizer');
   const event=selectField('الفعالية المطلوبة',[['','اختر فعالية عامة']],'');event.node.hidden=true;
   const org=field('اسم الجهة أو المؤسسة','text','',{required:true,maxlength:200,autocomplete:'organization'}),name=field('اسم المسؤول','text','',{required:true,maxlength:160,autocomplete:'name'}),email=field('البريد الإلكتروني','email','',{required:true,maxlength:200,autocomplete:'email'}),phone=field('رقم الهاتف — اختياري','tel','',{maxlength:60,autocomplete:'tel',dir:'ltr'});
@@ -51,5 +44,5 @@ export async function accessPage(){
     finally{sending=false;submit.disabled=false;}
   });
   formHost.append(form);
-  await loadDownload();
+
 }

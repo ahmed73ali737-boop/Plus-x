@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -45,17 +46,18 @@ def main():
         subprocess.run([str(x) for x in args], cwd=ROOT, check=True)
     manifest = ET.parse(ANDROID / "app/src/main/AndroidManifest.xml")
     manifest.getroot().set("package", "com.pulsex.app")
+    manifest.getroot().find("application").set("{http://schemas.android.com/apk/res/android}debuggable", "false")
     manifest.write(out / "AndroidManifest.xml", encoding="utf-8", xml_declaration=True)
     run(tools / "aapt2", "compile", "--dir", ANDROID / "app/src/main/res", "-o", out / "res.zip")
     run(tools / "aapt2", "link", "-I", platform, "--manifest", out / "AndroidManifest.xml",
         "--java", gen, "--min-sdk-version", "26", "--target-sdk-version", "35",
         "--version-code", "10003", "--version-name", "1.0.3-android-preview-debug",
-        "--rename-manifest-package", "com.pulsex.app.preview", "--debug-mode",
+        "--rename-manifest-package", "com.pulsex.app.preview",
         "-o", out / "resources.apk", out / "res.zip")
     build_config = gen / "com/pulsex/app/BuildConfig.java"
     build_config.parent.mkdir(parents=True, exist_ok=True)
     build_config.write_text('package com.pulsex.app; public final class BuildConfig { '
-        'public static final boolean DEBUG=true; public static final String VERSION_NAME="1.0.3-android-preview-debug"; '
+        'public static final boolean DEBUG=false; public static final String VERSION_NAME="1.0.3-android-preview-debug"; '
         'public static final String SOURCE_SHA=' + json.dumps(revision) + '; }\n')
     sources = sorted((ANDROID / "app/src/main/java").rglob("*.java")) + sorted(gen.rglob("*.java"))
     bootclasspath = os.pathsep.join((str(platform), str(tools / "core-lambda-stubs.jar")))
@@ -79,13 +81,24 @@ def main():
             "-keysize", "2048", "-validity", "3650")
         key.chmod(0o600)
     run(tools / "apksigner", "sign", "--ks", key, "--ks-pass", "pass:android", "--out", apk, aligned)
-    run(tools / "apksigner", "verify", "--verbose", "--print-certs", apk)
+    signature = subprocess.check_output([str(tools / "apksigner"), "verify", "--verbose", "--print-certs", str(apk)], text=True)
+    print(signature)
+    certificate = re.search(r"Signer #1 certificate SHA-256 digest: ([0-9a-f]{64})", signature)
+    if not certificate: raise RuntimeError("APK_CERTIFICATE_DIGEST_MISSING")
+    badging = subprocess.check_output([str(tools / "aapt"), "dump", "badging", str(apk)], text=True)
+    permissions = sorted(re.findall(r"uses-permission: name='([^']+)'", badging))
+    allowed = sorted(["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.CAMERA"])
+    if "application-debuggable" in badging: raise RuntimeError("APK_MUST_NOT_BE_DEBUGGABLE")
+    if permissions != allowed: raise RuntimeError("APK_PERMISSION_ALLOWLIST_MISMATCH")
     run(tools / "zipalign", "-c", "4", apk)
     evidence = {"source_revision": revision, "source_dirty": tracked_dirty, "package": "com.pulsex.app.preview",
         "min_sdk": 26, "target_sdk": 35, "build_tools": "35.0.0", "signing": "disposable_debug_key_not_production",
         "qr_decoder": {"artifact": "com.google.zxing:core:3.5.3", "sha256": decoder_hash},
         "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "apk_bytes": apk.stat().st_size,
-        "device_tested": False, "server_included": False}
+        "device_tested": False, "server_included": False, "debuggable": False,
+        "distribution": "internal_review_only", "malware_scanned": False,
+        "certificate_sha256": certificate.group(1), "permissions": permissions,
+        "static_checks": "signature_alignment_permission_allowlist_no_debug_passed"}
     (out / "BUILD_EVIDENCE.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(evidence, indent=2))
     print(apk)
