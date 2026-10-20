@@ -18,10 +18,18 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 import httpx
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 QA = ROOT / 'qa' / 'invitations'
+
+
+def wait_for_qr(page, selector):
+    # Locator assertions poll the image property without evaluating an expression
+    # string, which strict CSP correctly rejects on some Chromium versions.
+    image = page.locator(selector).first
+    expect(image).not_to_have_js_property('naturalWidth', 0, timeout=30000)
+    assert image.evaluate('(element) => element.naturalWidth') > 20
 
 
 def main():
@@ -119,7 +127,7 @@ def main():
                         mobile.get_by_role('button', name='تحديث حالة الطلب', exact=True).click()
                         mobile.get_by_role('heading', name='ننتظرك في الفعالية', exact=True).wait_for()
                         mobile.locator('img.inv-qr').wait_for()
-                        mobile.wait_for_function("document.querySelector('img.inv-qr')?.naturalWidth > 20")
+                        wait_for_qr(mobile, 'img.inv-qr')
                         number = mobile.locator('.inv-pass-number').inner_text()
                         assert number.startswith('G-')
                         assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
@@ -128,7 +136,7 @@ def main():
                         mark('approved_rsvp_shows_real_qr_and_companions_on_mobile')
                         mobile.get_by_role('link', name='عرض بطاقة الدخول', exact=True).click()
                         mobile.locator('img.guest-qr').wait_for()
-                        mobile.wait_for_function("document.querySelector('img.guest-qr')?.naturalWidth > 20")
+                        wait_for_qr(mobile, 'img.guest-qr')
                         assert number in mobile.locator('body').inner_text()
                         mark('private_guest_pass_link_renders_without_public_event_disclosure')
                         desktop_ctx = browser.new_context(viewport={'width': 1440, 'height': 1000}, locale='ar-YE')
@@ -197,7 +205,7 @@ def main():
                         mobile.get_by_label('أوافق على استخدام بياناتي لتنظيم الحضور.', exact=True).check()
                         mobile.get_by_role('button', name='تأكيد التسجيل', exact=True).click()
                         mobile.get_by_role('heading', name='ننتظرك في الفعالية', exact=True).wait_for()
-                        mobile.wait_for_function("document.querySelector('img.inv-qr')?.naturalWidth > 20")
+                        wait_for_qr(mobile, 'img.inv-qr')
                         assert mobile.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
                         mobile.screenshot(path=str(QA / 'public-registration-mobile.png'), full_page=True)
                         mark('public_self_registration_ui_to_approved_pass')
