@@ -1,5 +1,5 @@
 """Native HTTP browser journey: preferences, admin delivery and recipient inbox."""
-import json, os, socket, threading, time
+import json, os, socket, tempfile, threading, time
 from pathlib import Path
 import uvicorn
 from playwright.sync_api import sync_playwright
@@ -7,7 +7,9 @@ from app.server import create_app
 
 
 def run():
-    app=create_app('sqlite:///:memory:',origin='http://127.0.0.1:4387',seed_demo=True)
+    temporary=tempfile.TemporaryDirectory(prefix='eventna-account-browser-')
+    # HTTP requests run concurrently; a file DB gives them separate connections.
+    app=create_app('sqlite:///'+(Path(temporary.name)/'account.sqlite').as_posix(),origin='http://127.0.0.1:4387',seed_demo=True)
     server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=4387,log_level='error'))
     thread=threading.Thread(target=server.run,daemon=True);thread.start()
     for _ in range(100):
@@ -50,5 +52,6 @@ def run():
             browser.close()
     finally:
         server.should_exit=True;thread.join(timeout=5)
+        temporary.cleanup()
 
 if __name__=='__main__':run()
