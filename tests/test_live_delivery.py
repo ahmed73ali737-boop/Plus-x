@@ -9,6 +9,7 @@ from test_admission_http_ack import running_server
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = 'a' * 40
+APK_BYTES = json.loads((ROOT/'artifacts/android/BUILD_EVIDENCE.json').read_text())['apk_bytes']
 
 
 @pytest.mark.parametrize('origin,local', [
@@ -28,7 +29,7 @@ def test_actual_http_delivery_checks_local_mode_and_detects_old_build(tmp_path, 
         result = verify_delivery(origin, SHA, allow_local_test=True)
         assert result['status'] == 'passed', result
         assert result['local_test'] and result['production_accepted'] is False
-        assert len(result['checks']) == 4 and result['apk_bytes'] == 299736
+        assert len(result['checks']) == 4 and result['apk_bytes'] == APK_BYTES
         stale = verify_delivery(origin, 'b'*40, allow_local_test=True)
         assert stale['status'] == 'failed' and stale['reason'] == 'SOURCE_BUILD_MISMATCH'
 
@@ -46,9 +47,9 @@ def synthetic_site(path):
         return httpx.Response(401, json={'detail':'AUTH_REQUIRED'})
     if path == '/api/downloads/android':
         evidence=json.loads((ROOT/'artifacts/android/BUILD_EVIDENCE.json').read_text())
-        return httpx.Response(200, json={'download_url':'/downloads/pulsex-android-preview.apk',
+        return httpx.Response(200, json={'download_url':'/downloads/eventna-android-preview.apk',
             'channel':'preview', 'production_signed':False, 'bytes':evidence['apk_bytes'], 'sha256':evidence['apk_sha256']})
-    if path == '/downloads/pulsex-android-preview.apk':
+    if path == '/downloads/eventna-android-preview.apk':
         return httpx.Response(200, content=(ROOT/'artifacts/android/Eventna-Android-Preview-1.0.3.apk').read_bytes(),
             headers={'content-type':'application/vnd.android.package-archive',
                      'content-disposition':'attachment; filename=preview.apk', 'x-content-type-options':'nosniff'})
@@ -64,7 +65,7 @@ def synthetic_site(path):
     ('tampered_apk','APK_BYTES_DO_NOT_MATCH_CHECKOUT'),
     ('remote_apk','APK_METADATA_DOES_NOT_MATCH_CHECKOUT'),
     ('sqlite','POSTGRES_MIGRATIONS_REQUIRED'),
-    ('oversize','BODY_LIMIT:/downloads/pulsex-android-preview.apk'),
+    ('oversize','BODY_LIMIT:/downloads/eventna-android-preview.apk'),
     ('network','DELIVERY_PROBE_FAILED'),
 ])
 def test_external_delivery_never_accepts_stale_unsafe_or_partial_response(fault, reason):
@@ -77,7 +78,7 @@ def test_external_delivery_never_accepts_stale_unsafe_or_partial_response(fault,
         if fault=='stale_asset' and path=='/assets/app.mjs':return httpx.Response(200, text='old asset', headers={'content-type':'text/javascript'})
         if fault=='exposed_admin' and path=='/api/admin/sites':return httpx.Response(200,json={'users':[]})
         if fault in ('tampered_apk','oversize') and path.endswith('.apk'):
-            return httpx.Response(200,content=b'x'*(299737 if fault=='oversize' else 299736),headers={'content-type':'application/vnd.android.package-archive'})
+            return httpx.Response(200,content=b'x'*(APK_BYTES + 1 if fault=='oversize' else APK_BYTES),headers={'content-type':'application/vnd.android.package-archive'})
         response=synthetic_site(path)
         if fault=='remote_apk' and path=='/api/downloads/android':
             data=response.json();data['download_url']='https://untrusted.test/file.apk';return httpx.Response(200,json=data)

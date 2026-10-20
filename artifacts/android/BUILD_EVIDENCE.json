@@ -1,5 +1,5 @@
 {
-  "source_revision": "d18f5c992fb625120059fe97a46a23c9f48a90a3",
+  "source_revision": "64b720b098c18404b4b59f344da98c34e73ecc92",
   "source_dirty": false,
   "package": "com.pulsex.app.preview",
   "min_sdk": 26,
@@ -10,7 +10,7 @@
     "artifact": "com.google.zxing:core:3.5.3",
     "sha256": "8d8064c1636fdaef7189dd9055c7d59950a8940a12f2293956446ec3c109fd82"
   },
-  "apk_sha256": "1c14b96c350066c2561956b010caa75a920d058d8bebacad0894cd9a767bd90c",
+  "apk_sha256": "6d1b47087f1e93c29917e6a8a482dc8fc9af4db056c8b42d2c2d96b753f66e87",
   "apk_bytes": 299736,
   "device_tested": false,
   "server_included": false

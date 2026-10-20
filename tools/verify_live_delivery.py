@@ -105,7 +105,7 @@ def verify_delivery(origin, expected_source, *, allow_local_test=False, client=N
             require(isinstance(json.loads(raw).get('detail'), str), 'UNEXPECTED_AUTH_DENIAL')
             report['checks'].append('anonymous_administration_denied')
             meta = data('/api/downloads/android')
-            require(meta.get('download_url') == '/downloads/pulsex-android-preview.apk'
+            require(meta.get('download_url') == '/downloads/eventna-android-preview.apk'
                     and meta.get('sha256') == expected_hash and meta.get('bytes') == expected_bytes,
                     'APK_METADATA_DOES_NOT_MATCH_CHECKOUT')
             require(meta.get('channel') == 'preview' and meta.get('production_signed') is False,

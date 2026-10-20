@@ -1,9 +1,7 @@
-# PulseX Android preview APK
+# Eventna Android preview
 
-`PulseX-Android-Preview-1.0.2.apk` is the **debug-signed preview** built from clean source `d18f5c992fb625120059fe97a46a23c9f48a90a3` (PR #34), already contained in main. It is not a production-signed release. Its SHA256 is recorded in `BUILD_EVIDENCE.json`:
+`Eventna-Android-Preview-1.0.3.apk` was built from clean source `64b720b098c18404b4b59f344da98c34e73ecc92` by [GitHub Actions](https://github.com/ahmed73ali737-boop/Plus-x/actions/runs/39354220074).
 
-`1c14b96c350066c2561956b010caa75a920d058d8bebacad0894cd9a767bd90c`
+SHA256: `6d1b47087f1e93c29917e6a8a482dc8fc9af4db056c8b42d2c2d96b753f66e87`. Size: 299736 bytes. Signature, alignment, server-origin checks and offline QR decoder checks passed.
 
-The APK hosts the current PulseX server UI and does not bundle the FastAPI server. Deploy the current main web assets to receive offline synchronization fixes and Service Worker v27; those server-served updates do not require changing this APK's bytes. First configure a working HTTPS PulseX origin inside the app. Android 8+ and an up-to-date Android System WebView are required.
-
-See [Android guide](../../android/README_AR.md) and [offline verification and limits](../../docs/OFFLINE_UPLOAD_VERIFICATION_20261020_AR.md). No signing keystore is included. Synchronize pending data before uninstalling or changing servers.
+This remains a debug-signed preview, not a production-signed release. Physical-device testing has not been performed. It uses the existing `com.pulsex.app.preview` package identifier for compatibility.

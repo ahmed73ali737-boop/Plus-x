@@ -18,7 +18,7 @@ async function runtime(failDownload=false){
   field:(label,type,value,attrs)=>{const input=h('input',{label,type,value,...attrs});return{input,node:h('label',{},input)};},
   selectField:(label,options,value)=>{const input=h('select',{label,value},options.map(([v,l])=>h('option',{value:v},l)));return{input,node:h('label',{},input)};},
   check:label=>{const input=h('input',{type:'checkbox',label});return{input,node:h('label',{},input)};},
-  api:async(path,body)=>{calls.push({path,body});if(path==='/api/downloads/android'){if(failDownload)throw Error('offline');return{channel:'preview',download_url:'/downloads/pulsex-android-preview.apk',bytes:299736,sha256:'a'.repeat(64),min_android:8};}if(path==='/api/public/site/platform')return{events:[{id:'event-demo',title:'Event'}]};if(path==='/api/signup-request')return pending?pending:{status:'pending',grants_access:false};throw Error(path);}};
+  api:async(path,body)=>{calls.push({path,body});if(path==='/api/downloads/android'){if(failDownload)throw Error('offline');return{channel:'preview',download_url:'/downloads/eventna-android-preview.apk',bytes:299736,sha256:'a'.repeat(64),min_android:8};}if(path==='/api/public/site/platform')return{events:[{id:'event-demo',title:'Event'}]};if(path==='/api/signup-request')return pending?pending:{status:'pending',grants_access:false};throw Error(path);}};
  const mod=new vm.SourceTextModule(await readFile(new URL('../web/access.mjs',import.meta.url),'utf8'),{context:ctx});
  await mod.link(()=>new vm.SyntheticModule(Object.keys(ui),function(){for(const[k,v]of Object.entries(ui))this.setExport(k,v);},{context:ctx}));await mod.evaluate();await mod.namespace.accessPage();
  return{root,calls,form:()=>walk(root).find(x=>x.tag==='form'),field:label=>walk(root).find(x=>x.attrs.label===label),setPending(p){pending=p;}};
@@ -27,7 +27,7 @@ test('public choices and preview download are explicit and same-origin',async()=
  const r=await runtime();const links=walk(r.root).filter(x=>x.tag==='a');
  assert.ok(links.some(x=>x.attrs.href==='/'&&text(x).includes('ضيف')));
  assert.ok(links.some(x=>x.attrs.href==='/admin'));
- assert.ok(links.some(x=>x.attrs.href==='/downloads/pulsex-android-preview.apk'));
+ assert.ok(links.some(x=>x.attrs.href==='/downloads/eventna-android-preview.apk'));
  assert.match(text(r.root),/نسخة معاينة/);assert.equal(r.calls.length,1);
 });
 test('consent blocks POST; account request remains pending without privileges',async()=>{
@@ -44,7 +44,7 @@ test('participant requires selection from published event options',async()=>{
  assert.equal(r.calls.find(x=>x.body).body.site_id,'event-demo');
 });
 test('download failure never invents a working APK link',async()=>{
- const r=await runtime(true);assert.equal(walk(r.root).filter(x=>x.attrs.href==='/downloads/pulsex-android-preview.apk').length,0);
+ const r=await runtime(true);assert.equal(walk(r.root).filter(x=>x.attrs.href==='/downloads/eventna-android-preview.apk').length,0);
 });
 test('double submit sends one request',async()=>{
  const r=await runtime();r.field('أوافق على إرسال هذه البيانات للمنظم لمراجعة طلب الحساب.').checked=true;
