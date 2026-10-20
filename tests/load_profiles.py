@@ -1,4 +1,5 @@
 from __future__ import annotations
+from harness_support import sqlite_connection
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import argparse, json, os, socket, sqlite3, subprocess, sys, tempfile, time, urllib.request, uuid
@@ -85,7 +86,7 @@ def main():
                     write_lat.append(latency);write_classes[category]+=1;receipt_statuses.update(statuses);write_errors+=category!='passed'
             write_elapsed=time.perf_counter()-t1
             resource1=resources(proc.pid)
-            with sqlite3.connect((temp/'db.sqlite').as_uri()+'?mode=ro',uri=True) as db:
+            with sqlite_connection((temp/'db.sqlite').as_uri()+'?mode=ro',uri=True) as db:
                 persisted=db.execute('SELECT count(*) FROM px_submissions').fetchone()[0]
             report={
                 'status':'passed' if read_errors==0 and write_errors==0 and persisted==cfg['writes'] else 'failed',

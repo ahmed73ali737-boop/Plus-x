@@ -1,4 +1,5 @@
 """Real local HTTP API checks + bounded synthetic write workload; not browser E2E or a capacity certificate."""
+from harness_support import sqlite_connection
 from pathlib import Path
 import os, subprocess, tempfile, json, time, urllib.request, sys, uuid, sqlite3
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +32,10 @@ try:
     with httpx.Client(base_url=url,timeout=30) as c:
         # Simulate a client not retaining its receipt, then replay the identical body.
         r=c.post('/api/collect',json={'items':items[:50]});assert all(x['status']=='duplicate' for x in r.json()['receipts']);checks.append('replay_50_exact_bodies_no_extra_writes')
-    conn=sqlite3.connect(temp/'db.sqlite');count=conn.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0];assert count==1000;conn.close();checks.append('database_count_matches_1000')
+    with sqlite_connection(temp/'db.sqlite') as conn:
+        count=conn.execute("select count(*) from px_submissions where kind='survey'").fetchone()[0]
+        assert count==1000
+    checks.append('database_count_matches_1000')
     report={'checks':checks,'passed':len(checks),'backend':'SQLite','transport':'real local HTTP; Python clients, not browser','distinct_synthetic_submissions':1000,'batch_size':50,'concurrent_batch_clients':4,'elapsed_seconds':round(elapsed,3),'batch_request_p95_seconds':round(sorted(durations)[int(.95*len(durations))-1],3),'data_loss':0,'extra_rows_after_replay':0,'not_a_concurrent_1000_user_or_postgresql_benchmark':True,'not_physical_kiosk_test':True}
     (ROOT/'qa/http-smoke.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(report))
 finally:proc.terminate();proc.wait(timeout=10);log.close()

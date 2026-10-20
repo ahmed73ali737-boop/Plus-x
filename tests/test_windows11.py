@@ -1,3 +1,4 @@
+from harness_support import sqlite_connection
 import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -148,10 +149,9 @@ def test_admin_ui_exposes_people_without_account_and_later_account_creation():
 def test_additive_compat_migration_adds_password_change_flag_to_old_sqlite(tmp_path):
     import sqlite3
     db=tmp_path/'old.sqlite'
-    con=sqlite3.connect(db)
-    con.execute("CREATE TABLE px_users (id VARCHAR(64) PRIMARY KEY, email VARCHAR(200) UNIQUE NOT NULL, name VARCHAR(200) NOT NULL, role VARCHAR(20) NOT NULL, scope_id VARCHAR(64), password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)")
-    con.commit();con.close()
+    with sqlite_connection(db) as con:
+        con.execute("CREATE TABLE px_users (id VARCHAR(64) PRIMARY KEY, email VARCHAR(200) UNIQUE NOT NULL, name VARCHAR(200) NOT NULL, role VARCHAR(20) NOT NULL, scope_id VARCHAR(64), password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)")
     app=create_app('sqlite:///'+str(db),origin='http://testserver',seed_demo=False)
-    with sqlite3.connect(db) as con:
+    with sqlite_connection(db) as con:
         cols={r[1] for r in con.execute('PRAGMA table_info(px_users)').fetchall()}
     assert 'must_change_password' in cols

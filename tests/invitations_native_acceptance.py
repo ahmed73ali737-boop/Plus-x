@@ -4,6 +4,7 @@ This is native browser acceptance, not native PostgreSQL or camera hardware QA.
 Optional PX_CHROMIUM_EXECUTABLE selects an installed browser for constrained hosts.
 """
 from __future__ import annotations
+from harness_support import sqlite_connection
 import json
 import os
 import socket
@@ -269,7 +270,7 @@ def main():
                         for key in ('total_checkins','admitted_people','inside_count'):
                             assert before_replay[key]==after_replay[key]
                         import sqlite3
-                        with sqlite3.connect(temp/'test.sqlite') as db:
+                        with sqlite_connection(temp/'test.sqlite') as db:
                             scan_id=attempts[0]['scan_id']
                             assert db.execute('SELECT count(*) FROM px_guest_checkins WHERE id=?',(scan_id,)).fetchone()[0]==1
                             assert db.execute('SELECT count(*) FROM px_admission_uses WHERE scan_id=?',(scan_id,)).fetchone()[0]==1

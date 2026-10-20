@@ -1,4 +1,5 @@
 """Regression additions for the Windows-focused UI release; run on the reported OS only."""
+from harness_support import sqlite_connection
 import json
 import re
 import sqlite3
@@ -73,7 +74,7 @@ def test_port_detector_does_not_kill_other_processes():
 def test_backup_consistency_and_no_credentials(tmp_path,monkeypatch):
     monkeypatch.setattr(backup_local,'ROOT',tmp_path);monkeypatch.delenv('DATABASE_URL',raising=False)
     (tmp_path/'data').mkdir()
-    with sqlite3.connect(tmp_path/'data/pulsex-pilot.sqlite3') as c:
+    with sqlite_connection(tmp_path/'data/pulsex-pilot.sqlite3') as c:
         c.execute('create table example(id integer primary key, text text)')
         c.execute('insert into example(text) values(?)',('بيانات Unicode',))
     (tmp_path/'data/first-run-accounts.json').write_text('DO_NOT_INCLUDE',encoding='utf-8')
@@ -81,6 +82,6 @@ def test_backup_consistency_and_no_credentials(tmp_path,monkeypatch):
     with zipfile.ZipFile(archive) as z:
         assert 'data/first-run-accounts.json' not in z.namelist()
         z.extract('data/pulsex-pilot.sqlite3',tmp_path/'restore')
-    with sqlite3.connect(tmp_path/'restore/data/pulsex-pilot.sqlite3') as c:
+    with sqlite_connection(tmp_path/'restore/data/pulsex-pilot.sqlite3') as c:
         assert c.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
         assert c.execute('select text from example').fetchone()[0]=='بيانات Unicode'

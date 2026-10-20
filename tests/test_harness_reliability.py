@@ -61,3 +61,22 @@ def test_admission_resilience_javascript_contract(tmp_path):
     out=root/'qa/contracts/admission-resilience.log';out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(run.stdout+run.stderr,encoding='utf-8')
     assert run.returncode==0,run.stdout+run.stderr
+
+
+@pytest.mark.parametrize('fail',[False,True])
+def test_sqlite_transaction_owner_closes_handle_even_when_reference_survives(tmp_path,fail):
+    import sqlite3
+    from harness_support import sqlite_connection
+    path=tmp_path/'owned.sqlite'
+    connection=None
+    try:
+        with sqlite_connection(path) as connection:
+            connection.execute('CREATE TABLE checks(value INTEGER)')
+            connection.execute('INSERT INTO checks VALUES (1)')
+            if fail:raise RuntimeError('injected sqlite batch failure')
+    except RuntimeError:
+        assert fail
+    with pytest.raises(sqlite3.ProgrammingError,match='closed'):
+        connection.execute('SELECT 1')
+    path.unlink()
+    assert not path.exists()

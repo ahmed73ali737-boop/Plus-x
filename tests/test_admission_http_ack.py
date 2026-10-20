@@ -1,4 +1,5 @@
 """Real HTTP commit followed by lost client ACK, using a disposable server/DB."""
+from harness_support import sqlite_connection
 from contextlib import contextmanager
 from datetime import datetime
 import json, os, socket, sqlite3, subprocess, sys, time
@@ -60,7 +61,7 @@ def test_real_http_lost_ack_after_commit_has_one_ledger_use(tmp_path):
                 dropping.post(path+'/guest-checkins',json=body)
         replay=staff.post(path+'/guest-checkins',json=body)
         assert replay.status_code==200 and replay.json()['status']=='duplicate'
-        with sqlite3.connect(tmp_path/'http.sqlite') as db:
+        with sqlite_connection(tmp_path/'http.sqlite') as db:
             assert db.execute('SELECT count(*) FROM px_guest_checkins WHERE id=?',(body['scan_id'],)).fetchone()[0]==1
             assert db.execute('SELECT count(*) FROM px_admission_uses WHERE scan_id=?',(body['scan_id'],)).fetchone()[0]==1
             assert db.execute('SELECT consumed FROM px_admission_entitlements').fetchone()[0]==2

@@ -1,12 +1,21 @@
 """Explicit ownership for disposable QA resources; never touches a live database."""
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 import json
 import subprocess
+import sqlite3
 import threading
 import traceback
 from fastapi.testclient import TestClient
 import httpx
+
+
+@contextmanager
+def sqlite_connection(*args, **kwargs):
+    """Commit/rollback the transaction and then close the OS file handle."""
+    with closing(sqlite3.connect(*args, **kwargs)) as connection:
+        with connection:
+            yield connection
 
 
 @contextmanager
