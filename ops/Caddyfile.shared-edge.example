@@ -1,0 +1,9 @@
+# Add this site block to the existing edge configuration after checking conflicts.
+# PulseX must be served at the domain root: /assets, /api and /downloads are absolute.
+eventna.app {
+    encode zstd gzip
+    request_body {
+        max_size 7MB
+    }
+    reverse_proxy 127.0.0.1:14310
+}

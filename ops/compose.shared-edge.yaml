@@ -1,0 +1,8 @@
+# Overlay for an existing host reverse proxy. Preserve the current Compose project
+# name and volumes. Start `app`; never use down -v during an upgrade.
+services:
+  app:
+    ports:
+      - "127.0.0.1:${PULSEX_HOST_PORT:-14310}:4310"
+  proxy:
+    profiles: [dedicated-edge]
