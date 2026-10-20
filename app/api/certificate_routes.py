@@ -88,7 +88,8 @@ def install_certificate_routes(app, engine, public_origin, identify, log):
             permission(conn, request, event_id, 'certificates.manage')
             rows = conn.execute(select(certificates).where(certificates.c.event_id == event_id)
                                 .order_by(certificates.c.issued_at.desc(), certificates.c.id).offset(offset).limit(limit)).mappings()
-            return {'items': [{**staff(dict(r)), 'snapshot': {'data': r['snapshot']['data'], 'template_id': r['template_id']},
+            return {'items': [{**staff(dict(r)), 'snapshot': {'data': r['snapshot']['data'], 'template_id': r['template_id'],
+                                                           'issue_timezone': r['snapshot'].get('issue_timezone', 'UTC')},
                                'validity': svc.state(r)} for r in rows]}
 
     @app.post('/api/admin/events/{event_id}/certificates')

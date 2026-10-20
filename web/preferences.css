@@ -5,3 +5,5 @@
 .certificate-stage{position:relative;max-width:100%;margin:16px 0;direction:ltr}.certificate-stage>img{display:block;width:100%;height:auto}.certificate-handle{position:absolute;transform:translate(-50%,-80%);border:1px dashed #176b73;border-radius:8px;background:#fff;color:#176b73;width:32px;height:32px;cursor:move;touch-action:none}.certificate-handle:focus-visible{outline:3px solid #16a394}
 
 .certificate-page{max-width:1120px;margin:auto;padding:clamp(12px,3vw,32px);box-sizing:border-box}.certificate-page code{overflow-wrap:anywhere;word-break:break-word;white-space:normal}.certificate-page a{white-space:normal}
+
+.certificate-page h1,.certificate-page h2,.certificate-page p{overflow-wrap:anywhere}

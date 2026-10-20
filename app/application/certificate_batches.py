@@ -43,6 +43,7 @@ def preview(conn, event_id, user_id, body):
     allowed = required | {'grade', 'training_hours'}
     if not isinstance(mapping, dict) or not required.issubset(mapping) or set(mapping) - allowed or any(v not in headers for v in mapping.values()):
         fail('CERTIFICATE_IMPORT_MAPPING')
+    zone = svc.issue_timezone(body.get('timezone'))
     template_id = text(body.get('template_id'), 64, True)
     if not conn.execute(select(certificate_templates.c.id).where(certificate_templates.c.event_id == event_id,
                            certificate_templates.c.id == template_id)).first(): fail('CERTIFICATE_TEMPLATE_NOT_FOUND', 404)
@@ -59,7 +60,7 @@ def preview(conn, event_id, user_id, body):
             if mapped.get('training_hours'): number(mapped['training_hours'], low=0, high=100000)
             if conn.execute(select(certificates.c.id).where(certificates.c.event_id == event_id,
                 certificates.c.recipient_key == pair[0], certificates.c.award_key == pair[1])).first(): fail('CERTIFICATE_ALREADY_ISSUED')
-            rows.append({'template_id': template_id, 'recipient_key': pair[0], 'award_key': pair[1],
+            rows.append({'template_id': template_id, 'recipient_key': pair[0], 'award_key': pair[1], 'timezone': zone,
                          'data': {key: mapped.get(key, '') for key in svc.FIELDS[:5]}})
         except HTTPException as exc: errors.append({'row': index, 'error': exc.detail})
     if not rows and not errors: fail('IMPORT_ROWS_1_TO_1000')

@@ -4,6 +4,7 @@ Templates are immutable versions; issuing freezes design and resolved data.
 The hash detects accidental changes; it is NOT a digital issuer signature.
 """
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from hashlib import sha256
 from html import escape
 import io
@@ -29,6 +30,13 @@ PLACEHOLDER = re.compile(r'\{\{?\s*([^{}]+?)\s*\}\}?')
 
 def fingerprint(value):
     return sha256(canonical_json(value).encode()).hexdigest()
+
+
+def issue_timezone(value):
+    name = text(value or 'UTC', 80, True)
+    try: ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError): fail('CERTIFICATE_TIMEZONE_INVALID')
+    return name
 
 
 def default_design():
@@ -110,12 +118,15 @@ def issue(conn, event_id, body):
     if data['training_hours']:
         number(data['training_hours'], low=0, high=100000)
     expiry = stamp(body.get('expires_at')) or None
-    request_hash = fingerprint({'template_id': template_id, 'recipient_key': recipient_key,
-                                'award_key': award_key, 'data': data, 'expires_at': expiry})
+    zone = issue_timezone(body.get('timezone'))
+    request_data = {'template_id': template_id, 'recipient_key': recipient_key,
+                    'award_key': award_key, 'data': data, 'expires_at': expiry}
+    request_hash = fingerprint({**request_data, 'timezone': zone})
     existing = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
                                     certificates.c.request_key == request_key)).mappings().first()
     if existing:
-        if existing['request_hash'] != request_hash: fail('CERTIFICATE_REQUEST_CONFLICT', 409)
+        legacy_retry = zone == 'UTC' and existing['request_hash'] == fingerprint(request_data)
+        if existing['request_hash'] != request_hash and not legacy_retry: fail('CERTIFICATE_REQUEST_CONFLICT', 409)
         return dict(existing), None, False
     if expiry and datetime.fromisoformat(expiry) <= datetime.now(timezone.utc): fail('CERTIFICATE_EXPIRY_INVALID')
     template = conn.execute(select(certificate_templates).where(certificate_templates.c.id == template_id,
@@ -123,9 +134,9 @@ def issue(conn, event_id, body):
     if not template: fail('CERTIFICATE_TEMPLATE_NOT_FOUND', 404)
     serial = 'CERT-' + secrets.token_hex(16).upper()
     issued_at = now()
-    data.update(serial=serial, issue_date=issued_at[:10])
+    data.update(serial=serial, issue_date=datetime.fromisoformat(issued_at).astimezone(ZoneInfo(zone)).date().isoformat())
     validate_layout(template['design'], data)
-    snapshot = {'design': template['design'], 'data': data, 'template_id': template_id, 'font_hash': font_hash(), 'renderer': 'certificate-raster-v1'}
+    snapshot = {'design': template['design'], 'data': data, 'template_id': template_id, 'font_hash': font_hash(), 'renderer': 'certificate-raster-v1', 'issue_timezone': zone}
     token = secrets.token_urlsafe(32)
     row = {'id': new_id(), 'event_id': event_id, 'template_id': template_id, 'request_key': request_key,
            'request_hash': request_hash, 'recipient_key': recipient_key, 'award_key': award_key,
@@ -154,7 +165,8 @@ def public_view(row):
     data = row['snapshot']['data']
     return {'serial': row['serial'], 'status': state(row), 'participant_name': data['participant_name'],
             'course_title': data['course_title'], 'issuer_name': data['issuer_name'],
-            'issued_at': row['issued_at'], 'expires_at': row['expires_at']}
+            'issued_at': row['issued_at'], 'expires_at': row['expires_at'], 'issue_date': data['issue_date'],
+            'issue_timezone': row['snapshot'].get('issue_timezone', 'UTC')}
 
 
 def revoke(conn, event_id, certificate_id, reason):

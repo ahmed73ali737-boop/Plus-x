@@ -248,3 +248,28 @@ def test_replacement_is_atomic_new_serial_linked_and_idempotent(system):
     with app.state.engine.connect() as conn:
         assert conn.execute(select(func.count()).select_from(certificate_replacements)).scalar_one()==1
         assert conn.execute(select(func.count()).select_from(certificates)).scalar_one()==2
+
+
+
+def test_issuer_timezone_date_and_legacy_idempotency(system, monkeypatch):
+    from app.application import certificate_service as svc
+    app,client,headers,event,_=system;base,body=setup(system)
+    monkeypatch.setattr(svc,'now',lambda:'2026-10-20T23:30:00+00:00')
+    issued=client.post(base+'/certificates',json={**body,'timezone':'Asia/Aden'},headers=headers)
+    assert issued.status_code==200,issued.text
+    row=issued.json()['certificate']
+    assert row['snapshot']['data']['issue_date']=='2026-10-21'
+    public=client.get('/api/public/certificates/verify/'+row['serial']).json()
+    assert public['issue_date']=='2026-10-21' and public['issue_timezone']=='Asia/Aden'
+    assert client.post(base+'/certificates',json={**body,'timezone':'UTC'},headers=headers).status_code==409
+    assert client.post(base+'/certificates',json={**body,'request_key':'bad-zone','timezone':'no/such-zone'},headers=headers).status_code==422
+    # A previously issued UTC request remains replayable after the additive timezone field.
+    legacy={**body,'request_key':'legacy','recipient_key':'legacy-person'}
+    original=client.post(base+'/certificates',json=legacy,headers=headers).json()['certificate']
+    request_data={k:legacy[k] for k in ('template_id','recipient_key','award_key','data')}
+    request_data['data']={key:legacy['data'].get(key,'') for key in svc.FIELDS[:5]}
+    request_data['expires_at']=None
+    with app.state.engine.begin() as conn:
+        conn.execute(update(certificates).where(certificates.c.id==original['id']).values(request_hash=svc.fingerprint(request_data)))
+    retry=client.post(base+'/certificates',json=legacy,headers=headers)
+    assert retry.status_code==200 and retry.json()['created'] is False
