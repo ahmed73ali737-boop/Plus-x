@@ -1,3 +1,4 @@
+import {preferencePanel} from './preferences.mjs';
 import {icon} from './icons.mjs';
 import{h,root,api,field,selectField,check,button,modal,toast,brand,labels,types,setCSRF,msg,isoToLocalInput,localInputToISO}from'./ui.mjs';
 import {backup,saveDeviceToken} from './offline.mjs';
@@ -7,7 +8,7 @@ import {renderCommittee} from './committee.mjs';
 import {admissionDesk} from './admission-desk.mjs';
 import {storyboard} from './storyboard.mjs';
 let user,allSites=[],current,tab='overview',host;
-const tabs=[['overview','نظرة عامة'],['identity','الهوية والقالب'],['sections','أقسام الصفحة'],['organizations','المؤسسات والمشاركات'],['guests','الزوار و QR'],['invitations','الدعوات وتأكيد الحضور'],['committee','اللجان والصلاحيات'],['content','الفعالية والخدمات'],['storyboard','ترتيب التجربة'],['questions','إدخال الأسئلة'],['polls','التصويت'],['ratings','التقييم والملاحظات'],['ads','الإعلانات والعروض'],['facts','الحقائق والأرقام'],['import','Excel / CSV'],['metrics','النتائج والتقارير'],['preview','معاينة الصفحة'],['devices','الأجهزة والطرفيات'],['users','الحسابات'],['audit','السجل والتدقيق'],['settings','أمان الحساب']];
+const tabs=[['overview','نظرة عامة'],['identity','الهوية والقالب'],['sections','أقسام الصفحة'],['organizations','المؤسسات والمشاركات'],['guests','الزوار و QR'],['invitations','الدعوات وتأكيد الحضور'],['committee','اللجان والصلاحيات'],['content','الفعالية والخدمات'],['storyboard','ترتيب التجربة'],['questions','إدخال الأسئلة'],['polls','التصويت'],['ratings','التقييم والملاحظات'],['ads','الإعلانات والعروض'],['facts','الحقائق والأرقام'],['import','Excel / CSV'],['metrics','النتائج والتقارير'],['preview','معاينة الصفحة'],['devices','الأجهزة والطرفيات'],['users','الحسابات'],['audit','السجل والتدقيق'],['settings','الإعدادات والإشعارات']];
 async function save(){const x=await api('/api/admin/sites/'+current.id,{draft_rev:current.draft_rev,config:current.draft},'PUT');current.draft_rev=x.draft_rev;toast('حُفظت المسودة. اضغط نشر لتظهر للزوار.');}
 async function reload(){current=await api('/api/admin/sites/'+current.id);await renderTab();}
 function visibleTab(k){const p=current?.permissions||[];if(k==='invitations')return current?.kind==='event'&&p.includes('invitations.manage');if(k==='committee')return current?.kind==='event'&&p.includes('committee.manage');if(current?.can_manage===false)return k==='settings'||(k==='guests'&&p.includes('guests.read'))||(k==='metrics'&&!current.admission_only);return(k!=='users'||user.role!=='agency')&&(k!=='guests'||current?.kind==='event');}
@@ -254,6 +255,7 @@ async function auditTab(){
   host.append(h('p',{class:'lead'},'سجل للعمليات الإدارية المهمة: الدخول، الحفظ، النشر، الاستيراد، إنشاء الحسابات وغيرها.'),list);
 }
 function settings(){
+  const preferenceHost=h('div',{});host.append(preferenceHost);preferencePanel(preferenceHost,{authenticated:true,user}).catch(e=>toast(msg(e),true));
   host.append(
     h('div',{class:'notice'},'بعد تجهيز التاب: اخرج من حساب الإدارة، وأغلق لوحة الإدارة. استخدم وضع الكشك في نظام التشغيل لمنع وصول الجمهور لإعدادات المتصفح.'),
     button('نسخة احتياطية من الطابور المحلي — للمشغل',backup,'btn secondary')

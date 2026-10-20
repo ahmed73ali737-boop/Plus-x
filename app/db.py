@@ -227,3 +227,15 @@ def ensure_compat_schema(engine):
 
 # Register additive admission tables for both application and migration entrypoints.
 from app import invitations_db as _invitations_db  # noqa: E402,F401
+
+# Account preferences and an owner-isolated inbox; delivery is durable in the DB.
+preferences=Table('px_preferences',metadata,
+    Column('user_id',String(64),ForeignKey('px_users.id'),primary_key=True),
+    Column('config',JSON,nullable=False))
+notifications=Table('px_notifications',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('user_id',String(64),ForeignKey('px_users.id'),nullable=False),
+    Column('sender_id',String(64),ForeignKey('px_users.id'),nullable=False),
+    Column('title',String(160),nullable=False),Column('body',Text,nullable=False),
+    Column('created_at',String(64),nullable=False),Column('read_at',String(64)))
+Index('px_notifications_owner_time',notifications.c.user_id,notifications.c.created_at)

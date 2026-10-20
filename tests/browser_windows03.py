@@ -167,7 +167,7 @@ with sync_playwright() as p:
         page.get_by_text('أشخاص فريدون موثّقون',exact=True).wait_for()
         mark('real_analytics_page_and_honest_people_counts')
         page.screenshot(path=str(ROOT/'qa/analytics.png'),full_page=True)
-        for tab in ['الهوية والقالب','أقسام الصفحة','الفعالية والخدمات','التصويت','الإعلانات والعروض','الحقائق والأرقام','الأجهزة والطرفيات','السجل والتدقيق','أمان الحساب']:
+        for tab in ['الهوية والقالب','أقسام الصفحة','الفعالية والخدمات','التصويت','الإعلانات والعروض','الحقائق والأرقام','الأجهزة والطرفيات','السجل والتدقيق','الإعدادات والإشعارات']:
             page.get_by_role('button',name=tab,exact=True).click()
             page.get_by_role('heading',level=1,name=tab,exact=True).wait_for()
             mark('admin_module_'+tab)

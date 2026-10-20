@@ -1,0 +1,15 @@
+{
+  "implementation_commit": "398a5e2b1e8b337fef8657de8458a46ca6972fe0",
+  "pytest": {
+    "passed": 562,
+    "skipped": 1,
+    "subtests_passed": 14
+  },
+  "offline_node_tests": {
+    "passed": 9
+  },
+  "browser": "blocked: Chromium socket() Operation not permitted",
+  "delivery": "local commit only; public git push rejected by automatic approval review",
+  "production_deployed": false,
+  "apk_rebuilt": false
+}

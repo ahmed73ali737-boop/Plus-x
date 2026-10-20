@@ -4,6 +4,7 @@ import json, sqlite3, zipfile
 from sqlalchemy import create_engine, insert, select, text, update
 import pytest
 from app.db import event_guests, sites, versions
+from app.core.migrations import MIGRATION_PATHS
 from app.infrastructure.seed import seed_demo_data
 from app.server import create_app
 from tools.upgrade_inventory import inventory, state_fingerprints
@@ -38,7 +39,7 @@ def test_inventory_reads_old_schema_without_writing_missing_columns(tmp_path):
             c.exec_driver_sql('PRAGMA query_only=ON')
             report=inventory(c)
             assert report['events']['legacy-event']['legacy_passes']==1
-            assert len(report['migration_missing'])==8
+            assert len(report['migration_missing'])==len(MIGRATION_PATHS)
     finally:engine.dispose()
 
 
