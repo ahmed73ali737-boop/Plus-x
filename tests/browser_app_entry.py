@@ -1,4 +1,4 @@
-"""Real HTTP Chromium: public entry, download bytes, mobile layout, pending signup."""
+"""Real HTTP Chromium: public entry, APK quarantine, mobile layout, pending signup."""
 from pathlib import Path
 import hashlib,json,os,sys,tempfile,traceback
 from playwright.sync_api import sync_playwright
@@ -23,16 +23,15 @@ def main():
                     page=browser.new_page(viewport={'width':390,'height':844},locale='ar-YE')
                     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                     page.goto(base+'/start')
-                    page.get_by_role('link',name='تحميل Android',exact=False).wait_for()
+                    page.get_by_role('heading',name='تنزيل Android متوقف مؤقتًا',exact=True).wait_for()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
                     page.screenshot(path=str(OUT/'mobile-entry.png'),full_page=True)
                     mark('mobile_390_no_horizontal_overflow')
-                    with page.expect_download() as pending:
-                        page.get_by_role('link',name='تحميل Android',exact=False).click()
-                    download=pending.value;target=temp/'preview.apk';download.save_as(target)
+                    assert page.locator('a[href$=".apk"]').count()==0
                     evidence=staff.get('/api/downloads/android').json()
-                    assert hashlib.sha256(target.read_bytes()).hexdigest()==evidence['sha256']
-                    mark('download_link_returns_pinned_apk_bytes')
+                    assert evidence['available'] is False and evidence['security_status']=='review_required'
+                    assert staff.get('/downloads/eventna-android-preview.apk').status_code==410
+                    mark('reported_apk_withdrawn_and_web_alternative_visible')
                     page.get_by_label('اسم الجهة أو المؤسسة',exact=True).fill('Synthetic browser org')
                     page.get_by_label('اسم المسؤول',exact=True).fill('Synthetic browser owner')
                     page.get_by_label('البريد الإلكتروني',exact=True).fill('browser-entry@example.test')
@@ -51,7 +50,7 @@ def main():
                     assert page.get_by_role('link',name='إنشاء طلب حساب جهة',exact=True).count()==1
                     mark('guest_and_registered_routes_reach_canonical_surfaces')
                     page.goto(base+'/start');page.set_viewport_size({'width':1440,'height':1000})
-                    page.get_by_role('link',name='تحميل Android',exact=False).wait_for()
+                    page.get_by_role('heading',name='تنزيل Android متوقف مؤقتًا',exact=True).wait_for()
                     assert page.evaluate("""() => {const box=document.querySelector('.access-download>[role=status]');const b=box.getBoundingClientRect();return [...box.children].every(el=>{const r=el.getBoundingClientRect();return r.left>=b.left-1&&r.right<=b.right+1;});}""")
                     mark('desktop_download_copy_stays_in_its_column')
                     page.screenshot(path=str(OUT/'desktop-entry.png'),full_page=True)

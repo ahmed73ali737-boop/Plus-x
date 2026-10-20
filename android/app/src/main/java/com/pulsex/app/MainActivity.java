@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs=getSharedPreferences("pulsex",MODE_PRIVATE);
-        try { server=ServerPolicy.normalize(prefs.getString("server","")); } catch(Exception ignored) {}
+        try { server=ServerPolicy.normalize(prefs.getString("server",ServerPolicy.DEFAULT_SERVER)); } catch(Exception ignored) {}
         slug=prefs.getString("event","demo");
         getWindow().setStatusBarColor(INK);
         root=column();root.setBackgroundColor(BG);
@@ -131,7 +131,20 @@ public final class MainActivity extends Activity {
         if(path.endsWith("/scan"))toolbar.addView(action("QR",()->{if(web!=null&&ServerPolicy.sameOrigin(server,web.getUrl()))startActivityForResult(new Intent(this,QrScanActivity.class),QR_SCAN);}));
         toolbar.addView(action("تحديث",()->{if(web!=null)web.reload();}));root.addView(toolbar);
         progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);root.addView(progress,new LinearLayout.LayoutParams(-1,dp(3)));
-        if(web==null)createWeb();else{ViewGroup parent=(ViewGroup)web.getParent();if(parent!=null)parent.removeView(web);}
+        if(web==null){
+            try{createWeb();}catch(RuntimeException error){
+                try{destroyWeb();}catch(RuntimeException ignored){web=null;}
+                progress.setVisibility(View.GONE);
+                LinearLayout recovery=column();recovery.setPadding(dp(24),dp(24),dp(24),dp(24));
+                recovery.addView(label("تعذر تشغيل مكوّن عرض الويب في الهاتف.",20,INK,true));
+                recovery.addView(label("حدّث مكوّن عرض الويب من متجر جهازك، أو افتح المنصة في المتصفح.",15,MUTED,false));
+                recovery.addView(action("فتح المنصة في المتصفح",()->{
+                    try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(server+path)).addCategory(Intent.CATEGORY_BROWSABLE));}
+                    catch(Exception unavailable){note("لا يوجد متصفح متاح على الجهاز.");}
+                }));
+                root.addView(recovery);return;
+            }
+        }else{ViewGroup parent=(ViewGroup)web.getParent();if(parent!=null)parent.removeView(web);}
         web.setVisibility(View.VISIBLE);webHolder=column();webHolder.addView(web,new LinearLayout.LayoutParams(-1,-1));root.addView(webHolder,new LinearLayout.LayoutParams(-1,0,1));web.onResume();web.loadUrl(server+path);
     }
     @SuppressWarnings("deprecation") private void createWeb(){
@@ -140,7 +153,7 @@ public final class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
         ServiceWorkerController.getInstance().getServiceWorkerWebSettings().setAllowFileAccess(false);
         ServiceWorkerController.getInstance().getServiceWorkerWebSettings().setAllowContentAccess(false);
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        WebView.setWebContentsDebuggingEnabled(false);
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest request){
                 String url=request.getUrl().toString();if(ServerPolicy.sameOrigin(server,url))return false;

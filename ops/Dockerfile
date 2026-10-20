@@ -14,7 +14,7 @@ COPY run.py ./run.py
 COPY tools ./tools
 COPY ops ./ops
 COPY VERSION ./VERSION
-COPY artifacts/android ./artifacts/android
+COPY artifacts/android/BUILD_EVIDENCE.json ./artifacts/android/BUILD_EVIDENCE.json
 RUN mkdir -p /app/data/media && chown -R pulsex:pulsex /app
 USER pulsex
 ENV HOST=0.0.0.0 PORT=4310 PYTHONUTF8=1 PYTHONUNBUFFERED=1

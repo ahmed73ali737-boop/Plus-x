@@ -2,6 +2,7 @@ import com.pulsex.app.ServerPolicy;
 public final class ServerPolicyCheck {
     public static void main(String[] args) {
         int count = 0;
+        if (!ServerPolicy.normalize(ServerPolicy.DEFAULT_SERVER).equals("https://eventna.app")) throw new AssertionError(); count++;
         for (String s : new String[]{"http://host", "https://user:pass@host", "https://host/path", "https://host?token=x", "https://host#x", "file:///x", "javascript:alert(1)", "https://host:0", "https://host:70000", "https://host\\@evil.test"}) {
             try { ServerPolicy.normalize(s); throw new AssertionError(s); } catch (IllegalArgumentException expected) { count++; }
         }
