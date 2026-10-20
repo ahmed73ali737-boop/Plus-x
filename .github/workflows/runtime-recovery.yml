@@ -6,21 +6,57 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PYTHONUTF8: "1"
 jobs:
   recovery:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - run: |
-          python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt
-      - run: python tests/runtime_recovery_acceptance.py
-      - uses: actions/upload-artifact@v4
+          python-version: '3.12.15'
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/recovery/baseline.json --verify-ci --profile qa --job-id recovery
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/recovery/source-locks.json', 'qa/ci/recovery/bundle', 'qa/runtime-recovery']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/recovery/source-locks.json
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
+      - name: Install hash-locked acceptance dependencies
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
+      - name: Run disposable Compose recovery acceptance
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p qa/runtime-recovery
+          python tests/runtime_recovery_acceptance.py 2>&1 | tee qa/runtime-recovery/runner.log
+      - name: Seal exact-source evidence even when a required check fails
         if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/recovery/baseline.json --output qa/ci/recovery/bundle/provenance.json --verify-ci --profile qa --job-id recovery --job-status '${{ job.status }}' --evidence 'qa/ci/recovery/source-locks.json' --evidence 'qa/runtime-recovery/results.json' --evidence 'qa/runtime-recovery' --require-pass 'qa/ci/recovery/source-locks.json' --require-pass 'qa/runtime-recovery/results.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: runtime-recovery-${{ github.sha }}
-          path: qa/runtime-recovery/
+          name: phase01-runtime-recovery-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/recovery/bundle/
+          if-no-files-found: error
+      - name: Preserve runner logs and original reports on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-runtime-recovery-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            qa/ci/recovery/baseline.json
+            qa/runtime-recovery
           if-no-files-found: error

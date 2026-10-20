@@ -6,37 +6,109 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PYTHONUTF8: "1"
 jobs:
   focused:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            python: '3.12.15'
+          - os: windows-latest
+            python: '3.13.16'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
+      - name: Record and verify exact checkout identity
+        run: python tools/build_provenance.py snapshot --output qa/ci/focused/baseline.json --verify-ci --profile qa --job-id focused
+      - name: Remove only generated evidence from previous checkouts
+        run: python -c "from pathlib import Path; import shutil; targets=['qa/ci/focused/source-locks.json', 'qa/ci/focused/bundle', 'qa/reliability', 'qa/guest-capacity-smoke.json', 'qa/contracts/admission-resilience.log']; [(shutil.rmtree(p) if p.is_dir() else p.unlink()) for p in map(Path,targets) if p.exists()]"
+      - name: Verify SHA256 observability source lock before dependencies
+        run: python tools/verify_shared_observability.py
+      - name: Verify Git blob consolidation source lock before dependencies
+        run: python tools/verify_consolidation_assets.py
+      - name: Exercise independent source locks and negative controls
+        run: python tools/source_lock_diagnostics.py --controls --checkouts --output qa/ci/focused/source-locks.json
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.3'
-      - run: |
-          python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt
+      - name: Install hash-locked pip bootstrap
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt'
+      - name: Install hash-locked acceptance dependencies
+        run: 'python -m pip install --require-hashes --only-binary=:all: -r requirements/locks/qa.txt'
       - name: Run ownership and fault contracts twice in fresh directories
         shell: bash
         run: |
-          mkdir -p qa/reliability
-          for attempt in 1 2; do
-            python -m pytest -q tests/test_upgrade_safety.py tests/test_acceptance_evidence.py tests/test_performance_measurement.py tests/test_public_bundle_query_budget.py tests/test_pwa_install_contract.py tests/test_guest_frontend_security.py tests/test_device_admission_scope.py tests/test_harness_reliability.py tests/test_runtime_recovery.py tests/test_admission_http_ack.py tests/test_admission_gate_integration.py tests/test_linux_standalone_contract.py --basetemp="qa/reliability/temp-$attempt" --junitxml="qa/reliability/run-$attempt.xml" || exit $?
-            python tests/guest_capacity_smoke.py > "qa/reliability/guest-$attempt.log" 2>&1 || exit $?
-          done
-      - uses: actions/upload-artifact@v4
+          python - <<'PY'
+          from pathlib import Path
+          import shutil, subprocess, sys, traceback
+
+          output = Path('qa/reliability')
+          output.mkdir(parents=True, exist_ok=True)
+          capacity_report = Path('qa/guest-capacity-smoke.json')
+          suites = [
+              'tests/test_upgrade_safety.py', 'tests/test_acceptance_evidence.py',
+              'tests/test_performance_measurement.py', 'tests/test_public_bundle_query_budget.py',
+              'tests/test_pwa_install_contract.py', 'tests/test_guest_frontend_security.py',
+              'tests/test_device_admission_scope.py', 'tests/test_harness_reliability.py',
+              'tests/test_runtime_recovery.py', 'tests/test_admission_http_ack.py',
+              'tests/test_admission_gate_integration.py', 'tests/test_linux_standalone_contract.py',
+              'tests/test_acceptance_workflow_provenance.py',
+          ]
+          failed = False
+          for attempt in (1, 2):
+              commands = [
+                  ('pytest', [sys.executable, '-m', 'pytest', '-q', *suites,
+                              f'--basetemp=qa/reliability/temp-{attempt}',
+                              f'--junitxml=qa/reliability/run-{attempt}.xml']),
+                  ('guest', [sys.executable, 'tests/guest_capacity_smoke.py']),
+              ]
+              for label, command in commands:
+                  if label == 'guest':
+                      capacity_report.unlink(missing_ok=True)
+                  with (output / f'{label}-{attempt}.log').open('w', encoding='utf-8') as log:
+                      try:
+                          result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
+                          failed |= result.returncode != 0
+                      except OSError:
+                          traceback.print_exc(file=log)
+                          failed = True
+                  if label == 'guest':
+                      if capacity_report.is_file():
+                          shutil.copyfile(capacity_report, output / f'guest-{attempt}.json')
+                      else:
+                          failed = True
+          raise SystemExit(int(failed))
+          PY
+      - name: Seal exact-source evidence even when a required check fails
         if: always()
+        run: python tools/build_provenance.py snapshot --baseline qa/ci/focused/baseline.json --output qa/ci/focused/bundle/provenance.json --verify-ci --profile qa --job-id focused --job-status '${{ job.status }}' --evidence 'qa/ci/focused/source-locks.json' --evidence 'qa/reliability/run-1.xml' --evidence 'qa/reliability/run-2.xml' --evidence 'qa/reliability/guest-1.json' --evidence 'qa/reliability/guest-2.json' --evidence 'qa/reliability/pytest-1.log' --evidence 'qa/reliability/guest-1.log' --evidence 'qa/reliability/pytest-2.log' --evidence 'qa/reliability/guest-2.log' --evidence 'qa/contracts/admission-resilience.log' --require-pass 'qa/ci/focused/source-locks.json' --require-pass 'qa/reliability/run-1.xml' --require-pass 'qa/reliability/run-2.xml' --require-pass 'qa/reliability/guest-1.json' --require-pass 'qa/reliability/guest-2.json'
+      - name: Upload same-run source and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: harness-reliability-${{ matrix.os }}-${{ github.sha }}
+          name: phase01-harness-reliability-${{ matrix.os }}-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: qa/ci/focused/bundle/
+          if-no-files-found: error
+      - name: Preserve runner logs and original reports on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase01-diagnostics-harness-reliability-${{ matrix.os }}-${{ env.SOURCE_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            qa/reliability/
+            qa/ci/focused/baseline.json
+            qa/reliability/*.xml
+            qa/reliability/*.json
+            qa/reliability/*.log
             qa/contracts/admission-resilience.log
           if-no-files-found: error
