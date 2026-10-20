@@ -16,6 +16,9 @@ MIGRATION_PATHS = (
     ROOT / "ops/008_event_pass_isolation.sql",
     ROOT / "ops/009_invitations.sql",
     ROOT / "ops/010_account_preferences_notifications.sql",
+    ROOT / "ops/011_certificates.sql",
+    ROOT / "ops/011_phone_accounts.sql",
+    ROOT / "ops/012_certificate_batches.sql",
 )
 
 

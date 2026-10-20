@@ -114,7 +114,7 @@ try:
 
         # Organizer sees the guest directory and can provision/pair an event scanner.
         page.goto(URL+"/admin")
-        page.get_by_label("البريد الإلكتروني",exact=True).fill(organizer["email"])
+        page.get_by_label("رقم الهاتف",exact=True).fill(organizer["email"])
         page.get_by_label("كلمة المرور",exact=True).fill(organizer["password"])
         page.get_by_role("button",name="تسجيل الدخول",exact=True).click()
         page.get_by_role("heading",name="نظرة عامة",exact=True).wait_for()

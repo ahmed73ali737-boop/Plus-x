@@ -4,7 +4,11 @@ starlette==1.7.0
 uvicorn==0.48.0
 SQLAlchemy==2.0.50
 qrcode==8.2
-pillow==12.3.0
+pillow==13.0.0
 # IANA time zones are required on Windows and minimal container images.
 tzdata==2026.5
 # PostgreSQL adapter is installed separately for the container deployment:
+
+# Portable Arabic shaping for platforms whose Pillow wheel lacks RAQM.
+arabic-reshaper==3.0.1
+python-bidi==0.6.12

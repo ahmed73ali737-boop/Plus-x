@@ -22,6 +22,35 @@
     "get",
     "put"
   ],
+  "/api/admin/events/{event_id}/certificate-templates": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates": [
+    "get",
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/batches": [
+    "get"
+  ],
+  "/api/admin/events/{event_id}/certificates/import/commit": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/import/preview": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/preview": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/{certificate_id}/access-link": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/{certificate_id}/replace": [
+    "post"
+  ],
+  "/api/admin/events/{event_id}/certificates/{certificate_id}/revoke": [
+    "post"
+  ],
   "/api/admin/events/{event_id}/committee": [
     "get",
     "post"
@@ -158,6 +187,15 @@
   "/api/admin/sites/{sid}/users/{user_id}": [
     "patch"
   ],
+  "/api/admin/users": [
+    "get"
+  ],
+  "/api/admin/users/{user_id}": [
+    "patch"
+  ],
+  "/api/admin/users/{user_id}/password/reset": [
+    "post"
+  ],
   "/api/auth/login": [
     "post"
   ],
@@ -167,7 +205,19 @@
   "/api/auth/me": [
     "get"
   ],
+  "/api/auth/options": [
+    "get"
+  ],
   "/api/auth/password": [
+    "post"
+  ],
+  "/api/auth/password/reset": [
+    "post"
+  ],
+  "/api/auth/phone": [
+    "post"
+  ],
+  "/api/auth/register": [
     "post"
   ],
   "/api/auth/sessions": [
@@ -204,6 +254,18 @@
     "get"
   ],
   "/api/health/ready": [
+    "get"
+  ],
+  "/api/public/certificates/access/{token}": [
+    "get"
+  ],
+  "/api/public/certificates/access/{token}/download.{extension}": [
+    "get"
+  ],
+  "/api/public/certificates/access/{token}/image.svg": [
+    "get"
+  ],
+  "/api/public/certificates/verify/{serial}": [
     "get"
   ],
   "/api/public/events/{event_slug}/guest-config": [

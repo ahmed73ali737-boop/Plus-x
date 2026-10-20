@@ -1,0 +1,14 @@
+(node:24) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ phone signup requires no email and makes a single direct request without verification (15.165781ms)
+✔ confirmation mismatch blocks registration and does not clear entered data (11.627868ms)
+✔ double submission while account creation is pending sends one request (5.854675ms)
+✔ ordinary account page reads only its own session and does not offer management access (4.40488ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 189.461915

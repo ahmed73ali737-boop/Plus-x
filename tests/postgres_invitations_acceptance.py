@@ -163,6 +163,25 @@ def main():
             row = conn.execute(select(entitlements).where(entitlements.c.invitation_id == rev['id'])).mappings().one()
             mark('revoked_race_final_state_consistent', row['status'] == 'revoked' and row['consumed'] in (0, 1))
 
+        from app.application import certificate_service as certsvc
+        from app.certificates_db import certificates
+        cert_event = create_event('certificate-concurrency')
+        with engine.begin() as conn:
+            template = certsvc.create_template(conn, cert_event['id'], {'name': 'Native certificate'})
+        cert_body = {'template_id': template['id'], 'request_key': 'concurrent-request',
+                     'recipient_key': 'synthetic-person', 'award_key': 'synthetic-course',
+                     'data': {'participant_name': 'Synthetic Recipient', 'course_title': 'Native Course', 'issuer_name': 'Synthetic Issuer'}}
+        def issue_certificate():
+            with engine.begin() as conn:
+                row, _, created = certsvc.issue(conn, cert_event['id'], cert_body)
+                return {'id': row['id'], 'created': created}
+        issued = parallel([issue_certificate for _ in range(8)])
+        mark('certificate_concurrent_idempotent_issue_no_errors', all(r['ok'] for r in issued))
+        mark('certificate_concurrent_one_issued_seven_replays', sum(r['value']['created'] for r in issued) == 1)
+        with engine.connect() as conn:
+            mark('certificate_concurrent_one_database_row', conn.execute(select(func.count()).select_from(certificates)
+                .where(certificates.c.event_id == cert_event['id'])).scalar_one() == 1)
+
         report['status'] = 'passed'
         report['warning'] = 'This verifies native PostgreSQL migrations and transaction races, not physical scanners, load SLA, or production deployment.'
         return 0

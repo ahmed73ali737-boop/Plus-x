@@ -1,0 +1,12 @@
+{
+  "status": "blocked",
+  "executed": false,
+  "reason": "No Chromium binary installed; Playwright download returned truncated/non-ZIP content. No browser, mobile-layout or PNG-download success claimed.",
+  "syntax_checks": [
+    "web/certificates.mjs",
+    "web/admin.mjs",
+    "web/app.mjs",
+    "web/sw.js"
+  ],
+  "postgres_native": "not executed"
+}
