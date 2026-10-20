@@ -30,7 +30,7 @@ const ctx={h,root,field,selectField,check,button,brand:()=>h('a',{},'PulseX'),to
   api:async(path,body,method)=>{calls.push({path,body,method});const value=responses.get(path);if(value instanceof Error)throw value;if(typeof value==='function')return value(body,method);if(!value)throw new Error('UNEXPECTED_API '+path);return structuredClone(value);},
   navigator:{},location:{origin:'https://example.test',assign:path=>{ctx.location.assigned=path;}},
   document:{documentElement:{},body:h('body'),title:''},window:{print(){}},URL,Intl,Date,Set,Number,String,JSON,encodeURIComponent,FileReader:class{readAsDataURL(){this.result='data:text/csv;base64,YQ==';this.onload();}}};
-runInNewContext(source+'\nthis.exports={renderInvitations,invitationPage,invitationRegistrationPage,renderReception};',ctx);
+runInNewContext(source+'\nthis.exports={renderInvitations,invitationPage,invitationRegistrationPage,renderReception,eventDateTime};',ctx);
 const el=(node,label)=>walk(node).find(x=>x.attrs['aria-label']===label);
 const btn=(node,label)=>walk(node).find(x=>x.tag==='button'&&text(x).trim()===label);
 const form=node=>walk(node).find(x=>x.tag==='form');
@@ -80,4 +80,10 @@ el(dialog,'بداية المناوبة — اختياري').value='';el(dialog,'
 responses.set('/api/public/invitations/test-token',publicView);await ctx.exports.invitationPage('test-token');assert.equal(walk(root).filter(x=>x.attrs['aria-label']==='تفاصيل الفعالية').length,0);assert.doesNotMatch(text(root),/undefined|null/);pass();
 const eventProjection={...publicView.event,description:'تجارب ومشاركات حية',location:'صنعاء — القاعة الرئيسية',start:'2026-11-01T06:00:00Z',end:'2026-11-01T14:00:00Z'};responses.set('/api/public/invitations/test-token',{...publicView,event:eventProjection});await ctx.exports.invitationPage('test-token');const details=walk(root).find(x=>x.attrs['aria-label']==='تفاصيل الفعالية');assert.ok(details);assert.match(text(details),/صنعاء — القاعة الرئيسية/);assert.match(text(details),/تجارب ومشاركات حية/);assert.match(text(details),/بتوقيت عدن/);assert.equal(walk(details).find(x=>x.tag==='time').children[0],new Intl.DateTimeFormat('ar-YE',{timeZone:'Asia/Aden',dateStyle:'long',timeStyle:'short'}).format(new Date(eventProjection.start)));assert.equal(walk(details).filter(x=>x.tag==='a').length,0);pass();
 responses.set('/api/public/events/details/registration',{event:{...eventProjection,start:'invalid',end:null},policy:{...policy,visibility:'public'}});await ctx.exports.invitationRegistrationPage('details');const registrationDetails=walk(root).find(x=>x.attrs['aria-label']==='تفاصيل الفعالية');assert.ok(registrationDetails);assert.equal(walk(registrationDetails).filter(x=>x.tag==='time').length,0);assert.match(text(registrationDetails),/القاعة الرئيسية/);assert.doesNotMatch(text(registrationDetails),/undefined|null|Invalid Date/);pass();
+// P06-T02: explain separate sources instead of silently constraining admission days.
+responses.set('/api/public/invitations/test-token',{...publicView,event:eventProjection});await ctx.exports.invitationPage('test-token');assert.match(text(root),/الجدول العام المنشور مستقل عن أيام صلاحية الدعوة/);pass();
+// P06-T03: equal instants across offsets render identically, with controlled event timezone.
+assert.equal(ctx.exports.eventDateTime('2026-11-01T21:30:00Z','Asia/Aden'),ctx.exports.eventDateTime('2026-11-02T00:30:00+03:00','Asia/Aden'));pass();
+for(const invalid of ['invalid','2026-02-31T10:00:00Z','2026-11-01T10:00:00'])assert.equal(ctx.exports.eventDateTime(invalid),null);pass();
+responses.set('/api/public/invitations/test-token',{...publicView,policy:{...policy,rsvp_deadline:'invalid'}});await ctx.exports.invitationPage('test-token');assert.doesNotMatch(text(root),/Invalid Date/);assert.match(text(root),/للتحقق من الموعد/);pass();
 console.log(JSON.stringify({suite:'INVITATIONS_UI_CONTRACT',passed:count,failed:0,scope:'Isolated DOM contract; not real browser or field acceptance'}));

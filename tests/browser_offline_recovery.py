@@ -3,6 +3,7 @@
 An explicit Chrome for Testing executable is allowed and recorded as such.
 This does not claim Android WebView, physical venue hardware or five-day soak.
 """
+from harness_support import sqlite_connection
 from pathlib import Path
 import json
 import os
@@ -82,7 +83,7 @@ def run():
                     context.set_offline(False)
                     result = page.evaluate("async id=>{const o=await import('/assets/offline.mjs');await o.sync();return {receipt:await o.get('receipts',id),s:await o.status()};}", item_id)
                     assert result["receipt"]["status"] in ("accepted", "duplicate") and all(item["id"] != item_id for item in result["s"]["items"]), result
-                    with sqlite3.connect(data / "qa.sqlite") as database:
+                    with sqlite_connection(data / "qa.sqlite") as database:
                         assert database.execute("select count(*) from px_submissions where id=?", (item_id,)).fetchone()[0] == 1
                     checks.append("reconnect_receipt_drains_queue_and_server_has_one_row")
 

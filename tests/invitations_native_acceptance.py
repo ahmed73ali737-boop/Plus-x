@@ -4,6 +4,7 @@ This is native browser acceptance, not native PostgreSQL or camera hardware QA.
 Optional PX_CHROMIUM_EXECUTABLE selects an installed browser for constrained hosts.
 """
 from __future__ import annotations
+from harness_support import sqlite_connection
 import json
 import os
 import socket
@@ -229,8 +230,51 @@ def main():
                         assert crew_page.get_by_role('button', name='إدخال الأسئلة', exact=True).count() == 0
                         assert crew_page.get_by_role('button', name='الدعوات والحضور', exact=True).count() == 0
                         crew_page.get_by_label('بحث بالاسم أو رقم التذكرة', exact=True).fill(new_number)
+                        # Real HTTP fault injection: first 503 before commit, then
+                        # server commit with the response deliberately lost, then
+                        # reload and replay the exact same session-scoped scan ID.
+                        attempts=[]
+                        def admission_fault(route):
+                            if route.request.method!='POST':
+                                route.continue_();return
+                            attempts.append(route.request.post_data_json)
+                            if len(attempts)==1:
+                                route.fulfill(status=503,json={'detail':'TEST_BEFORE_COMMIT'});return
+                            response=route.fetch()
+                            if len(attempts)==2:
+                                assert response.json()['status']=='accepted'
+                                route.abort('failed');return
+                            assert response.json()['status']=='duplicate'
+                            route.fulfill(response=response)
+                        crew_page.route('**/api/admin/events/event-demo/guest-checkins',admission_fault)
                         crew_page.get_by_role('button', name='تسجيل الدخول', exact=True).click()
-                        crew_page.get_by_text('تم تأكيد الدخول', exact=True).wait_for()
+                        crew_page.locator('article[data-state="unknown-outcome"]').wait_for()
+                        crew_page.get_by_role('button', name='تسجيل الدخول', exact=True).click()
+                        crew_page.locator('article[data-state="unknown-outcome"]').wait_for()
+                        assert len(attempts)==2
+                        before_replay=ok(staff.get(path+'/guest-checkins'))
+                        crew_page.reload()
+                        crew_page.get_by_label('بحث بالاسم أو رقم التذكرة',exact=True).fill(new_number)
+                        def fail_counters(route):
+                            if route.request.method=='GET':route.fulfill(status=503,json={'detail':'TEST_COUNTER_FAILURE'})
+                            else:admission_fault(route)
+                        crew_page.unroute('**/api/admin/events/event-demo/guest-checkins',admission_fault)
+                        crew_page.route('**/api/admin/events/event-demo/guest-checkins',fail_counters)
+                        crew_page.get_by_role('button', name='تسجيل الدخول', exact=True).click()
+                        crew_page.locator('article[data-state="confirmed"]').wait_for()
+                        crew_page.get_by_text('سبق تسجيل العملية', exact=True).first.wait_for()
+                        crew_page.locator('.admission-live[data-state="stale"]').wait_for()
+                        assert len(attempts)==3
+                        assert all(x['scan_id']==attempts[0]['scan_id'] and x['quantity']==attempts[0]['quantity'] for x in attempts)
+                        after_replay=ok(staff.get(path+'/guest-checkins'))
+                        for key in ('total_checkins','admitted_people','inside_count'):
+                            assert before_replay[key]==after_replay[key]
+                        import sqlite3
+                        with sqlite_connection(temp/'test.sqlite') as db:
+                            scan_id=attempts[0]['scan_id']
+                            assert db.execute('SELECT count(*) FROM px_guest_checkins WHERE id=?',(scan_id,)).fetchone()[0]==1
+                            assert db.execute('SELECT count(*) FROM px_admission_uses WHERE scan_id=?',(scan_id,)).fetchone()[0]==1
+                        mark('desk_503_lost_ack_reload_replay_one_ledger_and_stale_counters')
                         crew_page.screenshot(path=str(QA / 'limited-scanner-role-desktop.png'), full_page=True)
                         mark('new_scanner_account_password_change_and_limited_checkin_ui')
                         assert crew_page.request.get(base + '/api/admin/sites/event-demo').status == 403

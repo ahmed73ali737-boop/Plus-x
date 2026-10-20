@@ -1,0 +1,55 @@
+import {h,root,api,field,selectField,check,brand} from './ui.mjs';
+
+function style(){if(!document.querySelector('link[data-access-style]'))document.head.append(h('link',{rel:'stylesheet',href:'/assets/access.css','data-access-style':'true'}));}
+export async function accessPage(){
+  style();document.documentElement.dir='rtl';document.documentElement.lang='ar';document.title='ابدأ تجربتك | PulseX';
+  root.replaceChildren();
+  const main=h('main',{class:'access-shell',id:'main-content'});
+  root.append(h('a',{class:'skip-link',href:'#main-content'},'انتقل إلى المحتوى'),h('header',{class:'access-header'},brand(),h('a',{href:'/',class:'text-btn'},'استكشف الفعاليات')),main);
+  const hero=h('section',{class:'access-hero'},h('span',{class:'access-kicker'},'PULSEX · LIVE EXPERIENCES'),h('h1',{},'تجربتك تبدأ\nمن هنا.'),h('p',{},'استكشف وشارك كضيف، أو ادخل إلى مساحة جهتك لإدارة الفعاليات والمحتوى.'),h('div',{class:'access-hero-actions'},h('a',{href:'/',class:'btn'},'الاستمرار كضيف'),h('a',{href:'/admin',class:'btn secondary'},'تسجيل الدخول')));
+  const choices=h('section',{class:'access-choices','aria-label':'اختر طريقة الاستخدام'},
+    h('article',{class:'access-choice'},h('span',{class:'access-number'},'01'),h('h2',{},'أنا زائر'),h('p',{},'تصفح الفعاليات وشارك في الاستبيانات والتصويت دون إنشاء حساب. بطاقة الحضور تخضع لسياسة كل فعالية.'),h('a',{href:'/',class:'text-btn'},'تصفح كضيف ←')),
+    h('article',{class:'access-choice'},h('span',{class:'access-number'},'02'),h('h2',{},'لدي حساب'),h('p',{},'ادخل بالبريد وكلمة المرور. الأدوات المتاحة لك يحددها دورك وصلاحياتك.'),h('a',{href:'/admin',class:'text-btn'},'الدخول إلى مساحتي ←')),
+    h('article',{class:'access-choice'},h('span',{class:'access-number'},'03'),h('h2',{},'أريد إنشاء مساحة'),h('p',{},'قدّم طلب حساب لجهة منظمة أو مشاركة. إنشاء الفعالية أو الصفحة يتم بعد اعتماد الحساب وبحسب صلاحياته.'),h('a',{href:'#account',class:'text-btn'},'طلب حساب جهة ←')));
+  const downloadState=h('div',{role:'status','aria-live':'polite'},'جارٍ التحقق من ملف Android…');
+  const downloads=h('section',{class:'access-download',id:'download'},h('div',{},h('span',{class:'access-kicker'},'خذ التجربة معك'),h('h2',{},'PulseX على Android'),h('p',{},'تطبيق خفيف يفتح منصة مؤسستك الآمنة، مع بطاقة الزائر وبوابة QR. يلزم عنوان HTTPS لخادم PulseX عند أول استخدام.')),downloadState);
+  const formHost=h('section',{class:'access-account',id:'account'},h('span',{class:'access-kicker'},'مساحتك القادمة'),h('h2',{},'إنشاء طلب حساب جهة'),h('p',{},'هذا طلب مراجعة؛ لا ينشئ حسابًا نشطًا ولا يمنح صلاحية إدارة فورًا. الزائر يستطيع المشاركة كضيف دون هذا الطلب.'));
+  main.append(hero,choices,downloads,formHost);
+  async function loadDownload(){
+    try{
+      const file=await api('/api/downloads/android');
+      if(file.channel!=='preview'||file.download_url!=='/downloads/pulsex-android-preview.apk'||!Number.isInteger(file.bytes)||file.bytes<=0||!/^[a-f0-9]{64}$/.test(file.sha256))throw new Error('INVALID_DOWNLOAD_METADATA');
+      downloadState.replaceChildren(h('span',{class:'access-preview'},'نسخة معاينة · Android '+file.min_android+' فأحدث'),h('a',{href:file.download_url,class:'btn',download:'PulseX-Android-Preview-1.0.2.apk'},'تحميل Android · '+(file.bytes/1024).toFixed(0)+' كيلوبايت'),h('p',{class:'muted small'},'معاينة بتوقيع اختبار؛ لم تُعتمد كتطبيق إنتاجي أو تُختبر على هاتف فعلي. التنزيل يحتاج اتصالًا.'),h('details',{},h('summary',{},'بصمة الملف والتحقق'),h('code',{class:'access-hash',dir:'ltr'},file.sha256)));
+    }catch{downloadState.replaceChildren(h('p',{class:'notice'},'التنزيل غير متاح الآن. تحقق من الاتصال ثم أعد المحاولة.'),h('button',{type:'button',class:'btn secondary',onclick:loadDownload},'إعادة التحقق'));}
+  }
+  const role=selectField('نوع الحساب',[['organizer','جهة منظمة لفعالية'],['participant','جهة مشاركة في فعالية']],'organizer');
+  const event=selectField('الفعالية المطلوبة',[['','اختر فعالية عامة']],'');event.node.hidden=true;
+  const org=field('اسم الجهة أو المؤسسة','text','',{required:true,maxlength:200,autocomplete:'organization'}),name=field('اسم المسؤول','text','',{required:true,maxlength:160,autocomplete:'name'}),email=field('البريد الإلكتروني','email','',{required:true,maxlength:200,autocomplete:'email'}),phone=field('رقم الهاتف — اختياري','tel','',{maxlength:60,autocomplete:'tel',dir:'ltr'});
+  const consent=check('أوافق على إرسال هذه البيانات للمنظم لمراجعة طلب الحساب.',false);
+  const output=h('p',{role:'status','aria-live':'polite'}),submit=h('button',{type:'submit',class:'btn'},'إرسال طلب المراجعة');
+  const form=h('form',{class:'access-form'},h('div',{class:'access-form-grid'},role.node,event.node,org.node,name.node,email.node,phone.node),consent.node,output,submit);
+  let events=[],loadingEvents=null;
+  async function eventOptions(){
+    if(loadingEvents)return loadingEvents;
+    loadingEvents=(async()=>{try{const platform=await api('/api/public/site/platform');events=platform.events||[];for(const row of events)event.input.append(h('option',{value:row.id},row.title||row.slug));}catch{output.textContent='تعذر تحميل الفعاليات. أعد فتح الصفحة عند عودة الاتصال لإرسال طلب مشاركة.';}})();
+    return loadingEvents;
+  }
+  role.input.addEventListener('change',async()=>{event.node.hidden=role.input.value!=='participant';event.input.required=role.input.value==='participant';if(event.input.required)await eventOptions();});
+  let sending=false;
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();if(sending)return;
+    if(!form.reportValidity())return;
+    if(!consent.input.checked){output.textContent='يلزم الموافقة على إرسال البيانات قبل تقديم الطلب.';return;}
+    const participant=role.input.value==='participant';
+    if(participant&&!events.some(row=>row.id===event.input.value)){output.textContent='اختر فعالية متاحة قبل إرسال طلب المشاركة.';return;}
+    sending=true;submit.disabled=true;output.textContent='جارٍ إرسال الطلب…';
+    try{
+      const result=await api('/api/signup-request',{site_id:participant?event.input.value:'platform',requested_role:role.input.value,organization_name:org.input.value.trim(),contact_name:name.input.value.trim(),email:email.input.value.trim(),phone:phone.input.value.trim(),participation_type:'exhibitor',wants_account:true});
+      if(result.status!=='pending'||result.grants_access!==false)throw new Error('UNEXPECTED_SIGNUP_RESPONSE');
+      form.replaceChildren(h('div',{class:'notice',role:'status'},h('h3',{},'تم استلام طلبك للمراجعة'),h('p',{},'لم يُفعّل حساب أو تُمنح صلاحيات بعد. راجع الجهة المنظمة لمتابعة الاعتماد؛ لا توجد رسالة بريد أو SMS آلية موعودة.'),h('a',{href:'/',class:'btn secondary'},'تصفح كضيف أثناء الانتظار')));
+    }catch{output.textContent='تعذر تأكيد استلام الطلب. تحقق من الاتصال أو راجع المنظم قبل إعادة الإرسال.';}
+    finally{sending=false;submit.disabled=false;}
+  });
+  formHost.append(form);
+  await loadDownload();
+}

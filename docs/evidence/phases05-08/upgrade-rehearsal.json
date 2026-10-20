@@ -1,0 +1,7 @@
+{
+  "status": "blocked",
+  "backend": "PostgreSQL",
+  "scope": "synthetic logical restore; not PITR/RPO/field acceptance",
+  "checks": [],
+  "reason": "Dedicated test URL, explicit reset opt-in and pg_dump/pg_restore required"
+}

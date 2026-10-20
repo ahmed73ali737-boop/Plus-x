@@ -1,0 +1,4 @@
+{
+  "status": "failed",
+  "traceback": "Traceback (most recent call last):\n  File \"/workspace/scratch/4e211908d847/Plus-x/tests/harness_support.py\", line 56, in result_file\n    yield report\n  File \"/workspace/scratch/4e211908d847/Plus-x/tests/load_profiles.py\", line 49, in main\n    resource0=resources(proc.pid)\n              ^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/4e211908d847/Plus-x/tests/load_profiles.py\", line 21, in resources\n    root=psutil.Process(pid)\n         ^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/psutil/__init__.py\", line 314, in __init__\n    self._init(pid)\n  File \"/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/psutil/__init__.py\", line 360, in _init\n    raise NoSuchProcess(pid, msg=msg) from None\npsutil.NoSuchProcess: process PID not found (pid=790)\n"
+}

@@ -1,0 +1,61 @@
+(node:14) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ QR parser accepts exact new passes and canonical URLs only (4.933469ms)
+✔ manifest validity depends on server generation time and credential version (3.784299ms)
+✔ controlled invitations fail closed offline while unmanaged valid records remain provisional (5.549565ms)
+✔ offline manifest cannot outlive or precede device shift even while otherwise fresh (4.422544ms)
+✔ device checkpoint scope distinguishes deny-all from legacy unrestricted (9.402106ms)
+✔ HTTP 401 deletes cached manifest and never falls back (3.738967ms)
+✔ HTTP 403 deletes cached manifest and never falls back (4.375846ms)
+✔ network outage permits only fresh cache bound to the current device token (3.072333ms)
+✔ private scanner context uses scoped device endpoint and clears cache after denial (2.794205ms)
+✖ P05-T04 cross-event manifest is rejected online and from cache (4.352784ms)
+✖ P05-T04 malformed manifest fails closed instead of trusting cache (3.510364ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 226.045062
+
+✖ failing tests:
+
+test at tests/test_guest_frontend_security.mjs:96:1
+✖ P05-T04 cross-event manifest is rejected online and from cache (4.352784ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/test_guest_frontend_security.mjs:100:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/test_guest_frontend_security.mjs:107:1
+✖ P05-T04 malformed manifest fails closed instead of trusting cache (3.510364ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/4e211908d847/Plus-x/tests/test_guest_frontend_security.mjs:111:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

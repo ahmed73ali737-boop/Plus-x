@@ -2,25 +2,29 @@ from __future__ import annotations
 from pathlib import Path
 import json, os, socket, subprocess, sys, tempfile, time, urllib.request
 import httpx
+from harness_support import result_file, stop_process
 
 ROOT=Path(__file__).resolve().parents[1]
 checks=[]
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='px-sec-') as td:
+    checks.clear()
+    output=ROOT/'qa/hardening/security-smoke.json'
+    with result_file(output) as evidence, tempfile.TemporaryDirectory(prefix='px-sec-') as td:
         temp=Path(td)
         with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
         base=f'http://127.0.0.1:{port}'
-        env={**os.environ,'HOST':'127.0.0.1','PORT':str(port),'PUBLIC_ORIGIN':base,'DATABASE_URL':'sqlite:///'+str(temp/'db.sqlite'),'CREDENTIALS_PATH':str(temp/'accounts.json'),'MEDIA_DIR':str(temp/'media'),'SEED_DEMO':'true'}
+        env={**os.environ,'HOST':'127.0.0.1','PORT':str(port),'PUBLIC_ORIGIN':base,'DATABASE_URL':'sqlite:///'+str(temp/'db.sqlite'),'CREDENTIALS_PATH':str(temp/'accounts.json'),'MEDIA_DIR':str(temp/'media'),'SEED_DEMO':'true','WEB_WORKERS':'1','PULSEX_ENV':'test','REQUIRE_POSTGRES':'false'}
         log=open(temp/'server.log','w',encoding='utf-8')
-        proc=subprocess.Popen([sys.executable,str(ROOT/'run.py')],cwd=ROOT,env=env,stdout=log,stderr=log)
+        proc=None
         try:
+            proc=subprocess.Popen([sys.executable,str(ROOT/'run.py')],cwd=ROOT,env=env,stdout=log,stderr=log)
             for _ in range(100):
                 try: urllib.request.urlopen(base+'/api/health',timeout=.3); break
                 except Exception: time.sleep(.1)
             else: raise RuntimeError('server timeout')
             accounts=json.loads((temp/'accounts.json').read_text(encoding='utf-8'))
-            with httpx.Client(base_url=base,timeout=20) as c:
+            with httpx.Client(base_url=base,timeout=20,trust_env=False) as c:
                 r=c.get('/api/health');
                 assert r.headers['x-content-type-options']=='nosniff'; checks.append('security_headers')
                 assert r.headers['cache-control']=='no-store'; checks.append('api_no_store')
@@ -42,12 +46,15 @@ def main():
                 rr=c.post('/api/access-request',content=payload,headers={'Content-Type':'application/json','Origin':base})
                 assert rr.status_code==413; checks.append('request_size_limit')
             # Fresh client/IP bucket equivalent is not available, but failed auth rate limit is checked in isolation.
-            with httpx.Client(base_url=base,timeout=10) as c2:
+            with httpx.Client(base_url=base,timeout=10,trust_env=False) as c2:
                 statuses=[c2.post('/api/auth/login',json={'email':'none@example.com','password':'not-the-right-password'}).status_code for _ in range(21)]
                 assert statuses[-1]==429 and 429 in statuses and statuses.count(401)>=18; checks.append('auth_rate_limit')
             report={'status':'passed','passed':len(checks),'checks':checks,'backend':'SQLite','scope':'bounded hardening checks; not DAST or pentest'}
+            evidence.update(report)
         finally:
-            proc.terminate(); proc.wait(timeout=10); log.close()
+            try:
+                if proc is not None:stop_process(proc)
+            finally:log.close()
     out=ROOT/'qa/hardening/security-smoke.json';out.write_text(json.dumps(report,indent=2),encoding='utf-8');print(json.dumps(report))
 
 if __name__=='__main__': main()

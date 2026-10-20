@@ -1,3 +1,5 @@
+> Historical v1.0.1 snapshot. Checked items below are not acceptance of the current remediation candidate. See [current acceptance](docs/CURRENT_ACCEPTANCE_AR.md) for source-bound results and open gates.
+
 # PulseX v1.0.1 — Delivery Acceptance Checklist
 
 ## Software/Functional

@@ -207,6 +207,7 @@ export function parseGuestNumber(value){
 }
 function gatePresenceKey(eventId,guestNumber){return eventId+':'+guestNumber;}
 export function manifestReadiness(manifest,at=Date.now()){
+  if(!manifest||typeof manifest!=='object'||!Array.isArray(manifest.guests))return{valid:false,reason:'MANIFEST_INCOMPLETE'};
   if(manifest.blocked)return{valid:false,reason:manifest.error||'DEVICE_NOT_PAIRED'};
   if(manifest.credential_version!==2)return{valid:false,reason:'MANIFEST_LEGACY'};
   if((manifest.guests||[]).some(g=>!/^G-[0-9A-F]{30}$/.test(g.guest_number||'')))return{valid:false,reason:'MANIFEST_LEGACY'};
@@ -234,7 +235,10 @@ export async function loadManifest(eventId,token){
   try{
     const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-manifest',{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});
     if(!r.ok){await del('guest_manifests',eventId);return emptyManifest(eventId,'MANIFEST_HTTP_'+r.status);}
-    const data=await r.json(),cached_at=new Date().toISOString();
+    let data;
+    try{data=await r.json();}catch{await del('guest_manifests',eventId);return emptyManifest(eventId,'MANIFEST_INCOMPLETE');}
+    if(!data||data.event_id!==eventId){await del('guest_manifests',eventId);return emptyManifest(eventId,'MANIFEST_EVENT_SCOPE');}
+    const cached_at=new Date().toISOString();
     const state=manifestReadiness(data);if(!state.valid){await del('guest_manifests',eventId);return emptyManifest(eventId,state.reason);}
     await put('guest_manifests',{id:eventId,data,cached_at,token});
     for(const guest of data.guests||[])await put('gate_presence',{id:gatePresenceKey(eventId,guest.guest_number),event_id:eventId,guest_number:guest.guest_number,state:guest.presence||'outside',last_direction:guest.last_direction||'',last_checkpoint:guest.last_checkpoint||'',updated_at:guest.presence_updated_at||cached_at,source:'manifest'});
@@ -242,6 +246,7 @@ export async function loadManifest(eventId,token){
   }catch{
     const cached=await get('guest_manifests',eventId);
     if(!cached||cached.token!==token)return emptyManifest(eventId,'MANIFEST_UNAVAILABLE');
+    if(cached.data?.event_id!==eventId){await del('guest_manifests',eventId);return emptyManifest(eventId,'MANIFEST_EVENT_SCOPE');}
     const state=manifestReadiness(cached.data);if(!state.valid)return emptyManifest(eventId,state.reason);
     return{...cached.data,cached_at:cached.cached_at,offline:true};
   }

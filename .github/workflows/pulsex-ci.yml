@@ -159,6 +159,8 @@ jobs:
         run: python tests/browser_guest_flow.py
       - name: Run invitation RSVP and admission browser acceptance
         run: python tests/invitations_native_acceptance.py
+      - name: Verify app download, guest entry and pending signup in Chromium
+        run: python tests/browser_app_entry.py
       - name: Run Windows full question control roundtrip
         run: python tests/browser_question_roundtrip.py
       - name: Audit all rendered admin controls across roles
@@ -173,6 +175,7 @@ jobs:
           path: |
             qa/browser-components.json
             qa/invitations/
+            qa/app-entry/
             qa/browser-smoke.json
             qa/browser-platform-diagnostic.json
             qa/exhibition-brands.json
@@ -250,6 +253,8 @@ jobs:
         run: python tests/browser_guest_flow.py
       - name: Run invitation RSVP and admission browser acceptance
         run: python tests/invitations_native_acceptance.py
+      - name: Verify app download, guest entry and pending signup in Chromium
+        run: python tests/browser_app_entry.py
       - name: Run full question control roundtrip
         run: python tests/browser_question_roundtrip.py
       - name: Audit all rendered admin controls across roles
@@ -268,6 +273,7 @@ jobs:
           path: |
             qa/browser-components.json
             qa/invitations/
+            qa/app-entry/
             qa/browser-smoke.json
             qa/browser-platform-diagnostic.json
             qa/windows11-browser-offline-indexeddb.json

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 from sqlalchemy import func, insert, select
 
 from app.application.audit_service import new_id
@@ -12,7 +14,7 @@ from app.db import assignments, event_participations, memberships, organizations
 from app.domain import default_config, normalize_config, now
 
 
-def seed_demo_data(engine, credentials_path=None, count=10):
+def seed_demo_data(engine, credentials_path=None, count=10, *, demo_day: date | None = None):
     creds = []
     created_file=None
     try:
@@ -27,12 +29,16 @@ def seed_demo_data(engine, credentials_path=None, count=10):
             event = default_config('معرض التجربة التفاعلية', 'event')
             event['subtitle'] = 'خمسة أيام من اللقاءات والأفكار والتفاعل'
             event['description'] = 'تجربة أولية للمنظم وعشر جهات من أصل 70 جهة مستهدفة. استعرض المشاركين وقيّم التجربة بحرية.'
-            event['start'] = '2026-09-29T09:00:00+03:00'
-            event['end'] = '2026-10-03T20:00:00+03:00'
+            # Choose once when a NEW demo is created. Existing published data is untouched.
+            day=demo_day or datetime.now(ZoneInfo('Asia/Aden')).date()
+            def at(offset,hour):
+                return datetime.combine(day+timedelta(days=offset),time(hour),tzinfo=ZoneInfo('Asia/Aden')).isoformat()
+            event['start'] = at(0,9)
+            event['end'] = at(4,20)
             event['location'] = 'مكان تجريبي — يحدده المنظم'
             event['cover'] = '/media/venue-demo.svg'
             event['records'] = [
-                {'kind':'session','code':'welcome-talk','title':'جلسة الافتتاح — نموذج','body':'نبذة الجلسة والمتحدث والمكان يحددها المنظم.','start':'2026-09-29T10:00:00+03:00','end':'2026-09-29T11:00:00+03:00'},
+                {'kind':'session','code':'welcome-talk','title':'جلسة الافتتاح — نموذج','body':'نبذة الجلسة والمتحدث والمكان يحددها المنظم.','start':at(0,10),'end':at(0,11)},
                 {'kind':'sponsor','code':'sponsor-demo','title':'الراعي التجريبي','body':'مثال توضيحي؛ استبدله ببيانات الراعي الفعلية.'},
                 {'kind':'fact','code':'expected','title':'جهات مستهدفة','value':70,'unit':'جهة','source':'افتراض نطاق المستخدم — ليس حضورًا فعليًا','display':'number'},
                 {'kind':'place','code':'venue','title':'مخطط القاعة التجريبي','body':'يمكن رفع صورة القاعة أو مخطّط الأجنحة.','media':'/media/venue-demo.svg'},

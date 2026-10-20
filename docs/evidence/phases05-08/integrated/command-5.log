@@ -1,0 +1,17 @@
+/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+Traceback (most recent call last):
+  File "/workspace/scratch/4e211908d847/Plus-x/tests/load_profiles.py", line 111, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/scratch/4e211908d847/Plus-x/tests/load_profiles.py", line 49, in main
+    resource0=resources(proc.pid)
+              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/Plus-x/tests/load_profiles.py", line 21, in resources
+    root=psutil.Process(pid)
+         ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/psutil/__init__.py", line 314, in __init__
+    self._init(pid)
+  File "/workspace/scratch/4e211908d847/venv/lib/python3.12/site-packages/psutil/__init__.py", line 360, in _init
+    raise NoSuchProcess(pid, msg=msg) from None
+psutil.NoSuchProcess: process PID not found (pid=790)

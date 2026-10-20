@@ -1,0 +1,98 @@
+{
+  "purpose": "test_fixture",
+  "status": "blocked",
+  "source_sha": "REPLACE_WITH_REVIEWED_SOURCE_SHA",
+  "warning": "Template only. Never use this file as production acceptance. Populate actual source-bound results, artifacts and authorized review after execution.",
+  "gates": {
+    "runtime_recovery": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    },
+    "native_postgres": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    },
+    "upgrade_restore": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    },
+    "performance": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    },
+    "security": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    },
+    "field_offline": {
+      "status": "blocked",
+      "source_sha": "",
+      "environment": {
+        "os": "",
+        "architecture": "",
+        "database": "",
+        "test_layer": ""
+      },
+      "reviewed_by": "",
+      "reviewed_at": "",
+      "artifacts": [],
+      "slo_definition": null,
+      "devices": []
+    }
+  }
+}

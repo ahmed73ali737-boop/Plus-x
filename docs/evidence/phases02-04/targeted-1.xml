@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="91" time="14.474" timestamp="2026-10-19T17:47:14.330423-05:00" hostname="43681b8e9623"><testcase classname="tests.test_runtime_recovery" name="test_live_independent_of_database_and_ready_recovers" time="0.236" /><testcase classname="tests.test_runtime_recovery" name="test_stdlib_probe_requires_explicit_readiness[payload0-0]" time="0.001" /><testcase classname="tests.test_runtime_recovery" name="test_stdlib_probe_requires_explicit_readiness[payload1-1]" time="0.001" /><testcase classname="tests.test_runtime_recovery" name="test_probe_fails_on_transport_error" time="0.000" /><testcase classname="tests.test_harness_reliability" name="test_single_lifespan_closes_sqlite_before_directory_removal[success]" time="0.191" /><testcase classname="tests.test_harness_reliability" name="test_single_lifespan_closes_sqlite_before_directory_removal[batch-exception]" time="0.238" /><testcase classname="tests.test_harness_reliability" name="test_thread_clients_close_after_workers_even_on_failure" time="0.060"><failure message="ImportError: Using SOCKS proxy, but the 'socksio' package is not installed. Make sure to install httpx using `pip install httpx[socks]`.">def test_thread_clients_close_after_workers_even_on_failure():
+        registry=ThreadClients()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+&gt;           list(pool.map(lambda _:registry.get('http://testserver'),range(16)))
+
+tests/test_harness_reliability.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_harness_reliability.py:35: in &lt;lambda&gt;
+    list(pool.map(lambda _:registry.get('http://testserver'),range(16)))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/harness_support.py:32: in get
+    client = httpx.Client(base_url=base, timeout=timeout,
+../venv/lib/python3.12/site-packages/httpx/_client.py:700: in __init__
+    else self._init_proxy_transport(
+../venv/lib/python3.12/site-packages/httpx/_client.py:750: in _init_proxy_transport
+    return HTTPTransport(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;httpx.HTTPTransport object at 0x7f4528f9e060&gt;, verify = True
+cert = None, trust_env = True, http1 = True, http2 = False
+limits = Limits(max_connections=16, max_keepalive_connections=8, keepalive_expiry=5.0)
+proxy = Proxy('socks5h://127.0.0.1:41155'), uds = None, local_address = None
+retries = 0, socket_options = None
+
+    def __init__(
+        self,
+        verify: ssl.SSLContext | str | bool = True,
+        cert: CertTypes | None = None,
+        trust_env: bool = True,
+        http1: bool = True,
+        http2: bool = False,
+        limits: Limits = DEFAULT_LIMITS,
+        proxy: ProxyTypes | None = None,
+        uds: str | None = None,
+        local_address: str | None = None,
+        retries: int = 0,
+        socket_options: typing.Iterable[SOCKET_OPTION] | None = None,
+    ) -&gt; None:
+        import httpcore
+    
+        proxy = Proxy(url=proxy) if isinstance(proxy, (str, URL)) else proxy
+        ssl_context = create_ssl_context(verify=verify, cert=cert, trust_env=trust_env)
+    
+        if proxy is None:
+            self._pool = httpcore.ConnectionPool(
+                ssl_context=ssl_context,
+                max_connections=limits.max_connections,
+                max_keepalive_connections=limits.max_keepalive_connections,
+                keepalive_expiry=limits.keepalive_expiry,
+                http1=http1,
+                http2=http2,
+                uds=uds,
+                local_address=local_address,
+                retries=retries,
+                socket_options=socket_options,
+            )
+        elif proxy.url.scheme in ("http", "https"):
+            self._pool = httpcore.HTTPProxy(
+                proxy_url=httpcore.URL(
+                    scheme=proxy.url.raw_scheme,
+                    host=proxy.url.raw_host,
+                    port=proxy.url.port,
+                    target=proxy.url.raw_path,
+                ),
+                proxy_auth=proxy.raw_auth,
+                proxy_headers=proxy.headers.raw,
+                ssl_context=ssl_context,
+                proxy_ssl_context=proxy.ssl_context,
+                max_connections=limits.max_connections,
+                max_keepalive_connections=limits.max_keepalive_connections,
+                keepalive_expiry=limits.keepalive_expiry,
+                http1=http1,
+                http2=http2,
+                socket_options=socket_options,
+            )
+        elif proxy.url.scheme in ("socks5", "socks5h"):
+            try:
+                import socksio  # noqa
+            except ImportError:  # pragma: no cover
+&gt;               raise ImportError(
+                    "Using SOCKS proxy, but the 'socksio' package is not installed. "
+                    "Make sure to install httpx using `pip install httpx[socks]`."
+                ) from None
+E               ImportError: Using SOCKS proxy, but the 'socksio' package is not installed. Make sure to install httpx using `pip install httpx[socks]`.
+
+../venv/lib/python3.12/site-packages/httpx/_transports/default.py:191: ImportError</failure></testcase><testcase classname="tests.test_harness_reliability" name="test_output_created_and_traceback_preserved_on_setup_exception" time="0.002" /><testcase classname="tests.test_harness_reliability" name="test_subprocess_is_reaped_after_failure" time="0.002" /><testcase classname="tests.test_harness_reliability" name="test_admission_resilience_javascript_contract" time="0.437" /><testcase classname="tests.test_admission_gate_integration" name="test_managed_party_split_replay_quantity_conflict_and_overuse" time="1.355" /><testcase classname="tests.test_admission_gate_integration" name="test_private_registration_bypass_and_private_scanner_context" time="1.316" /><testcase classname="tests.test_admission_gate_integration" name="test_offline_managed_denial_and_invalid_batch_sibling_do_not_consume" time="1.252" /><testcase classname="tests.test_admission_gate_integration" name="test_revoke_blocks_bearer_qr_and_gate_without_resetting_consumption" time="1.173" /><testcase classname="tests.test_admission_gate_integration" name="test_new_event_local_day_restores_only_that_days_entitlement[admission0]" time="1.217" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[scanner-guests.checkin-guests.register]" time="0.038" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[reception-guests.register-guests.export]" time="0.025" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[committee_supervisor-invitations.review-committee.manage]" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[analyst-guests.read-guests.checkin]" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[auditor-guests.read-guests.export]" time="0.027" /><testcase classname="tests.test_admission_permissions" name="test_admission_roles_enforce_action_and_exact_event[event_manager-policy.manage-unknown.action]" time="0.034" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[scanner]" time="0.033" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[reception]" time="0.037" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[analyst]" time="0.023" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[auditor]" time="0.458" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[committee_supervisor]" time="0.050" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[member]" time="0.021" /><testcase classname="tests.test_admission_permissions" name="test_admission_assignment_never_grants_generic_site_editing[unexpected-admin]" time="0.020" /><testcase classname="tests.test_admission_permissions" name="test_expired_future_and_invalid_shifts_fail_closed[assignment_values0]" time="0.036" /><testcase classname="tests.test_admission_permissions" name="test_expired_future_and_invalid_shifts_fail_closed[assignment_values1]" time="0.031" /><testcase classname="tests.test_admission_permissions" name="test_expired_future_and_invalid_shifts_fail_closed[assignment_values2]" time="0.024" /><testcase classname="tests.test_admission_permissions" name="test_expired_future_and_invalid_shifts_fail_closed[assignment_values3]" time="0.046" /><testcase classname="tests.test_admission_permissions" name="test_timezone_offset_shift_compares_instants" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_revoked_assignment_and_disabled_user_fail_closed" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_organizer_scope_and_agency_scope_do_not_expand_to_other_events" time="0.020" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[owner-active-True]" time="0.030" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[admin-active-True]" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[editor-active-True]" time="0.197" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[analyst-active-False]" time="0.025" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[member-active-False]" time="0.020" /><testcase classname="tests.test_admission_permissions" name="test_direct_agency_scope_cannot_bypass_membership_restrictions[owner-suspended-False]" time="0.023" /><testcase classname="tests.test_admission_permissions" name="test_organization_owner_is_not_event_admission_manager" time="0.025" /><testcase classname="tests.test_admission_permissions" name="test_private_events_and_children_cannot_be_read_or_discovered" time="0.037" /><testcase classname="tests.test_admission_permissions" name="test_unlisted_event_is_directly_readable_but_not_listed" time="0.022" /><testcase classname="tests.test_admission_permissions" name="test_committee_assignment_capabilities_revocation_and_csrf" time="0.116" /><testcase classname="tests.test_admission_permissions" name="test_committee_rejects_privilege_and_shift_input[body0]" time="0.044" /><testcase classname="tests.test_admission_permissions" name="test_committee_rejects_privilege_and_shift_input[body1]" time="0.049" /><testcase classname="tests.test_admission_permissions" name="test_committee_rejects_privilege_and_shift_input[body2]" time="0.045" /><testcase classname="tests.test_admission_permissions" name="test_committee_manager_cannot_assign_other_event" time="0.036" /><testcase classname="tests.test_admission_permissions" name="test_new_committee_account_is_limited_and_secret_returned_once" time="0.167" /><testcase classname="tests.test_admission_permissions" name="test_limited_crew_cannot_create_more_accounts" time="0.097" /><testcase classname="tests.test_device_admission_scope" name="test_heartbeat_cannot_erase_or_override_checkpoint_and_shift_scope" time="0.034" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[None]" time="0.023" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[main]" time="0.017" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints2]" time="0.016" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints3]" time="0.019" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints4]" time="0.016" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints5]" time="0.031" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints6]" time="0.013" /><testcase classname="tests.test_device_admission_scope" name="test_create_rejects_invalid_checkpoint_policy[checkpoints7]" time="0.030" /><testcase classname="tests.test_device_admission_scope" name="test_empty_checkpoint_list_is_preserved_as_explicit_deny_all" time="0.021" /><testcase classname="tests.test_device_admission_scope" name="test_invalid_admin_update_does_not_erase_previous_policy" time="0.025" /><testcase classname="tests.test_device_admission_scope" name="test_expired_or_future_device_shift_rejects_token_and_heartbeat[policy0]" time="0.021" /><testcase classname="tests.test_device_admission_scope" name="test_expired_or_future_device_shift_rejects_token_and_heartbeat[policy1]" time="0.017" /><testcase classname="tests.test_device_admission_scope" name="test_device_shift_compares_instants_across_timezone_offsets" time="0.017" /><testcase classname="tests.test_device_admission_scope" name="test_admin_rejects_invalid_or_reversed_shift[policy0]" time="0.013" /><testcase classname="tests.test_device_admission_scope" name="test_admin_rejects_invalid_or_reversed_shift[policy1]" time="0.016" /><testcase classname="tests.test_device_admission_scope" name="test_admin_rejects_invalid_or_reversed_shift[policy2]" time="0.013" /><testcase classname="tests.test_device_admission_scope" name="test_legacy_invalid_shift_fails_closed_and_unrestricted_legacy_device_still_works" time="0.015" /><testcase classname="tests.test_device_admission_scope" name="test_invalid_telemetry_is_rejected_without_scope_changes" time="0.016" /><testcase classname="tests.test_invitations" name="test_private_invite_to_rsvp_issues_event_pass_without_phone_disclosure" time="0.091" /><testcase classname="tests.test_invitations" name="test_policy_initial_rev_zero_and_stale_revision_rejected" time="0.041" /><testcase classname="tests.test_invitations" name="test_manual_approval_no_pass_until_review" time="0.071" /><testcase classname="tests.test_invitations" name="test_manual_change_invalidates_old_approval_and_blocks_pass" time="0.078" /><testcase classname="tests.test_invitations" name="test_companion_bounds_and_days_fail_before_guest_creation" time="0.049" /><testcase classname="tests.test_invitations" name="test_capacity_reserves_party_size_and_releases_on_decline" time="0.057" /><testcase classname="tests.test_invitations" name="test_split_party_atomic_consumption_and_idempotent_replay" time="0.065" /><testcase classname="tests.test_invitations" name="test_consumption_outer_rollback_leaves_allowance" time="0.066" /><testcase classname="tests.test_invitations" name="test_rotation_revocation_and_decline" time="0.121" /><testcase classname="tests.test_invitations" name="test_list_scope_and_phone_dedup" time="0.057" /><testcase classname="tests.test_invitations" name="test_policy_does_not_remove_approved_days_or_shrink_reserved_capacity" time="0.045" /><testcase classname="tests.test_invitations" name="test_registration_deadline_and_private_policy" time="0.037" /><testcase classname="tests.test_invitations" name="test_csv_parser_rejects_bad_columns_and_formula_workbooks" time="0.042" /><testcase classname="tests.test_invitations" name="test_public_registration_and_import_api" time="1.391" /><testcase classname="tests.test_invitations" name="test_removed_pending_day_cannot_approve_or_respond" time="0.049" /><testcase classname="tests.test_invitations" name="test_stale_review_cannot_approve_changed_rsvp" time="0.049" /><testcase classname="tests.test_invitations" name="test_revoke_after_admission_keeps_capacity_used" time="0.053" /><testcase classname="tests.test_invitations" name="test_disabled_registration_legacy_enable_and_timezone_change_are_blocked" time="0.054" /><testcase classname="tests.test_invitations" name="test_public_api_unpublished_and_disabled_event_no_registration" time="0.996" /><testcase classname="tests.test_invitations" name="test_schedule_clear_or_timezone_change_cannot_invalidate_admission_history" time="0.066" /><testcase classname="tests.test_invitations" name="test_forged_invitation_metadata_cannot_consume_another_guests_quota" time="0.054" /></testsuite></testsuites>

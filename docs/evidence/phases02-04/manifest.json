@@ -1,0 +1,42 @@
+{
+  "code_commit_sha": "77eaf49faae27ee711419c17a6a8e56b16e5e759",
+  "source_files": {
+    ".github/workflows/harness-reliability.yml": "ba3b10ded015d0caa9deceab32ae33f3643b17a0d32fb9d8566ced521155b3f9",
+    ".github/workflows/runtime-recovery.yml": "3e33cb46cd95e63c430e1a01936776a3fe66d3e0b52cb54d8b65741749ffd4a0",
+    "app/api/routers/health.py": "de89e29eded6fea46bc956c1c2d93050e04bec67b9ed23c102f93cf6bc0732bc",
+    "compose.yaml": "b3b224d0f25a59509337b500cd1e19e643bc318ef175cf5bff96f84882ec6e87",
+    "ops/compose.recovery.yaml": "d507eaf8328d367d556613bf0b7d7581cea2c5803ef7dae662dfff974c30d4e5",
+    "ops/regression_registry.json": "3a7a7913ea8e1253add857ac2765c59915c3f1bf2f031d8016efdaa5abd1a959",
+    "tests/admission_resilience.mjs": "8ac38c8ce28b8ac50d8bf10bea59abe527ad45fdc94fcfd2275168d6223cb2b5",
+    "tests/exhibition_scale_smoke.py": "e713f640acd68ca8353d57e175575a8df0990d7e0d21f8ff32da2af2777d706b",
+    "tests/guest_capacity_smoke.py": "3caf9e9f811b4bbe7f277c0b91a002c47618fd054916cd836bdabad048e0ecf2",
+    "tests/harness_support.py": "3c83bd3a17e59fcfb76cb60410e349ae45032612cb180437491fc8b347d9a797",
+    "tests/invitations_native_acceptance.py": "f5322fa15145d3a760c53f1c3368fe2cc11f7bfbd8d1503e3dfee68557967730",
+    "tests/load_profiles.py": "87238409b06b9e222b596ad6a84b610c72a0b97198eef850324e057ca45b1ccc",
+    "tests/postgres_invitations_acceptance.py": "049a0b3a1078dfb3a900da23a9542284307673d0a65701611ebb9befacf2f893",
+    "tests/runtime_recovery_acceptance.py": "b6f1642f23b2b381c3e91e013b783167f087097b7b4335720a8ac7a0434919b0",
+    "tests/test_admission_gate_integration.py": "cf1153aa22eedec65402a33c2947874c9175fb7e72e335654173d61178a6099b",
+    "tests/test_admission_http_ack.py": "66aa7088428fc71367d18268bf58f33f9e57d05cbb4b96b3925344cb04f8aa0b",
+    "tests/test_harness_reliability.py": "9981c41ee6bef52f9a34201ab0c79f7054d1750ed669fb3fae92b0ea4907e4a5",
+    "tests/test_runtime_recovery.py": "a6cdd5c30b68b973f7878a3392c050d286afae68f09d3414450cfad5bf6577ae",
+    "tools/app_healthcheck.py": "90c146dda4dff43f52dc7d398c11c8baa9324f71196cb343cfb0ce31acb81ce4",
+    "web/admission-desk.mjs": "42f1e73b2b2985a1a8d103910b9d2ece828d91584b5bbd54d497856312952f1b",
+    "web/admission-live.mjs": "bcc4d12df18d96ff6a9bc444f198396a141049d36b7b620897a5931eaba94ee6"
+  },
+  "evidence": {
+    "environment.json": "e6ad20f2e356a69386d9332776d762f432de457de0d2367bae393304a333e51f",
+    "exhibition-1.log": "0bd25dbb62c10d3356532a6e95255a2c389970121f289ba3013735b290a82f9b",
+    "exhibition-failure.json": "b95be1e13424c938559e7dc46116ed53c5bfa477977b7982afd651ce0103e665",
+    "frontend-before.log": "1739f92c0dc1e494ace9deb15bf7ff5ec8510a2544fba5082aed15d268b8b00e",
+    "guest-1.log": "8bd774fac662758e513b604bfa6904bd957aee76cdb3d3f231df85f7fdec2d8a",
+    "guest-2.log": "0e0f33ecb765169adf53309d11c40aa12eec265706fe20b7fc90a5cf50a372cb",
+    "load-pilot.json": "8ea509f4be40d617738f9bfe939b8a766a58c563ef44e4cbbe45cfe5aaac92f4",
+    "load-pilot.log": "be4f359688046a703f25025d4db6b7b88794ee1cc8207d172f5da390ee25fa20",
+    "targeted-1.log": "21fa9843cf9e16e671c61dbc714356fd1d77fa53a0ae50b15e90dfa168e823f3",
+    "targeted-1.xml": "bbc8cee23ce3015ee934eb9d7ce58ff20fc5d1b58bed857f7354e9d31f430182",
+    "targeted-2.log": "652b42e95fb18d89a7b0a1f7df9de0a19f0cfe22c68a9ef9fe8cd24d1811e84c",
+    "targeted-2.xml": "86a7feeb7b269d3793ad056353c1ddb3971bc4e0deda621020b1b9ecf679e648",
+    "targeted-3.log": "4f3cb10c942fe2cac3c5b65f8773c9ebe269fef84682fb3c1f1b60b6ef13cd43",
+    "targeted-3.xml": "f55cff1c5a41bd78f958de792f928a040f1a272aadcb2f2f968acf73b0133865"
+  }
+}

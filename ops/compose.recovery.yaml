@@ -1,0 +1,57 @@
+# Disposable integration stack. Never point this harness at production volumes.
+services:
+  postgres:
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    environment:
+      POSTGRES_DB: pulsex
+      POSTGRES_USER: pulsex
+      POSTGRES_PASSWORD: ${RECOVERY_DB_PASSWORD:?Dedicated random test password required}
+    volumes: ["recovery_db:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulsex -d pulsex"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+  app:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+      args:
+        PULSEX_SOURCE_SHA: ${PULSEX_SOURCE_SHA:?Source revision required}
+    command: ["sh", "-c", "python -m tools.migrate_postgres && exec python run.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://pulsex:${RECOVERY_DB_PASSWORD}@postgres:5432/pulsex
+      # Test environment uses a PostgreSQL URL without claiming production acceptance.
+      REQUIRE_POSTGRES: "false"
+      PULSEX_ENV: test
+      PUBLIC_ORIGIN: http://127.0.0.1:18080
+      SEED_DEMO: "true"
+      WEB_WORKERS: "1"
+      CREDENTIALS_PATH: /app/data/recovery-accounts.json
+    ports: ["127.0.0.1:14310:4310"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "tools.app_healthcheck"]
+      interval: 5s
+      timeout: 5s
+      start_period: 120s
+      retries: 6
+    stop_grace_period: 30s
+  proxy:
+    image: caddy:2@sha256:685ae3d7c34d9b5f8caeddc5d14051db7bbd88ff1f5a2fa0c16bd8ca328fb7af
+    environment:
+      DOMAIN: :80
+    ports: ["127.0.0.1:18080:80"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro"]
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  recovery_db:
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${RECOVERY_SUBNET:?Dedicated test network required}

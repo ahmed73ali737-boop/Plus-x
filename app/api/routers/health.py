@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text as sql_text
@@ -87,11 +89,15 @@ def create_health_router(engine) -> APIRouter:
 
             return {"status": "ready", **details}
         except Exception as exc:
+            # Exception type separates DB transport failures without logging SQL/URLs.
+            logging.getLogger(__name__).warning("APP_NOT_READY kind=%s", type(exc).__name__)
             return JSONResponse(
                 {
                     "status": "not_ready",
                     **details,
-                    "reason": str(exc).splitlines()[0][:300],
+                    "reason": (str(exc).splitlines()[0][:300]
+                               if isinstance(exc, RuntimeError) and str(exc).startswith("SCHEMA_")
+                               else "DATABASE_UNAVAILABLE"),
                 },
                 status_code=503,
             )

@@ -4,12 +4,12 @@ from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
-from app.db import event_participations, sites, submissions
+from app.db import event_participations, sites, submissions, versions
 from app.application.publishing import get_site_version
 from app.infrastructure.repository import get_site
-from app.domain import now
+from app.domain import fail, now
 from app.application.event_visibility import event_id_for_site, is_public_event, require_public_event
 
 
@@ -39,11 +39,18 @@ def build_public_bundle(conn, site, public_origin: str, draft: bool = False, *, 
         if e['published_version']:
             event={'id':e['id'],'slug':e['slug'],'config':public_config_without_answer_keys(get_site_version(conn,e)['config'])}
     parent_id=site['event_id'] or site['id']
-    for child in conn.execute(select(sites).where(sites.c.parent_id==parent_id)).mappings():
-        if child['kind']=='agency' and child['published_version']:
-            cfg=get_site_version(conn,child)['config']
-            part=conn.execute(select(event_participations).where(event_participations.c.agency_site_id==child['id'])).mappings().first()
-            children.append({'id':child['id'],'slug':child['slug'],'title':cfg['title'],'subtitle':cfg['subtitle'],'description':cfg['description'],'logo':cfg['logo'],'primary':cfg['primary'],'rating_criteria':cfg.get('rating_criteria',[]),'participation':dict(part) if part else None})
+    # Two set-based reads replace 2N child queries. Keep publication authority
+    # and the existing transaction/locking policy; no cache or schema change.
+    parts={}
+    for part in conn.execute(select(event_participations).join(sites,event_participations.c.agency_site_id==sites.c.id).where(sites.c.parent_id==parent_id)).mappings():
+        parts.setdefault(part['agency_site_id'],dict(part))
+    child_query=select(sites,versions.c.config.label('published_config')).select_from(
+        sites.outerjoin(versions,and_(versions.c.site_id==sites.c.id,versions.c.version==sites.c.published_version))
+    ).where(sites.c.parent_id==parent_id,sites.c.kind=='agency',sites.c.published_version>0)
+    for child in conn.execute(child_query).mappings():
+        cfg=child['published_config']
+        if cfg is None:fail('NOT_PUBLISHED',404)
+        children.append({'id':child['id'],'slug':child['slug'],'title':cfg['title'],'subtitle':cfg['subtitle'],'description':cfg['description'],'logo':cfg['logo'],'primary':cfg['primary'],'rating_criteria':cfg.get('rating_criteria',[]),'participation':parts.get(child['id'])})
     if site['kind']=='platform':
         current_time=datetime.now(timezone.utc)
         for e in conn.execute(select(sites).where(sites.c.kind=='event',sites.c.published_version>0)).mappings():

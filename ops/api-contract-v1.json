@@ -181,6 +181,9 @@
   "/api/device/heartbeat": [
     "post"
   ],
+  "/api/downloads/android": [
+    "get"
+  ],
   "/api/health": [
     "get"
   ],

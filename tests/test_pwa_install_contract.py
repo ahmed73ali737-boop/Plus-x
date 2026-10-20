@@ -4,10 +4,12 @@ import struct
 import pytest
 from fastapi.testclient import TestClient
 from app.server import create_app
+from harness_support import app_client
 
 @pytest.fixture
 def client(tmp_path):
-    return TestClient(create_app('sqlite:///'+str(tmp_path/'pwa.sqlite'),origin='http://testserver',seed_demo=False))
+    with app_client(create_app('sqlite:///'+str(tmp_path/'pwa.sqlite'),origin='http://testserver',seed_demo=False)) as c:
+        yield c
 
 def test_pwa_icons_manifest_are_real_pngs_with_safe_sizes(client):
     response=client.get('/assets/manifest.webmanifest')
@@ -33,8 +35,20 @@ def test_pwa_assets_are_precached_and_ios_has_touch_icon(client):
     assert 'apple-touch-icon' in html
     js=client.get('/sw.js')
     assert js.status_code==200
-    assert 'px-shell-v27' in js.text
+    assert 'px-shell-v29' in js.text
     for src in ('/assets/icon-192.png','/assets/icon-512.png',
                 '/assets/storyboard-core.mjs','/assets/storyboard.mjs',
                 '/assets/storyboard.css'):
         assert src in js.text
+
+
+def test_all_precache_assets_resolve_with_correct_module_mime(client):
+    import re
+    script=client.get('/sw.js').text
+    assets=re.findall(r"'(/assets/[^']+)'",script)
+    assert assets
+    for path in set(assets):
+        response=client.get(path)
+        assert response.status_code==200,path
+        if path.endswith('.mjs'):assert 'javascript' in response.headers['content-type']
+    assert '/api/' not in re.search(r'const ASSETS=(.*?);',script).group(1)

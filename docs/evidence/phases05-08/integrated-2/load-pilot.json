@@ -1,0 +1,76 @@
+{
+  "status": "passed",
+  "profile": "pilot",
+  "profile_config": {
+    "reads": 1000,
+    "read_workers": 50,
+    "writes": 1000,
+    "write_workers": 8,
+    "batch": 25
+  },
+  "backend": "SQLite",
+  "server_workers": 1,
+  "not_production_capacity_certificate": true,
+  "reads": {
+    "requests": 1000,
+    "workers": 50,
+    "errors": 0,
+    "elapsed_s": 18.493,
+    "rps": 54.1,
+    "p50_s": 0.6858,
+    "p95_s": 2.1994,
+    "p99_s": 4.4604
+  },
+  "writes": {
+    "submissions": 1000,
+    "batch_size": 25,
+    "concurrent_clients": 8,
+    "errors": 0,
+    "elapsed_s": 4.027,
+    "submissions_per_s": 248.3,
+    "batch_p50_s": 0.1593,
+    "batch_p95_s": 2.124,
+    "batch_p99_s": 3.4758
+  },
+  "classification": {
+    "reads": {
+      "passed": 1000
+    },
+    "write_batches": {
+      "passed": 40
+    },
+    "write_rows": {
+      "accepted": 1000
+    },
+    "unit": "HTTP requests / write batches / individual receipt rows are separate"
+  },
+  "persistence": {
+    "expected_submissions": 1000,
+    "actual_submissions": 1000,
+    "matched": true
+  },
+  "slo_status": "not_defined",
+  "performance_accepted": false,
+  "pool_wait_measurement": "not instrumented; PostgreSQL profiling required",
+  "resource": {
+    "scope": "sum of server launcher and recursive children; not container/host totals",
+    "before": {
+      "available": false,
+      "reason": "PROCESS_TREE_UNAVAILABLE",
+      "exception_type": "NoSuchProcess"
+    },
+    "after": {
+      "available": false,
+      "reason": "PROCESS_TREE_UNAVAILABLE",
+      "exception_type": "NoSuchProcess"
+    }
+  },
+  "limitations": [
+    "SQLite",
+    "single Uvicorn process",
+    "localhost",
+    "synthetic data",
+    "not simultaneous human browser sessions",
+    "no Redis/WebSocket/PostgreSQL/network latency"
+  ]
+}
