@@ -23,7 +23,7 @@ export async function preferencePanel(host,{authenticated=false,user=null}={}){
     config=next;persist();state.textContent=authenticated?'حُفظت إعدادات حسابك.':'حُفظت الإعدادات على هذا الجهاز.';
   });
   host.append(h('section',{class:'card preference-card'},h('h2',{},'على راحتك'),h('p',{class:'muted'},'اختر المظهر وحجم النص المناسبين لك.'),theme.node,size.node,motion.node,enabled.node,save,state));
-  if(!authenticated){host.append(h('p',{},'إعدادات الضيف محفوظة على هذا الجهاز. الدخول بالبريد وكلمة المرور لا يتطلب OTP.'),h('a',{href:'/admin',class:'text-btn'},'الدخول إلى حسابي'));return;}
+  if(!authenticated){host.append(h('p',{},'إعدادات الضيف محفوظة على هذا الجهاز. سجّل الدخول لحفظ إعداداتك في حسابك.'),h('a',{href:'/admin',class:'text-btn'},'الدخول إلى حسابي'));return;}
   const inbox=h('section',{class:'card preference-card','aria-label':'صندوق الإشعارات'});host.append(inbox);
   async function refresh(){
     const result=await api('/api/account/notifications');
@@ -48,6 +48,7 @@ export async function preferencePanel(host,{authenticated=false,user=null}={}){
 export function installPreferences(){
   const launcher=button('المظهر والإشعارات',async()=>{
     const host=h('div',{});const dialog=modal('إعدادات التطبيق',host);
+    dialog.querySelector('header button')?.setAttribute('aria-label','إغلاق الإعدادات');
     let user=null;
     try{const me=await api('/api/auth/me');if(!me.user.must_change_password){user=me.user;setCSRF(me.csrf);}}catch{}
     if(dialog.isConnected)await preferencePanel(host,{authenticated:!!user,user});

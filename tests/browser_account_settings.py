@@ -28,6 +28,8 @@ def run():
             page.get_by_label('حجم النص',exact=True).select_option('large')
             page.get_by_role('button',name='حفظ الإعدادات',exact=True).click()
             assert page.locator('html').get_attribute('data-appearance')=='dark'
+            assert page.locator('.preference-card .field>span').first.evaluate('(el)=>getComputedStyle(el).color')=='rgb(220, 233, 239)'
+            page.get_by_role('button',name='إغلاق الإعدادات',exact=True).wait_for()
             page.set_viewport_size({'width':390,'height':844})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             page.screenshot(path=str(evidence/'mobile-settings.png'))
