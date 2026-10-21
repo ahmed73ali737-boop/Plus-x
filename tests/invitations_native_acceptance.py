@@ -217,23 +217,23 @@ def main():
                         crew = ok(staff.post(path + '/committee', json={
                             'create_account': True, 'email': 'scanner-qa@example.test',
                             'name': 'موظف المسح', 'role': 'scanner'}))
-                        assert crew.get('temporary_password')
+                        assert crew['status']=='pending' and 'temporary_password' not in crew
+                        admin=next(row for row in accounts if row['role']=='platform')
+                        with httpx.Client(base_url=base,trust_env=False) as reviewer:
+                            decision_auth=ok(reviewer.post('/api/auth/login',json=admin))
+                            reviewer.headers.update({'X-CSRF':decision_auth['csrf'],'Origin':base})
+                            ok(reviewer.patch('/api/admin/account-requests/'+crew['id'],json={'status':'approved'}))
                         crew_ctx = browser.new_context(viewport={'width': 1280, 'height': 900}, locale='ar-YE')
                         crew_page = crew_ctx.new_page()
                         crew_page.on('pageerror', lambda error: page_errors.append(str(error)))
-                        crew_page.goto(base + '/admin')
-                        crew_page.get_by_label('رقم الهاتف', exact=True).fill('scanner-qa@example.test')
-                        crew_page.get_by_label('كلمة المرور', exact=True).fill(crew['temporary_password'])
-                        crew_page.get_by_role('button', name='تسجيل الدخول', exact=True).click()
-                        crew_page.get_by_role('heading', name='غيّر كلمة المرور المؤقتة', exact=True).wait_for()
-                        crew_page.get_by_label('كلمة المرور المؤقتة الحالية', exact=True).fill(crew['temporary_password'])
-                        crew_page.get_by_label('كلمة المرور الجديدة — 12 إلى 256 حرفًا', exact=True).fill('PrivateScannerQA42!')
-                        crew_page.get_by_label('تأكيد كلمة المرور الجديدة', exact=True).fill('PrivateScannerQA42!')
-                        crew_page.get_by_role('button', name='تغيير كلمة المرور والمتابعة', exact=True).click()
-                        crew_page.get_by_role('heading', name='تسجيل الدخول', exact=True).wait_for()
-                        crew_page.get_by_label('رقم الهاتف', exact=True).fill('scanner-qa@example.test')
-                        crew_page.get_by_label('كلمة المرور', exact=True).fill('PrivateScannerQA42!')
-                        crew_page.get_by_role('button', name='تسجيل الدخول', exact=True).click()
+                        crew_page.goto(base+'/account/request#'+crew['tracking_token'])
+                        crew_page.get_by_label('كلمة المرور الجديدة — 12 إلى 256 حرفًا',exact=True).fill('PrivateScannerQA42!')
+                        crew_page.get_by_label('تأكيد كلمة المرور الجديدة',exact=True).fill('PrivateScannerQA42!')
+                        crew_page.get_by_role('button',name='تعيين كلمة المرور',exact=True).click()
+                        crew_page.get_by_role('link',name='تسجيل الدخول',exact=True).click()
+                        crew_page.get_by_label('رقم الهاتف',exact=True).fill('scanner-qa@example.test')
+                        crew_page.get_by_label('كلمة المرور',exact=True).fill('PrivateScannerQA42!')
+                        crew_page.get_by_role('button',name='تسجيل الدخول',exact=True).click()
                         crew_page.get_by_label('بحث بالاسم أو رقم التذكرة', exact=True).wait_for()
                         assert crew_page.get_by_role('button', name='نشر التغييرات', exact=True).count() == 0
                         assert crew_page.get_by_role('button', name='إدخال الأسئلة', exact=True).count() == 0
@@ -285,7 +285,7 @@ def main():
                             assert db.execute('SELECT count(*) FROM px_admission_uses WHERE scan_id=?',(scan_id,)).fetchone()[0]==1
                         mark('desk_503_lost_ack_reload_replay_one_ledger_and_stale_counters')
                         crew_page.screenshot(path=str(QA / 'limited-scanner-role-desktop.png'), full_page=True)
-                        mark('new_scanner_account_password_change_and_limited_checkin_ui')
+                        mark('new_scanner_independent_approval_self_password_setup_and_limited_checkin_ui')
                         assert crew_page.request.get(base + '/api/admin/sites/event-demo').status == 403
                         assert crew_page.request.get(base + path + '/guests/export').status == 403
                         mark('scanner_cannot_read_editor_or_export_guests')

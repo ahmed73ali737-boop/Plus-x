@@ -6,6 +6,7 @@ from fastapi import Request
 from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.application import account_requests as account_request_service
 from app.application.access import EVENT_ROLE_PERMISSIONS, event_permissions, require_event_permission
 from app.application.audit_service import new_id, write_audit
 from app.db import assignments, sites, users, user_phones
@@ -60,53 +61,14 @@ def install_admission_access_routes(app, engine, identify):
     @app.post('/api/admin/events/{event_id}/committee')
     def committee_assign(event_id: str, body: dict, request: Request):
         with engine.begin() as conn:
-            actor, _ = identify(request, conn, True)
-            require_event_permission(conn, actor, event_id, 'committee.manage')
-            role = text(body.get('role'), 40, True)
-            if role not in EVENT_ROLE_PERMISSIONS:
-                fail('COMMITTEE_ROLE_INVALID')
-            # Existing users keep their global role/scope. A new crew account is
-            # always a member: event actions come only from its assignment.
-            temporary_password = None
-            account_created = False
-            phone = None
-            if body.get('user_id'):
-                query = select(users).where(users.c.id == text(body['user_id'], 64, True))
-            else:
-                email, phone = contact_identity(body)
-                query = select(users).join(user_phones, users.c.id == user_phones.c.user_id).where(user_phones.c.phone == phone) if phone else select(users).where(users.c.email == email)
-            target = conn.execute(query).mappings().first()
-            if target is None and body.get('create_account') is True and not body.get('user_id'):
-                temporary_password = new_temporary_password()
-                target = {'id': new_id(), 'email': email, 'name': text(body.get('name'), 160, True),
-                          'role': 'member', 'scope_id': event_id, 'active': 1, 'must_change_password': 1,
-                          'password_hash': hash_password(temporary_password)}
-                try:
-                    with conn.begin_nested():
-                        conn.execute(insert(users).values(**target))
-                        if phone: bind_phone(conn, target['id'], phone)
-                except IntegrityError:
-                    fail('USER_CONCURRENT_CHANGE', 409)
-                account_created = True
-            if not target or not target['active']:
-                fail('ACTIVE_USER_NOT_FOUND', 404)
-            if target['role'] == 'attendee':
-                conn.execute(update(users).where(users.c.id == target['id']).values(role='member'))
-            existing = conn.execute(select(assignments).where(assignments.c.user_id == target['id'], assignments.c.site_id == event_id, assignments.c.role == role)).mappings().first()
-            values = {'status': 'active', **validated_window(body, existing)}
-            assignment_id = existing['id'] if existing else new_id()
-            if existing:
-                conn.execute(update(assignments).where(assignments.c.id == assignment_id).values(**values))
-            else:
-                try:
-                    with conn.begin_nested():
-                        conn.execute(insert(assignments).values(id=assignment_id, user_id=target['id'], site_id=event_id, role=role, created_at=now(), **values))
-                except IntegrityError:
-                    fail('ASSIGNMENT_CONCURRENT_CHANGE', 409)
-            write_audit(conn, actor, event_id, 'committee_assigned', {'assignment_id': assignment_id, 'user_id': target['id'], 'role': role, 'account_created': account_created, **values})
-            return {'id': assignment_id, 'user_id': target['id'], 'site_id': event_id, 'name': target['name'], 'email': None if target['email'].startswith('tel:') else target['email'], 'phone': phone, 'role': role,
-                    'account_created': account_created, 'temporary_password': temporary_password,
-                    'must_change_password': bool(target.get('must_change_password')), **values}
+            actor,_=identify(request,conn,True)
+            require_event_permission(conn,actor,event_id,'committee.manage')
+            if body.get('role') not in EVENT_ROLE_PERMISSIONS:fail('COMMITTEE_ROLE_INVALID')
+            target=conn.execute(select(users).where(users.c.id==body.get('user_id'))).mappings().first() if body.get('user_id') else None
+            if body.get('user_id') and not target:fail('ACTIVE_USER_NOT_FOUND',404)
+            payload=dict(body)
+            if target:payload.update(name=target['name'],email=target['email'] if not target['email'].startswith('tel:') else None,phone=conn.execute(select(user_phones.c.phone).where(user_phones.c.user_id==target['id'])).scalar())
+            return account_request_service.submit(conn,actor=actor,body=payload,purpose='committee',scope_type='site',scope_id=event_id,role='member',assignment_role=body['role'])
 
     @app.patch('/api/admin/events/{event_id}/committee/{assignment_id}')
     def committee_update(event_id: str, assignment_id: str, body: dict, request: Request):

@@ -209,6 +209,11 @@ def ensure_compat_schema(engine):
     """Small additive compatibility migration for local upgrades; production uses versioned SQL migrations."""
     from sqlalchemy import inspect, text as sa_text
     insp=inspect(engine)
+    if engine.dialect.name=='sqlite' and 'px_account_requests' in insp.get_table_names():
+        # create_all does not add indexes to an existing phase-1 table.
+        from tools.migrate_postgres import execute_script
+        with engine.begin() as c:
+            execute_script(c,(Path(__file__).resolve().parents[1]/'ops/014_account_request_workflows.sql').read_text(encoding='utf-8'))
     if 'px_users' in insp.get_table_names():
         cols={c['name'] for c in insp.get_columns('px_users')}
         if 'must_change_password' not in cols:
@@ -244,3 +249,6 @@ notifications=Table('px_notifications',metadata,
     Column('title',String(160),nullable=False),Column('body',Text,nullable=False),
     Column('created_at',String(64),nullable=False),Column('read_at',String(64)))
 Index('px_notifications_owner_time',notifications.c.user_id,notifications.c.created_at)
+
+# Independent pending identities; registration is routed here only in later phases.
+from app import account_requests_db as _account_requests_db  # noqa: E402,F401

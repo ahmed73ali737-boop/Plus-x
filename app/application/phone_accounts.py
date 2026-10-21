@@ -7,7 +7,7 @@ Public responses expose phone and null email for these principals.
 """
 import re
 
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, func
 
 from app.application.guest_service import PHONE_DIGIT_TRANSLATION, normalize_phone
 from app.db import user_phones, users
@@ -43,7 +43,9 @@ def contact_identity(body, preserve_email=False):
 
 def find_contact_user(conn, email, phone):
     by_phone = find_by_phone(conn, phone) if phone else None
-    by_email = conn.execute(select(users).where(users.c.email == email)).mappings().first() if not email.startswith('tel:') else None
+    matches=conn.execute(select(users).where(func.lower(func.trim(users.c.email))==email.lower())).mappings().all() if not email.startswith('tel:') else []
+    if len(matches)>1:fail('CONTACT_IDENTITIES_CONFLICT',409)
+    by_email=matches[0] if matches else None
     if by_phone and by_email and by_phone['id'] != by_email['id']:
         fail('CONTACT_IDENTITIES_CONFLICT', 409)
     return by_phone or by_email
@@ -71,4 +73,23 @@ def public_user(conn, user):
     result['email'] = None if user['email'].startswith('tel:') else user['email']
     result['phone'] = conn.execute(select(user_phones.c.phone).where(user_phones.c.user_id == user['id'])).scalar()
     result['must_change_password'] = bool(user.get('must_change_password'))
+    result['management_access'] = bool(management_access(conn,user))
+    result['can_review_account_requests'] = can_review_accounts(conn,user)
     return result
+
+
+def management_access(conn, user):
+    from app.application.access import can_read, event_permissions
+    from app.db import sites, memberships
+    if conn.execute(select(memberships.c.user_id).where(memberships.c.user_id==user['id'],memberships.c.status=='active')).first():return True
+    return any(can_read(conn,user,site) or (site['kind']=='event' and event_permissions(conn,user,site['id']))
+               for site in conn.execute(select(sites)).mappings())
+
+
+def can_review_accounts(conn,user):
+    from app.db import memberships, assignments
+    from app.application.access import EVENT_ROLE_PERMISSIONS, active_window
+    if user['role'] in ('platform','organizer'):return True
+    if conn.execute(select(memberships.c.user_id).where(memberships.c.user_id==user['id'],memberships.c.status=='active',memberships.c.role=='owner')).first():return True
+    roles=[role for role,permissions in EVENT_ROLE_PERMISSIONS.items() if 'committee.manage' in permissions]
+    return any(active_window(row) for row in conn.execute(select(assignments).where(assignments.c.user_id==user['id'],assignments.c.role.in_(roles))).mappings())

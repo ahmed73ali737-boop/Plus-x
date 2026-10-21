@@ -2,6 +2,21 @@
   "/api/access-request": [
     "post"
   ],
+  "/api/account-invites/accept": [
+    "post"
+  ],
+  "/api/account-invites/inspect": [
+    "post"
+  ],
+  "/api/account-requests/cancel": [
+    "post"
+  ],
+  "/api/account-requests/password": [
+    "post"
+  ],
+  "/api/account-requests/status": [
+    "post"
+  ],
   "/api/account/notifications": [
     "get"
   ],
@@ -11,6 +26,15 @@
   "/api/account/preferences": [
     "get",
     "put"
+  ],
+  "/api/admin/account-requests": [
+    "get"
+  ],
+  "/api/admin/account-requests/{rid}": [
+    "patch"
+  ],
+  "/api/admin/account-requests/{rid}/setup-link": [
+    "post"
   ],
   "/api/admin/admission/events": [
     "get"
@@ -134,6 +158,12 @@
   ],
   "/api/admin/participations/{pid}": [
     "patch"
+  ],
+  "/api/admin/platform-account-invites": [
+    "post"
+  ],
+  "/api/admin/platform-account-requests": [
+    "post"
   ],
   "/api/admin/signup-requests": [
     "get"

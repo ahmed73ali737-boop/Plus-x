@@ -1,3 +1,4 @@
+from account_approval_support import prepare_review_admin, approve_request
 from harness_support import sqlite_connection
 import uuid
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from app.db import organizations, organization_people, memberships, users, event
 
 def boot(tmp_path):
     app=create_app('sqlite:///'+str(tmp_path/'w11.sqlite'),origin='http://testserver',seed_demo=True)
+    prepare_review_admin(app)
     return app,TestClient(app)
 
 
@@ -33,9 +35,10 @@ def test_platform_creates_event_then_organizer_account(tmp_path):
     assert created.status_code==200
     eid=created.json()['id']
     r=c.post(f'/api/admin/sites/{eid}/users',json={'name':'مدير الفعالية','email':'event11@organizer.test'})
-    assert r.status_code==200 and r.json()['role']=='organizer' and r.json()['temporary_password']
+    assert r.status_code==200 and r.json()['requested_role']=='organizer' and r.json()['status']=='pending'
+    approved=approve_request(app,r.json(),reset=True)
     c2=TestClient(app)
-    lr=c2.post('/api/auth/login',json={'email':'event11@organizer.test','password':r.json()['temporary_password']})
+    lr=c2.post('/api/auth/login',json={'email':'event11@organizer.test','password':approved['temporary_password']})
     assert lr.status_code==200 and lr.json()['user']['scope_id']==eid
 
 
@@ -58,9 +61,10 @@ def test_non_account_person_can_exist_and_account_can_be_added_later(tmp_path):
     listed=c.get(f'/api/admin/organizations/{oid}/people').json()['people']
     assert next(x for x in listed if x['id']==pid)['user_id'] is None
     created=c.post(f'/api/admin/organizations/{oid}/people/{pid}/account',json={'role':'editor'})
-    assert created.status_code==200 and created.json()['temporary_password']
+    assert created.status_code==200 and created.json()['status']=='pending'
+    approved_person=approve_request(app,created.json(),reset=True)
     c2=TestClient(app)
-    lr=c2.post('/api/auth/login',json={'email':'sara@people.test','password':created.json()['temporary_password']})
+    lr=c2.post('/api/auth/login',json={'email':'sara@people.test','password':approved_person['temporary_password']})
     assert lr.status_code==200
     with app.state.engine.connect() as db:
         person=db.execute(select(organization_people).where(organization_people.c.id==pid)).mappings().first()
@@ -113,6 +117,7 @@ def test_kiosk_two_visitors_use_separate_sessions_and_count_as_kiosk_sessions(tm
 def test_suspended_participation_revokes_member_site_management_but_not_public_interaction(tmp_path):
     app,c=boot(tmp_path); login(c,app,'admin@pulsex.test')
     user=c.post('/api/admin/organizations/org-01/users',json={'name':'محرر تجريبي','email':'suspend@org.test','role':'editor'}).json()
+    user=approve_request(app,user,reset=True)
     org=next(x for x in c.get('/api/admin/organizations').json()['organizations'] if x['id']=='org-01')
     part=org['participations'][0]
     assert c.patch('/api/admin/participations/'+part['id'],json={'status':'suspended'}).status_code==200
@@ -143,7 +148,7 @@ def test_offline_frontend_has_indexeddb_outbox_receipts_online_retry_qr_and_kios
 def test_admin_ui_exposes_people_without_account_and_later_account_creation():
     from pathlib import Path
     admin=Path('web/admin.mjs').read_text(encoding='utf-8')
-    for token in ['الفريق / أعضاء بدون حساب','إضافة عضو بدون حساب','إنشاء حساب إدارة لهذا العضو','يمكنه المشاركة كزائر في الاستبيان والتقييم دون حساب']:
+    for token in ['الفريق / أعضاء بدون حساب','إضافة عضو بدون حساب','طلب حساب إدارة لهذا الشخص','يمكنه المشاركة كزائر في الاستبيان والتقييم دون حساب']:
         assert token in admin
 
 def test_additive_compat_migration_adds_password_change_flag_to_old_sqlite(tmp_path):
