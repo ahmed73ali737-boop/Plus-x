@@ -94,6 +94,9 @@ def test_every_admin_creation_path_waits_for_independent_approval_and_setup(env,
     assert creator.patch('/api/admin/account-requests/'+request['id'],json={'status':'approved'}).status_code in (403,404)
     approved=decide(login,request);assert approved.status_code==200,approved.text
     assert approved.json()['setup_required']
+    if '/sites/' in path:
+        row=next(u for u in creator.get(path).json()['users'] if u['id']==approved.json()['user_id'])
+        assert row['setup_required'] and not row['active']
     token=request['tracking_token']
     assert client.post('/api/account-requests/password',json={'tracking_token':token,'password':PASSWORD,'confirmation':PASSWORD}).status_code==200
     assert client.post('/api/account-requests/password',json={'tracking_token':token,'password':PASSWORD,'confirmation':PASSWORD}).status_code==409

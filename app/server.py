@@ -314,7 +314,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
             u,_=identify(request,c);s=require_scope(c,u,sid)
             if u['role']=='agency':fail('FORBIDDEN_ROLE',403)
             entries=c.execute(select(users.c.id,users.c.email,users.c.name,users.c.role,users.c.scope_id,users.c.active,user_phones.c.phone).outerjoin(user_phones,users.c.id==user_phones.c.user_id).where(users.c.scope_id==sid)).mappings()
-            return {'users':[{**dict(x),'email':None if x['email'].startswith('tel:') else x['email']} for x in entries], 'requests':list_requests(c,sid)}
+            awaiting_setup=set(c.execute(select(request_workflows.c.user_id).join(users,users.c.id==request_workflows.c.user_id).where(users.c.scope_id==sid,request_workflows.c.setup_expires_at.is_not(None))).scalars())
+            return {'users':[{**dict(x),'setup_required':x['id'] in awaiting_setup,'email':None if x['email'].startswith('tel:') else x['email']} for x in entries], 'requests':list_requests(c,sid)}
 
     @app.post('/api/admin/sites/{sid}/users')
     def add_user(sid:str,body:dict,request:Request):
