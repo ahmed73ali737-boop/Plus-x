@@ -15,11 +15,11 @@ const walk=node=>[node,...node.children.filter(x=>x instanceof Element).flatMap(
 async function runtime({path='/account/signup',pending}={}){
   const h=(tag,attrs,...children)=>new Element(tag,attrs,children),root=h('div',{}),head=h('head',{}),calls=[],csrf=[];
   const location={pathname:path,href:'initial',replace(url){this.href=url;}};
-  const ui={h,root,brand:()=>h('a',{href:'/'},'Eventna'),setCSRF:value=>csrf.push(value),msg:error=>error.message,
+  const ui={newRequestKey:()=> 'a'.repeat(48),h,root,brand:()=>h('a',{href:'/'},'Eventna'),setCSRF:value=>csrf.push(value),msg:error=>error.message,
     field:(label,type,value,attrs)=>{const input=h('input',{label,type,value,...attrs});return{input,node:h('label',{},input)};},
     button:(label,fn)=>{const node=h('button',{label},label);node.fn=fn;return node;},modal:()=>{},
-    api:async(path,body)=>{calls.push({path,body});if(path==='/api/auth/register'){if(pending)await pending;return{csrf:'test-csrf',user:{name:'Owner',role:'attendee',phone:'+967777123456'}};}if(path==='/api/auth/me')return{csrf:'test-csrf',user:{name:'Owner',role:'attendee',phone:'+967777123456'}};throw new Error(path);}};
-  const context=vm.createContext({location,document:{head,documentElement:{},querySelector:()=>null},Number,Error,encodeURIComponent});
+    api:async(path,body)=>{calls.push({path,body});if(path==='/api/auth/register'){if(pending)await pending;return{status:'pending',tracking_token:'test-tracking-capability',grants_access:false};}if(path==='/api/auth/me')return{csrf:'test-csrf',user:{name:'Owner',role:'attendee',phone:'+967777123456'}};throw new Error(path);}};
+  const context=vm.createContext({crypto:{randomUUID:()=>'a'.repeat(32)},location,document:{head,documentElement:{},querySelector:()=>null},Number,Error,encodeURIComponent});
   const uiModule=new vm.SyntheticModule(Object.keys(ui),function(){for(const[key,value]of Object.entries(ui))this.setExport(key,value);},{context});
   const shared=new vm.SourceTextModule(await readFile(new URL('../web/account.mjs',import.meta.url),'utf8'),{context});
   const page=new vm.SourceTextModule(await readFile(new URL('../web/account-page.mjs',import.meta.url),'utf8'),{context});
@@ -33,7 +33,7 @@ test('phone signup requires no email and makes a single direct request without v
   assert.equal(walk(r.root).some(node=>node.attrs.type==='email'),false);
   await r.form().handlers.submit({preventDefault(){}});
   assert.equal(r.calls.length,1);assert.equal(r.calls[0].path,'/api/auth/register');assert.equal(r.calls[0].body.phone,'777123456');
-  assert.equal('email' in r.calls[0].body,false);assert.equal('verification_token' in r.calls[0].body,false);assert.equal(r.location.href,'/account');assert.deepEqual(r.csrf,['test-csrf']);
+  assert.equal('email' in r.calls[0].body,false);assert.equal('verification_token' in r.calls[0].body,false);assert.equal(r.location.href,'/account/request#test-tracking-capability');assert.deepEqual(r.csrf,[]);assert.ok(r.calls[0].body.request_key.length>=32);
 });
 test('confirmation mismatch blocks registration and does not clear entered data',async()=>{
   const r=await runtime();fill(r,'Wrong-Password-2026!');await r.form().handlers.submit({preventDefault(){}});

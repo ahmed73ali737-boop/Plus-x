@@ -74,7 +74,7 @@ def test_access_page_and_lazy_assets_are_public_and_precached(tmp_path):
 def test_public_account_requests_have_separate_bounded_rate_limit(tmp_path):
     app=create_app('sqlite:///'+str(tmp_path/'rate.sqlite'),origin='http://testserver',seed_demo=True)
     with app_client(app) as client:
-        payload={'site_id':'platform','requested_role':'organizer','organization_name':'Synthetic','contact_name':'QA','email':'qa@example.test'}
+        payload={'site_id':'platform','requested_role':'organizer','organization_name':'Synthetic','contact_name':'QA','email':'qa@example.test','request_key':'a1'*32}
         for _ in range(10):assert client.post('/api/signup-request',json=payload).status_code==200
         response=client.post('/api/signup-request',json=payload)
         assert response.status_code==429

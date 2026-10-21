@@ -1,3 +1,4 @@
+from account_approval_support import prepare_review_admin, approve_request
 """Local SQLite integration/domain tests. These are NOT native PostgreSQL acceptance."""
 import base64, copy, csv, io, json, uuid, zipfile
 from pathlib import Path
@@ -88,7 +89,7 @@ def test_access_request_does_not_grant_login(client):
 def test_subordinate_cannot_create_accounts(client,app):
     login(client,app,2);assert client.post('/api/admin/sites/agency-01/users',json={'email':'bad@sample.test','name':'x','role':'platform'}).status_code==403
 def test_organizer_creates_limited_account(client,app):
-    login(client,app,1);r=client.post('/api/admin/sites/agency-05/users',json={'email':'new@sample.test','name':'مستخدم','role':'platform'});assert r.status_code==200 and r.json()['role']=='agency'
+    login(client,app,1);r=client.post('/api/admin/sites/agency-05/users',json={'email':'new@sample.test','name':'مستخدم','role':'platform'});assert r.status_code==200 and r.json()['requested_role']=='agency' and r.json()['status']=='pending'
 def test_organizer_cannot_create_platform_event(client,app):
     login(client,app,1);assert client.post('/api/admin/sites',json={'parent_id':'platform','kind':'event','slug':'forbidden','title':'bad'}).status_code==403
 def test_create_new_agency_is_draft(client,app):

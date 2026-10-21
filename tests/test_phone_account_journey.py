@@ -12,6 +12,7 @@ from sqlalchemy.engine import make_url
 from app.core.security import verify_password
 from app.db import audit, metadata, user_phones, users
 from app.server import create_app
+from account_approval_support import prepare_review_admin, approve_request, register_approved
 
 PASSWORD = 'My-Personal-Password-2026!'
 PHONE = '+967777123456'
@@ -36,6 +37,7 @@ def system(monkeypatch, tmp_path):
     try:
         app = create_app(url, origin='http://testserver', seed_demo=True)
         with TestClient(app) as client:
+            prepare_review_admin(app)
             yield app, client
     finally:
         if admin_engine:
@@ -61,27 +63,28 @@ def admin(client, app):
     return login_as(client, app.state.seed_credentials[0])
 
 
-def test_register_phone_directly_starts_session_without_granting_admin(system):
-    app, client = system
-    response = register(client, role='platform', scope_id='platform', active=0, email='attacker@example.test')
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert data['user']['phone'] == PHONE and data['user']['email'] is None
-    assert data['user']['role'] == 'attendee' and data['user']['scope_id'] is None
-    assert not data['user']['must_change_password']
-    assert client.get('/api/auth/me').status_code == 200
-    for path in ('/api/admin/sites', '/api/admin/signup-requests', '/api/admin/organizations', '/api/admin/admission/events'):
-        assert client.get(path).status_code == 403, path
-    assert client.post('/api/admin/organizations', json={'name': 'Escalation', 'slug': 'escalation'}).status_code == 403
+def test_register_phone_waits_for_approval_without_granting_admin(system):
+    app,client=system
+    response=register(client,role='platform',scope_id='platform',active=0,email='attacker@example.test')
+    assert response.status_code==200,response.text
+    assert response.json()['status']=='pending' and 'user' not in response.json() and 'csrf' not in response.json()
+    assert client.get('/api/auth/me').status_code==401
+    assert client.post('/api/auth/login',json={'phone':PHONE,'password':PASSWORD}).status_code==401
+    approve_request(app,response.json())
+    data=login_as(client,{'phone':PHONE,'password':PASSWORD})
+    assert data['user']['phone']==PHONE and data['user']['email'] is None
+    assert data['user']['role']=='attendee' and data['user']['scope_id'] is None
+    for path in ('/api/admin/sites','/api/admin/signup-requests','/api/admin/organizations','/api/admin/admission/events'):
+        assert client.get(path).status_code==403
     with app.state.engine.connect() as conn:
-        saved = conn.execute(select(users).where(users.c.id == data['user']['id'])).mappings().one()
-        assert verify_password(PASSWORD, saved['password_hash']) and saved['password_hash'] != PASSWORD
+        saved=conn.execute(select(users).where(users.c.id==data['user']['id'])).mappings().one()
+        assert verify_password(PASSWORD,saved['password_hash'])
 
 
 @pytest.mark.parametrize('phone', ['777123456', '0777123456', '967777123456', '00967777123456', '+967 777 123 456', '٧٧٧١٢٣٤٥٦'])
 def test_phone_normalization_prevents_duplicate_accounts(system, phone):
-    _, client = system
-    assert register(client).status_code == 200
+    app, client = system
+    register_approved(app,client,phone=PHONE,password=PASSWORD)
     assert register(client, phone).status_code == 409
     assert client.post('/api/auth/login', json={'phone': phone, 'password': PASSWORD}).status_code == 200
 
@@ -130,14 +133,14 @@ def test_legacy_account_adds_phone_with_current_password_and_keeps_identity(syst
 
 def test_phone_cannot_be_taken_from_an_existing_account(system):
     app, client = system
-    assert register(client).status_code == 200
+    register_approved(app,client,phone=PHONE,password=PASSWORD)
     admin(client, app)
     assert client.post('/api/auth/phone', json={'phone': PHONE, 'current': app.state.seed_credentials[0]['password']}).status_code == 409
 
 
 def test_self_password_change_revokes_every_session(system):
     app, client = system
-    registered = register(client).json()
+    registered = register_approved(app,client,phone=PHONE,password=PASSWORD)
     client.headers['X-CSRF'] = registered['csrf']
     with TestClient(app) as other:
         login_as(other, {'phone': PHONE, 'password': PASSWORD})
@@ -151,7 +154,7 @@ def test_self_password_change_revokes_every_session(system):
 
 def test_administrator_recovery_revokes_sessions_forces_change_and_never_uses_otp(system):
     app, client = system
-    data = register(client).json()
+    data = register_approved(app,client,phone=PHONE,password=PASSWORD)
     target = data['user']['id']
     with TestClient(app) as staff:
         assert staff.post('/api/admin/users/' + target + '/password/reset', json={}).status_code == 401
@@ -174,7 +177,7 @@ def test_administrator_recovery_revokes_sessions_forces_change_and_never_uses_ot
 
 def test_suspended_user_cannot_login_or_reset(system):
     app, client = system
-    target = register(client).json()['user']['id']
+    target = register_approved(app,client,phone=PHONE,password=PASSWORD)['user']['id']
     with app.state.engine.begin() as conn:
         conn.execute(update(users).where(users.c.id == target).values(active=0))
     assert client.get('/api/auth/me').status_code == 401
@@ -185,22 +188,18 @@ def test_suspended_user_cannot_login_or_reset(system):
 
 def test_phone_only_business_request_is_pending_and_approval_is_not_replayed(system):
     app, client = system
-    registered = register(client).json()['user']
+    registered = register_approved(app,client,phone=PHONE,password=PASSWORD)['user']
     payload = {'site_id': 'event-demo', 'requested_role': 'participant', 'organization_name': 'Phone Org', 'contact_name': 'Owner', 'phone': PHONE}
     response = client.post('/api/signup-request', json=payload)
     assert response.status_code == 200, response.text
-    request_id = response.json()['id']
-    assert response.json()['grants_access'] is False
-    assert client.get('/api/admin/signup-requests').status_code == 403
-    admin(client, app)
-    reviewed = client.patch('/api/admin/signup-requests/' + request_id, json={'status': 'approved', 'organization_slug': 'phone-org'})
-    assert reviewed.status_code == 200, reviewed.text
-    assert reviewed.json()['temporary_password'] is None
-    assert client.patch('/api/admin/signup-requests/' + request_id, json={'status': 'approved'}).status_code == 409
-    signed_in = login_as(client, {'phone': PHONE, 'password': PASSWORD})['user']
-    assert signed_in['id'] == registered['id'] and signed_in['role'] == 'member'
-    assert client.get('/api/admin/sites/' + reviewed.json()['agency_site_id']).status_code == 200
-    assert client.get('/api/admin/signup-requests').status_code == 403
+    pending=response.json()
+    assert pending['grants_access'] is False
+    assert client.get('/api/admin/signup-requests').status_code==403
+    reviewed=approve_request(app,pending)
+    signed_in=login_as(client,{'phone':PHONE,'password':PASSWORD})['user']
+    assert signed_in['id']==registered['id'] and signed_in['role']=='attendee' and signed_in['management_access']
+    assert client.get('/api/admin/sites/'+reviewed['result_site_id']).status_code==200
+    assert client.get('/api/admin/signup-requests').status_code==403
 
 
 def test_operator_can_create_phone_staff_and_reset_only_in_scope(system):
@@ -208,6 +207,7 @@ def test_operator_can_create_phone_staff_and_reset_only_in_scope(system):
     platform_user = admin(client, app)['user']['id']
     created = client.post('/api/admin/sites/agency-01/users', json={'name': 'Phone Staff', 'phone': PHONE})
     assert created.status_code == 200, created.text
+    approve_request(app,created.json())
     user = next(row for row in client.get('/api/admin/sites/agency-01/users').json()['users'] if row['phone'] == PHONE)
     assert user['email'] is None
     login_as(client, app.state.seed_credentials[1])
@@ -223,7 +223,9 @@ def test_concurrent_registration_creates_exactly_one_phone_account(system):
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(attempt, range(2))) == [200, 409]
     with app.state.engine.connect() as conn:
-        assert len(conn.execute(select(user_phones)).all()) == 1
+        assert len(conn.execute(select(user_phones)).all()) == 0
+        from app.account_requests_db import account_requests
+        assert len(conn.execute(select(account_requests)).all()) == 1
 
 
 def test_additive_phone_migration_replays_and_preserves_legacy_users(system):
@@ -246,7 +248,7 @@ def test_cross_origin_registration_rejected(system):
 
 def test_platform_can_suspend_and_reactivate_phone_account(system):
     app, client = system
-    target = register(client).json()['user']['id']
+    target = register_approved(app,client,phone=PHONE,password=PASSWORD)['user']['id']
     client.headers['X-CSRF'] = client.get('/api/auth/me').json()['csrf']
     assert client.patch('/api/admin/users/' + target, json={'active': False}).status_code == 403
     platform = admin(client, app)['user']['id']
@@ -261,11 +263,11 @@ def test_platform_can_suspend_and_reactivate_phone_account(system):
 
 def test_phone_committee_account_and_registered_attendee_keep_scoped_roles(system):
     app, client = system
-    target = register(client).json()['user']['id']
+    target = register_approved(app,client,phone=PHONE,password=PASSWORD)['user']['id']
     admin(client, app)
     assigned = client.post('/api/admin/events/event-demo/committee', json={'phone': PHONE, 'role': 'scanner'})
     assert assigned.status_code == 200, assigned.text
-    assert assigned.json()['user_id'] == target
+    assert approve_request(app,assigned.json())['user_id'] == target
     login_as(client, {'phone': PHONE, 'password': PASSWORD})
     permissions = client.get('/api/admin/events/event-demo/permissions').json()['permissions']
     assert 'guests.checkin' in permissions and 'committee.manage' not in permissions
@@ -275,39 +277,43 @@ def test_phone_committee_account_and_registered_attendee_keep_scoped_roles(syste
     created = client.post('/api/admin/events/event-demo/committee', json={'phone': '+967777123458', 'role': 'reception', 'name': 'Phone Crew', 'create_account': True})
     assert created.status_code == 200, created.text
     assert created.json()['phone'] == '+967777123458' and created.json()['email'] is None
+    approve_request(app,created.json())
     rows = client.get('/api/admin/events/event-demo/committee').json()['assignments']
     assert any(row['phone'] == '+967777123458' and row['email'] is None for row in rows)
 
 
-def test_real_http_registration_and_login_need_no_verification(tmp_path):
+def test_real_http_registration_waits_for_approval_without_verification(tmp_path):
+    import json
     from test_admission_http_ack import running_server
     with running_server(tmp_path) as (_, client):
-        response = register(client)
-        assert response.status_code == 200, response.text
-        assert client.get('/api/auth/me').json()['user']['phone'] == PHONE
-        assert client.get('/api/admin/sites').status_code == 403
-        client.headers['X-CSRF'] = response.json()['csrf']
-        assert client.post('/api/auth/logout', json={}).status_code == 200
-        assert client.get('/api/auth/me').status_code == 401
-        assert client.post('/api/auth/login', json={'phone': '777123456', 'password': PASSWORD}).status_code == 200
+        response=register(client);assert response.status_code==200,response.text
+        assert client.get('/api/auth/me').status_code==401
+        accounts=json.loads((tmp_path/'accounts.json').read_text())
+        credential=next(a for a in accounts if a['role']=='platform')
+        auth=client.post('/api/auth/login',json=credential);client.headers['X-CSRF']=auth.json()['csrf']
+        reviewed=client.patch('/api/admin/account-requests/'+response.json()['id'],json={'status':'approved'})
+        assert reviewed.status_code==200,reviewed.text
+        assert client.post('/api/auth/logout',json={}).status_code==200
+        assert client.post('/api/auth/login',json={'phone':PHONE,'password':PASSWORD}).status_code==200
 
 
 def test_organization_user_creation_and_existing_phone_membership(system):
     app, client = system
-    registered = register(client).json()['user']['id']
+    registered = register_approved(app,client,phone=PHONE,password=PASSWORD)['user']['id']
     admin(client, app)
     linked = client.post('/api/admin/organizations/org-01/users', json={'name': 'Existing owner', 'phone': PHONE, 'role': 'editor'})
     assert linked.status_code == 200, linked.text
-    assert linked.json()['temporary_password'] is None
+    approve_request(app,linked.json())
     signed = login_as(client, {'phone': PHONE, 'password': PASSWORD})['user']
-    assert signed['id'] == registered and signed['role'] == 'member'
+    assert signed['id'] == registered and signed['role'] == 'attendee'
     assert client.get('/api/admin/sites/agency-01').status_code == 200
     admin(client, app)
     created = client.post('/api/admin/organizations/org-01/users', json={'name': 'New owner', 'phone': '+967777123459', 'role': 'editor'})
     assert created.status_code == 200, created.text
     assert created.json()['email'] is None
-    signed = login_as(client, {'phone': '+967777123459', 'password': created.json()['temporary_password']})
-    assert signed['user']['must_change_password'] is True
+    approve_request(app,created.json(),password=PASSWORD)
+    signed = login_as(client, {'phone': '+967777123459', 'password': PASSWORD})
+    assert signed['user']['must_change_password'] is False
 
 
 def test_organization_person_can_get_phone_account_without_email(system):
@@ -318,13 +324,14 @@ def test_organization_person_can_get_phone_account_without_email(system):
     result = client.post('/api/admin/organizations/org-01/people/' + person.json()['id'] + '/account', json={'role': 'editor'})
     assert result.status_code == 200, result.text
     assert result.json()['phone'] == PHONE and result.json()['email'] is None
-    state = login_as(client, {'phone': PHONE, 'password': result.json()['temporary_password']})
-    assert state['user']['must_change_password'] is True
+    approve_request(app,result.json(),password=PASSWORD)
+    state = login_as(client, {'phone': PHONE, 'password': PASSWORD})
+    assert state['user']['must_change_password'] is False
 
 
 def test_registered_phone_user_receives_private_admin_notifications_and_saves_preferences(system):
     app, client = system
-    registered = register(client).json()
+    registered = register_approved(app,client,phone=PHONE,password=PASSWORD)
     client.headers['X-CSRF'] = registered['csrf']
     preferences = {'theme':'dark','text_size':'large','reduce_motion':True,'notifications_enabled':True}
     assert client.put('/api/account/preferences',json=preferences).status_code == 200

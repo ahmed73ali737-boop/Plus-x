@@ -1,3 +1,4 @@
+from account_approval_support import prepare_review_admin, approve_request
 import uuid
 from pathlib import Path
 
@@ -67,7 +68,7 @@ def test_access_request_review(client,app):
     login(client,app,1)
     reqs=client.get('/api/admin/sites/agency-01/users').json()['requests']
     item=next(x for x in reqs if x['email']=='review-me@sample.test')
-    reviewed=client.patch(f"/api/admin/sites/agency-01/access-requests/{item['id']}",json={'status':'rejected'})
+    reviewed=client.patch(f"/api/admin/sites/agency-01/access-requests/{item['id']}",json={'status':'rejected','reason':'الرجاء مراجعة الجهة المسؤولة.'})
     assert reviewed.status_code==200 and reviewed.json()['status']=='rejected'
     after=client.get('/api/admin/sites/agency-01/users').json()['requests']
     assert next(x for x in after if x['id']==item['id'])['status']=='rejected'
@@ -77,7 +78,7 @@ def test_user_disable_revokes_login(client,app):
     login(client,app,1)
     made=client.post('/api/admin/sites/agency-08/users',json={'email':'disable-me@sample.test','name':'Disable Me'})
     assert made.status_code==200,made.text
-    pw=made.json()['temporary_password']
+    pw=approve_request(app,made.json(),reset=True)['temporary_password']
     users=client.get('/api/admin/sites/agency-08/users').json()['users']
     uid=next(x for x in users if x['email']=='disable-me@sample.test')['id']
     assert client.patch(f'/api/admin/sites/agency-08/users/{uid}',json={'active':False}).json()['sessions_revoked'] is True
@@ -90,7 +91,7 @@ def test_user_disable_revokes_login(client,app):
 def test_admin_ui_has_devices_and_request_review():
     text=(ROOT/'web/admin.mjs').read_text(encoding='utf-8')
     assert 'الأجهزة والطرفيات' in text
-    assert 'رفض الطلب' in text
+    assert 'رفض مع السبب' in text
     assert 'تم إيقاف الحساب وإنهاء جلساته' in text
 
 

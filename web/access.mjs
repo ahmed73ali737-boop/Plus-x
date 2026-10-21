@@ -1,4 +1,4 @@
-import {h,root,api,field,selectField,check,brand,msg} from './ui.mjs';
+import {newRequestKey,h,root,api,field,selectField,check,brand,msg} from './ui.mjs';
 
 function style(){if(!document.querySelector('link[data-access-style]'))document.head.append(h('link',{rel:'stylesheet',href:'/assets/access.css','data-access-style':'true'}));}
 export async function accessPage(){
@@ -28,7 +28,7 @@ export async function accessPage(){
     return loadingEvents;
   }
   role.input.addEventListener('change',async()=>{event.node.hidden=role.input.value!=='participant';event.input.required=role.input.value==='participant';if(event.input.required)await eventOptions();});
-  let sending=false;
+  let sending=false,requestKey=newRequestKey();form.addEventListener('input',()=>{requestKey=newRequestKey();});
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(sending)return;
     if(!form.reportValidity())return;
@@ -37,10 +37,10 @@ export async function accessPage(){
     if(participant&&!events.some(row=>row.id===event.input.value)){output.textContent='اختر فعالية متاحة قبل إرسال طلب المشاركة.';return;}
     sending=true;submit.disabled=true;output.textContent='جارٍ إرسال الطلب…';
     try{
-      const payload={site_id:participant?event.input.value:'platform',requested_role:role.input.value,organization_name:org.input.value.trim(),contact_name:name.input.value.trim(),phone:phone.input.value.trim(),participation_type:'exhibitor',wants_account:true};
+      const payload={request_key:requestKey,site_id:participant?event.input.value:'platform',requested_role:role.input.value,organization_name:org.input.value.trim(),contact_name:name.input.value.trim(),phone:phone.input.value.trim(),participation_type:'exhibitor',wants_account:true};
       const result=await api('/api/signup-request',payload);
       if(result.status!=='pending'||result.grants_access!==false)throw new Error('UNEXPECTED_SIGNUP_RESPONSE');
-      form.replaceChildren(h('div',{class:'notice',role:'status'},h('h3',{},'تم استلام طلبك للمراجعة'),h('p',{},'لم يُفعّل حساب أو تُمنح صلاحيات بعد. راجع الجهة المنظمة لمتابعة الاعتماد؛ لا توجد رسالة بريد أو SMS آلية موعودة.'),h('a',{href:'/',class:'btn secondary'},'تصفح كضيف أثناء الانتظار')));
+      location.href='/account/request#'+encodeURIComponent(result.tracking_token);
     }catch(error){output.textContent=msg(error)+' — لم يكتمل إرسال الطلب. راجع البيانات والاتصال قبل المحاولة مجددًا.';}
     finally{sending=false;submit.disabled=false;}
   });

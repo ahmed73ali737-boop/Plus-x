@@ -56,7 +56,7 @@ def store(tmp_path, monkeypatch):
     engine = make_engine(url)
     try:
         # A genuine pre-phase-1 database, containing existing identities and requests.
-        metadata.create_all(engine, tables=[t for t in metadata.sorted_tables if t is not account_requests])
+        metadata.create_all(engine, tables=[t for t in metadata.sorted_tables if t.name not in ('px_account_requests','px_account_request_workflows','px_platform_account_invites')])
         assert 'px_account_requests' not in inspect(engine).get_table_names()
         with engine.begin() as conn:
             for sid, kind in [('platform', 'platform'), ('event-one', 'event'), ('event-two', 'event')]:
@@ -79,6 +79,7 @@ def store(tmp_path, monkeypatch):
             before = snapshot(conn)
             execute_script(conn, MIGRATION.read_text())
             execute_script(conn, MIGRATION.read_text())
+            execute_script(conn,(ROOT/'ops/014_account_request_workflows.sql').read_text())
             assert snapshot(conn) == before
             assert conn.scalar(select(func.count()).select_from(account_requests)) == 0
         yield engine, url
@@ -238,7 +239,7 @@ def test_versioned_sql_and_orm_schema_have_matching_columns_checks_and_indexes(s
 
 def test_versioned_migration_checksum_and_postgres_replay(store):
     engine, _ = store
-    assert MIGRATION_PATHS[-1] == MIGRATION
+    assert MIGRATION in MIGRATION_PATHS
     from app.core.migrations import migration_checksum
     assert expected_migration_checksums()[MIGRATION.name] == migration_checksum(MIGRATION)
     if engine.dialect.name == 'postgresql':

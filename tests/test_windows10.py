@@ -1,3 +1,4 @@
+from account_approval_support import prepare_review_admin, approve_request
 from fastapi.testclient import TestClient
 from app.server import create_app
 from app.db import signup_requests, organizations, event_participations
@@ -25,11 +26,9 @@ def test_public_participant_signup_approval_creates_org_participation_account(tm
     sites=c.get('/api/admin/sites').json()['sites']; event=next(x for x in sites if x['kind']=='event')
     req=c.post('/api/signup-request',json={'site_id':event['id'],'requested_role':'participant','organization_name':'New Pay Co','contact_name':'Owner','email':'owner@newpay.test','phone':'+967700000000','participation_type':'exhibitor','wants_account':True,'message':'payments'})
     assert req.status_code==200
-    items=c.get('/api/admin/signup-requests',headers=h).json()['requests']; item=next(x for x in items if x['id']==req.json()['id'])
-    assert item['status']=='pending' and item['requested_role']=='participant'
-    approved=c.patch('/api/admin/signup-requests/'+item['id'],json={'status':'approved','organization_slug':'new-pay-co'},headers=h)
-    assert approved.status_code==200
-    data=approved.json(); assert data['agency_site_id'] and data['temporary_password'] and not data['account_deferred_until_assignment']
+    assert req.json()['status']=='pending'
+    data=approve_request(app,req.json())
+    assert data['result_site_id'] and data['result_organization_id'] and 'temporary_password' not in data
 
 
 def test_public_organizer_signup_does_not_grant_platform_scope(tmp_path):
@@ -40,7 +39,9 @@ def test_public_organizer_signup_does_not_grant_platform_scope(tmp_path):
     platform=next(x for x in c.get('/api/admin/sites').json()['sites'] if x['kind']=='platform')
     req=c.post('/api/signup-request',json={'site_id':platform['id'],'requested_role':'organizer','organization_name':'Organizer X','contact_name':'Manager','email':'manager@organizerx.test','wants_account':True})
     assert req.status_code==200
-    approved=c.patch('/api/admin/signup-requests/'+req.json()['id'],json={'status':'approved','organization_slug':'organizer-x'},headers=h)
-    assert approved.status_code==200
-    assert approved.json()['account_deferred_until_assignment'] is True
-    assert approved.json()['temporary_password'] is None
+    approved=approve_request(app,req.json())
+    assert approved['result_site_id']!='platform'
+    from app.db import users
+    with app.state.engine.connect() as conn:
+        user=conn.execute(select(users).where(users.c.id==approved['user_id'])).mappings().one()
+        assert user['role']=='organizer' and user['scope_id']==approved['result_site_id']

@@ -39,10 +39,11 @@ def main():
                     page.get_by_text('يلزم الموافقة على إرسال البيانات قبل تقديم الطلب.',exact=True).wait_for()
                     page.get_by_label('أوافق على إرسال هذه البيانات للمنظم لمراجعة طلب الحساب.',exact=True).check()
                     page.get_by_role('button',name='إرسال طلب المراجعة',exact=True).click()
-                    page.get_by_role('heading',name='تم استلام طلبك للمراجعة',exact=True).wait_for()
+                    page.get_by_role('heading',name='متابعة طلب الحساب',exact=True).wait_for()
+                    page.get_by_role('status').filter(has_text='بانتظار الموافقة').wait_for()
                     assert staff.get('/api/admin/sites').status_code==401
                     mark('anonymous_request_stays_pending_without_admin_access')
-                    page.get_by_role('link',name='تصفح كضيف أثناء الانتظار',exact=True).click()
+                    page.get_by_role('link',name='تصفح الفعاليات',exact=True).click()
                     assert page.url==base+'/'
                     page.goto(base+'/start')
                     page.get_by_role('link',name='تسجيل الدخول',exact=True).click()

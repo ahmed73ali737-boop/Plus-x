@@ -1,3 +1,4 @@
+from account_approval_support import prepare_review_admin, approve_request
 import uuid
 from pathlib import Path
 import pytest
@@ -9,6 +10,7 @@ from app.domain import normalize_config, normalize_record, answer_value
 @pytest.fixture
 def env(tmp_path):
     app=create_app('sqlite:///'+str(tmp_path/'v04.sqlite'),origin='http://testserver',seed_demo=True)
+    prepare_review_admin(app)
     return app,TestClient(app)
 
 def login(c,app,index=0):
@@ -57,8 +59,8 @@ def test_seed_demo_participation_access_is_clock_stable(env,monkeypatch):
 
 def test_platform_access_request_is_public_signup_request(env):
     _,c=env
-    r=c.post('/api/access-request',json={'site_id':'platform','name':'مؤسسة ترغب بالاشتراك','email':'join@example.test'})
-    assert r.status_code==200 and r.json()['status']=='pending_approval' and not r.json()['grants_access']
+    r=c.post('/api/access-request',json={'site_id':'event-demo','name':'مؤسسة ترغب بالاشتراك','email':'join@example.test'})
+    assert r.status_code==200 and r.json()['status']=='pending' and not r.json()['grants_access']
 
 def test_theme_and_section_templates_normalize():
     raw={'title':'Test','template':'technology','primary':'#112233','secondary':'#223344','accent':'#334455','background':'#F1F2F3','surface':'#FFFFFF','text_color':'#111111','card_style':'bordered','hero_style':'cover','radius':28,
@@ -120,13 +122,14 @@ def test_public_event_agencies_expose_participation_metadata(env):
 def test_platform_can_add_permanent_user_to_org(env):
     app,c=env; login(c,app,0)
     r=c.post('/api/admin/organizations/org-01/users',json={'name':'عضو جديد','email':'member@example.test','role':'analyst'})
-    assert r.status_code==200 and r.json()['permanent_membership'] is True and r.json()['temporary_password']
+    assert r.status_code==200 and r.json()['status']=='pending'
+    approved=approve_request(app,r.json(),reset=True)
     c2=TestClient(app)
-    l=c2.post('/api/auth/login',json={'email':'member@example.test','password':r.json()['temporary_password']})
+    l=c2.post('/api/auth/login',json={'email':'member@example.test','password':approved['temporary_password']})
     assert l.status_code==200 and l.json()['user']['must_change_password'] is True
     csrf=l.json()['csrf']; c2.headers.update({'X-CSRF':csrf,'Origin':'http://testserver'})
     assert c2.get('/api/admin/sites').status_code==428
-    changed=c2.post('/api/auth/password',json={'current':r.json()['temporary_password'],'password':'NewSecurePass123!'})
+    changed=c2.post('/api/auth/password',json={'current':approved['temporary_password'],'password':'NewSecurePass123!'})
     assert changed.status_code==200
     l2=c2.post('/api/auth/login',json={'email':'member@example.test','password':'NewSecurePass123!'})
     assert l2.status_code==200 and l2.json()['user']['must_change_password'] is False
@@ -148,9 +151,10 @@ def test_admin_ui_exposes_templates_audit_orgs_quiz_score_and_notes():
 def test_membership_and_participation_lifecycle_controls(env):
     app,c=env; login(c,app,0)
     created=c.post('/api/admin/organizations/org-01/users',json={'name':'محرر','email':'editor@example.test','role':'editor'}).json()
+    approve_request(app,created)
     members=c.get('/api/admin/organizations/org-01/members').json()['members']
     member=next(x for x in members if x['email']=='editor@example.test')
-    r=c.patch(f"/api/admin/organizations/org-01/members/{member['user_id']}",json={'status':'suspended','role':'analyst'})
+    r=c.patch(f"/api/admin/organizations/org-01/members/{member['user_id']}",json={'status':'suspended'})
     assert r.status_code==200 and r.json()['status']=='suspended'
     orgs=c.get('/api/admin/organizations').json()['organizations']; part=next(x for x in orgs if x['id']=='org-01')['participations'][0]
     r=c.patch('/api/admin/participations/'+part['id'],json={'status':'suspended','booth':'TEMP-1'})

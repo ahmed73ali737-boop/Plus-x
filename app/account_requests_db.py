@@ -54,3 +54,30 @@ Index('px_ar_pending_identity', account_requests.c.email, account_requests.c.sco
 Index('px_ar_scope_status_time', account_requests.c.scope_type, account_requests.c.scope_id, account_requests.c.status, account_requests.c.created_at)
 Index('px_ar_supervisor_status_time', account_requests.c.supervisor_id, account_requests.c.status, account_requests.c.created_at)
 Index('px_ar_status_expiry', account_requests.c.status, account_requests.c.expires_at)
+
+# Separate workflow context keeps migration 013 immutable and upgrade-safe.
+request_workflows = Table('px_account_request_workflows', metadata,
+    Column('request_id', String(64), ForeignKey('px_account_requests.id'), primary_key=True),
+    Column('purpose', String(20), nullable=False),
+    Column('tracking_hash', String(64), nullable=False, unique=True),
+    Column('payload_hash', String(64), nullable=False),
+    Column('existing_user_id', String(64), ForeignKey('px_users.id')),
+    Column('user_id', String(64), ForeignKey('px_users.id')),
+    Column('signup_id', String(64), ForeignKey('px_signup_requests.id'), unique=True),
+    Column('access_id', String(64), ForeignKey('px_access_requests.id'), unique=True),
+    Column('result_site_id', String(64), ForeignKey('px_sites.id')),
+    Column('result_organization_id', String(64), ForeignKey('px_organizations.id')),
+    Column('valid_from', String(64)), Column('valid_until', String(64)),
+    Column('setup_expires_at', String(64)),
+    CheckConstraint("purpose IN ('personal','site','organization','committee','signup','access')", name='ck_px_ar_workflow_purpose'))
+Index('px_ar_pending_phone', account_requests.c.phone, account_requests.c.scope_type, account_requests.c.scope_id,
+      unique=True, sqlite_where=text("status = 'pending' AND phone IS NOT NULL"), postgresql_where=text("status = 'pending' AND phone IS NOT NULL"))
+
+platform_account_invites = Table('px_platform_account_invites', metadata,
+    Column('id', String(64), primary_key=True),
+    Column('token_hash', String(64), nullable=False, unique=True),
+    Column('email', String(200), nullable=False), Column('phone', String(40)),
+    Column('name', String(160), nullable=False),
+    Column('created_by', String(64), ForeignKey('px_users.id'), nullable=False),
+    Column('created_at', String(64), nullable=False), Column('expires_at', String(64), nullable=False),
+    Column('request_id', String(64), ForeignKey('px_account_requests.id'), unique=True))

@@ -28,31 +28,19 @@ def session_response(app, conn, user):
 def install_auth_routes(app, engine, identify):
     @app.get('/api/auth/options')
     def options():
-        return {'authentication': 'phone_password', 'verification_required': False,
+        return {'authentication': 'phone_password', 'verification_required': False, 'approval_required': True,
                 'recovery_available': False, 'recovery': 'administrator_assisted',
                 'legacy_email_login_available': True}
 
     @app.post('/api/auth/register')
     def register(body: dict):
-        phone = account_phone(body.get('phone'))
-        name = text(body.get('name'), 160, True)
-        password = body.get('password')
-        if password != body.get('confirmation'):
-            fail('PASSWORD_CONFIRMATION_MISMATCH')
-        hashed = hash_password(password)
-        try:
-            with engine.begin() as conn:
-                if find_by_phone(conn, phone):
-                    fail('PHONE_ALREADY_REGISTERED', 409)
-                user = dict(id=new_id(), email=principal(phone), name=name, role='attendee',
-                            scope_id=None, password_hash=hashed, active=1, must_change_password=0)
-                # Client role/scope/active fields are deliberately ignored.
-                conn.execute(insert(users).values(**user))
-                bind_phone(conn, user['id'], phone)
-                write_audit(conn, user, None, 'phone_account_registered')
-                return session_response(app, conn, user)
-        except IntegrityError:
-            fail('PHONE_ALREADY_REGISTERED', 409)
+        from app.application import account_requests as service
+        phone=account_phone(body.get('phone'))
+        if body.get('password')!=body.get('confirmation'):fail('PASSWORD_CONFIRMATION_MISMATCH')
+        # Validate policy before persisting the pending identity; never issue a session.
+        hash_password(body.get('password'))
+        with engine.begin() as conn:
+            return service.submit(conn,actor=None,body={**body,'phone':phone,'email':None},purpose='personal',scope_type='site',scope_id='platform',role='member')
 
     @app.post('/api/auth/phone')
     def add_my_phone(body: dict, request: Request):
@@ -126,6 +114,8 @@ def install_auth_routes(app, engine, identify):
                 fail('USER_NOT_FOUND', 404)
             conn.execute(update(users).where(users.c.id == user_id).values(active=int(active)))
             if not active:
+                from app.account_requests_db import request_workflows
+                conn.execute(update(request_workflows).where(request_workflows.c.user_id==user_id).values(setup_expires_at=None))
                 conn.execute(delete(sessions).where(sessions.c.user_id == user_id))
             write_audit(conn, actor, target['scope_id'], 'user_status_changed', {'user_id': user_id, 'active': active})
         return {'id': user_id, 'active': active, 'sessions_revoked': not active}

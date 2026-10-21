@@ -40,7 +40,7 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
                                 source='admin', requested_by=None, password=None,
                                 phone=None, event_id=None, person_id=None,
                                 participation_id=None, membership_role=None,
-                                assignment_role=None):
+                                assignment_role=None, allow_existing=False):
     """Insert a normalized pending record in the caller's transaction.
 
     password is accepted only as transient input and immediately scrypt-hashed.
@@ -48,7 +48,7 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
     No pending row or credential is automatically migrated into px_users.
     """
     email = text(email, 200, True).lower()
-    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email) and not (phone and email == 'tel:' + phone):
         fail('EMAIL_INVALID')
     name = text(name, 160, True)
     request_key = text(request_key, 80, True)
@@ -66,7 +66,7 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
             raise ValueError('already expired')
     except (AttributeError, TypeError, ValueError):
         fail('ACCOUNT_REQUEST_EXPIRY_INVALID')
-    if conn.execute(select(users.c.id).where(func.lower(func.trim(users.c.email)) == email)).first():
+    if not allow_existing and conn.execute(select(users.c.id).where(func.lower(func.trim(users.c.email)) == email)).first():
         fail('ACCOUNT_ALREADY_EXISTS', 409)
     record = dict(id=uuid.uuid4().hex, email=email, name=name,
                   phone=text(phone, 40) or None, requested_role=requested_role,
@@ -86,7 +86,7 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
     except IntegrityError:
         # Recover the transaction after a uniqueness race; never hide FK/schema errors.
         duplicate = conn.execute(select(account_requests.c.id).where(
-            account_requests.c.email == email, account_requests.c.scope_type == scope_type,
+            ((account_requests.c.email == email) | (account_requests.c.phone == phone)) if phone else account_requests.c.email == email, account_requests.c.scope_type == scope_type,
             account_requests.c.scope_id == scope_id, account_requests.c.status == 'pending')).first()
         if duplicate:
             fail('ACCOUNT_REQUEST_PENDING', 409)

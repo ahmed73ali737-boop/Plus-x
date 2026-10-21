@@ -150,11 +150,13 @@ def committee_api():
     with engine.begin() as conn:
         for eid in ('event-a', 'event-b'):
             conn.execute(insert(sites).values(id=eid, kind='event', slug=eid, event_id=eid, draft=default_config(eid, 'event'), draft_rev=1, published_version=0))
-        for uid, role in [('manager', 'organizer'), ('crew', 'member')]:
+        for uid, role in [('manager', 'organizer'), ('crew', 'member'), ('reviewer','platform')]:
             conn.execute(insert(users).values(id=uid, name=uid, email=uid+'@example.test', role=role, scope_id='event-a', password_hash='unused', active=1))
             conn.execute(insert(sessions).values(token_hash=digest(uid+'-token'), user_id=uid, csrf='csrf-'+uid, expires_at='2999-01-01T00:00:00+00:00'))
     app = FastAPI()
     install_admission_access_routes(app, engine, identify_request)
+    from app.api.account_request_routes import install_account_request_routes
+    install_account_request_routes(app,engine,identify_request)
     client = TestClient(app)
     client.cookies.set('px_session', 'manager-token')
     client.headers['X-CSRF'] = 'csrf-manager'
@@ -170,7 +172,8 @@ def test_committee_assignment_capabilities_revocation_and_csrf(committee_api):
     client.headers['X-CSRF'] = 'csrf-manager'
     created = client.post(route, json={'email': 'crew@example.test', 'role': 'scanner'})
     assert created.status_code == 200, created.text
-    assignment_id = created.json()['id']
+    approve_committee(client,created.json())
+    assignment_id=client.get(route).json()['assignments'][0]['id']
     with engine.connect() as conn:
         assert conn.execute(select(users.c.role).where(users.c.id == 'crew')).scalar_one() == 'member'
     listed = client.get(route).json()['assignments']
@@ -205,29 +208,38 @@ def test_committee_manager_cannot_assign_other_event(committee_api):
     assert client.post('/api/admin/events/event-b/committee', json={'email': 'crew@example.test', 'role': 'scanner'}).status_code == 403
 
 
-def test_new_committee_account_is_limited_and_secret_returned_once(committee_api):
+def approve_committee(client,pending):
+    from fastapi.testclient import TestClient
+    staff=TestClient(client.app);staff.cookies.set('px_session','reviewer-token');staff.headers['X-CSRF']='csrf-reviewer'
+    result=staff.patch('/api/admin/account-requests/'+pending['id'],json={'status':'approved'})
+    assert result.status_code==200,result.text
+    if result.json()['setup_required']:
+        assert staff.post('/api/account-requests/password',json={'tracking_token':pending['tracking_token'],'password':'Crew-Password-2026!','confirmation':'Crew-Password-2026!'}).status_code==200
+    staff.close();return result.json()
+
+
+def test_new_committee_account_is_limited_and_credential_not_shown_to_reviewer(committee_api):
     from app.core.security import verify_password
-    client, engine = committee_api
-    body = {'email': 'new-crew@example.test', 'name': 'Reception', 'role': 'reception',
-            'create_account': True, 'global_role': 'platform', 'scope_id': 'event-b'}
-    result = client.post('/api/admin/events/event-a/committee', json=body)
-    assert result.status_code == 200, result.text
-    data = result.json()
-    assert data['account_created'] and data['must_change_password'] and data['temporary_password']
+    client,engine=committee_api
+    body={'email':'new-crew@example.test','name':'Reception','role':'reception','create_account':True,'global_role':'platform','scope_id':'event-b'}
+    result=client.post('/api/admin/events/event-a/committee',json=body)
+    assert result.status_code==200,result.text
+    assert result.json()['status']=='pending' and 'temporary_password' not in result.json()
+    with engine.connect() as conn:assert not conn.execute(select(users).where(users.c.email==body['email'])).first()
+    data=approve_committee(client,result.json())
     with engine.connect() as conn:
-        user = conn.execute(select(users).where(users.c.id == data['user_id'])).mappings().one()
-        assert user['role'] == 'member' and user['scope_id'] == 'event-a'
-        assert verify_password(data['temporary_password'], user['password_hash'])
-        assert not can_manage(conn, user, conn.execute(select(sites).where(sites.c.id == 'event-a')).mappings().one())
-        assert 'guests.register' in event_permissions(conn, user, 'event-a')
-        assert 'committee.manage' not in event_permissions(conn, user, 'event-a')
-    repeat = client.post('/api/admin/events/event-a/committee', json=body).json()
-    assert repeat['temporary_password'] is None and repeat['account_created'] is False
+        user=conn.execute(select(users).where(users.c.id==data['user_id'])).mappings().one()
+        assert user['role']=='member' and user['scope_id']=='event-a'
+        assert verify_password('Crew-Password-2026!',user['password_hash'])
+        assert not can_manage(conn,user,conn.execute(select(sites).where(sites.c.id=='event-a')).mappings().one())
+        assert 'guests.register' in event_permissions(conn,user,'event-a') and 'committee.manage' not in event_permissions(conn,user,'event-a')
 
 
 def test_limited_crew_cannot_create_more_accounts(committee_api):
     client, engine = committee_api
-    assert client.post('/api/admin/events/event-a/committee', json={'email': 'crew@example.test', 'role': 'scanner'}).status_code == 200
+    pending=client.post('/api/admin/events/event-a/committee',json={'email':'crew@example.test','role':'scanner'})
+    assert pending.status_code==200,pending.text
+    approve_committee(client,pending.json())
     client.cookies.set('px_session', 'crew-token'); client.headers['X-CSRF'] = 'csrf-crew'
     result = client.post('/api/admin/events/event-a/committee', json={
         'email': 'attacker@example.test', 'name': 'Attacker', 'role': 'event_manager', 'create_account': True,
