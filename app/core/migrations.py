@@ -19,6 +19,7 @@ MIGRATION_PATHS = (
     ROOT / "ops/011_certificates.sql",
     ROOT / "ops/011_phone_accounts.sql",
     ROOT / "ops/012_certificate_batches.sql",
+    ROOT / "ops/013_account_requests.sql",
 )
 
 

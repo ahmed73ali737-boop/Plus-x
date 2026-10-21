@@ -12,11 +12,26 @@ import {storyboard} from './storyboard.mjs';
 let user,allSites=[],current,tab='overview',host;
 const tabs=[['overview','نظرة عامة'],['identity','الهوية والقالب'],['sections','أقسام الصفحة'],['organizations','المؤسسات والمشاركات'],['guests','الزوار و QR'],['invitations','الدعوات وتأكيد الحضور'],['certificates','الشهادات'],['committee','اللجان والصلاحيات'],['content','الفعالية والخدمات'],['storyboard','ترتيب التجربة'],['questions','إدخال الأسئلة'],['polls','التصويت'],['ratings','التقييم والملاحظات'],['ads','الإعلانات والعروض'],['facts','الحقائق والأرقام'],['import','Excel / CSV'],['metrics','النتائج والتقارير'],['preview','معاينة الصفحة'],['devices','الأجهزة والطرفيات'],['users','الحسابات'],['audit','السجل والتدقيق'],['settings','الإعدادات والإشعارات']];
 async function save(){const x=await api('/api/admin/sites/'+current.id,{draft_rev:current.draft_rev,config:current.draft},'PUT');current.draft_rev=x.draft_rev;toast('حُفظت المسودة. اضغط نشر لتظهر للزوار.');}
-async function reload(){current=await api('/api/admin/sites/'+current.id);await renderTab();}
+async function reload(){await selectSite(current.id);await renderTab();}
 function visibleTab(k){if(k==='certificates')return current?.kind==='event'&&(current?.permissions||[]).includes('certificates.manage');const p=current?.permissions||[];if(k==='invitations')return current?.kind==='event'&&p.includes('invitations.manage');if(k==='committee')return current?.kind==='event'&&p.includes('committee.manage');if(current?.can_manage===false)return k==='settings'||(k==='guests'&&p.includes('guests.read'))||(k==='metrics'&&!current.admission_only);return(k!=='users'||user.role!=='agency')&&(k!=='guests'||current?.kind==='event');}
 function navButtons(){return tabs.filter(([k])=>visibleTab(k)).map(([key,label])=>button(label,async()=>{tab=key;await renderTab();},'nav-item'+(tab===key?' active':'')));}
 export async function adminPage(){try{const me=await api('/api/auth/me');user=me.user;setCSRF(me.csrf);}catch{return loginPage();}if(user.must_change_password)return forcePasswordChange();if(user.role==='attendee'){location.href='/account';return;}await loadSites();}
-async function selectSite(id){const item=allSites.find(x=>x.id===id);if(item.admission_only)current={...item,kind:'event',can_manage:false,draft:{title:item.title,records:[],sections:[]},draft_rev:0,published_version:0};else current=await api('/api/admin/sites/'+id);if(current.kind==='event'){const result=await api('/api/admin/events/'+id+'/permissions');current.permissions=result.permissions||[];}if(!visibleTab(tab))tab=(current.permissions||[]).includes('guests.read')?'guests':current.can_manage===false?'metrics':'overview';}
+async function selectSite(id){
+  const item=allSites.find(x=>x.id===id);
+  const next=item?.admission_only
+    ?{...item,kind:'event',can_manage:false,draft:{title:item.title,records:[],sections:[]},draft_rev:0,published_version:0}
+    :await api('/api/admin/sites/'+id);
+  if(next.kind==='event'){
+    const result=await api('/api/admin/events/'+id+'/permissions');
+    next.permissions=result.permissions||[];
+  }
+  // Commit the workspace only after its permissions have loaded successfully.
+  current=next;
+  if(!visibleTab(tab)){
+    tab=(current.permissions||[]).includes('guests.read')?'guests':current.can_manage===false?'settings':'overview';
+    toast('لم يعد التبويب السابق متاحًا ضمن صلاحيات مساحة العمل الحالية.');
+  }
+}
 async function loadSites(){const [result,admission]=await Promise.all([api('/api/admin/sites'),api('/api/admin/admission/events')]);allSites=result.sites;for(const e of admission.events||[])if(!allSites.some(x=>x.id===e.id))allSites.push({...e,kind:'event',admission_only:true});if(!allSites.length)throw new Error('لا توجد جهة متاحة لهذا الحساب.');const sid=sessionStorage.getItem('px-admin-site');const chosen=allSites.find(x=>x.id===sid)||allSites.find(x=>x.id===user.scope_id)||allSites[0];await selectSite(chosen.id);shell();await renderTab();}
 function shell(){document.documentElement.style.setProperty('--accent','#176B73');root.replaceChildren();const selector=selectField('مساحة العمل',allSites.map(x=>[x.id,(x.kind==='event'?'المنظم · ':x.kind==='platform'?'المنصة · ':'الجهة · ')+x.title]),current.id);selector.input.addEventListener('change',async()=>{try{sessionStorage.setItem('px-admin-site',selector.input.value);await selectSite(selector.input.value);await renderTab();}catch(e){toast(msg(e),true);}});const sidebar=h('aside',{class:'sidebar'},brand('Eventna إيفنتنا Studio'),h('p',{class:'muted'},user.name),h('span',{class:'role-badge'},({platform:'المدير العام',organizer:'إدارة المنظم',agency:'إدارة الجهة',member:'فريق الفعالية'})[user.role]),selector.node,h('nav',{id:'admin-nav'},navButtons()),button('تسجيل الخروج',async()=>{await api('/api/auth/logout',{});setCSRF('');location.href='/admin';},'text-btn'));host=h('main',{class:'admin-main'});root.append(h('div',{class:'admin-layout'},sidebar,host));}
 async function renderTab(){document.getElementById('admin-nav')?.replaceChildren(...navButtons());host.replaceChildren(h('div',{class:'admin-heading'},h('div',{},h('span',{class:'eyebrow'},'EVENTNA · STUDIO'),h('h1',{},tabs.find(x=>x[0]===tab)?.[1]||''),h('p',{class:'muted'},current.draft.title)),current.can_manage!==false?h('div',{class:'actions'},h('span',{class:'tag'},`مسودة ${current.draft_rev} · منشور ${current.published_version}`),button('نشر التغييرات',async()=>{await api('/api/admin/sites/'+current.id+'/publish',{draft_rev:current.draft_rev});toast('نُشرت نسخة جديدة.');await reload();}),h('a',{class:'btn secondary',href:publicPath(),target:'_blank',rel:'noopener'},'الصفحة العامة'),h('a',{class:'btn secondary',href:'/live/'+encodeURIComponent(current.slug),target:'_blank',rel:'noopener'},'شاشة العرض الحية')):null));host.append(h('div',{class:'notice small'},'تجربة خاضعة للمراجعة · تغييرات المسودة لا تظهر تلقائيًا للجمهور · المحتوى النموذجي ليس معلومات حقيقية.'));
@@ -163,7 +178,47 @@ async function devicesTab(){
 }
 
 async function signupRequestsPanel(){if(user.role==='agency')return null;let data;try{data=await api('/api/admin/signup-requests?site_id='+encodeURIComponent(current.id));}catch{return null;}const box=h('div',{class:'card form-card'},h('h3',{},'طلبات الانضمام من الموقع العام'),h('p',{class:'muted'},'المنظم أو الجهة المشاركة يستطيعان تقديم طلب من الموقع العام. الاعتماد لا يمنح صلاحية قبل إنشاء المؤسسة والحساب.'));for(const r of data.requests){const row=h('div',{class:'record-line'},h('div',{},h('strong',{},r.organization_name),h('small',{class:'muted'},`${r.requested_role==='organizer'?'جهة منظمة':'جهة مشاركة'} · ${r.contact_name} · ${r.phone||r.email}`)),h('span',{class:'tag'},r.status));if(r.status==='pending')row.append(h('span',{class:'actions'},button('اعتماد وإنشاء',async()=>{const slug=(r.organization_name||'org').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('org-'+r.id.slice(0,6));const x=await api('/api/admin/signup-requests/'+r.id,{status:'approved',organization_slug:slug},'PATCH');const parts=['تم الاعتماد وإنشاء المؤسسة.'];if(x.temporary_password)parts.push('كلمة المرور المؤقتة: '+x.temporary_password);if(x.account_deferred_until_assignment)parts.push('سيتم إنشاء حساب التحكم بعد ربط الجهة بفعالية/مساحة تشغيل؛ لم تُمنح صلاحية على المنصة.');toast(parts.join(' '));await renderTab();},'btn secondary'),button('رفض',async()=>{await api('/api/admin/signup-requests/'+r.id,{status:'rejected'},'PATCH');toast('تم رفض الطلب.');await renderTab();},'text-btn')));box.append(row);}return box;}
-async function users(){if(user.role==='agency'){host.append(h('p',{},'إنشاء الحسابات يتم بواسطة المنظم.'));return;}let x;try{x=await api('/api/admin/sites/'+current.id+'/users');}catch(e){host.append(h('p',{},msg(e)));return;}const name=field('اسم المستخدم'),phone=field('رقم الهاتف','tel','',{required:true,maxlength:40,inputmode:'tel',dir:'ltr'}),result=h('div');host.append(h('div',{class:'card form-card'},h('h3',{},'حساب مستقل لهذه المساحة'),h('p',{class:'muted'},'الصلاحية تُحدد في الخادم حسب المساحة. لا تمنح طلبات الموقع أي صلاحيات دون اعتماد.'),name.node,phone.node,button('إنشاء الحساب',async()=>{const r=await api('/api/admin/sites/'+current.id+'/users',{name:name.input.value,phone:phone.input.value});result.replaceChildren(h('div',{class:'notice'},'تظهر كلمة المرور المؤقتة مرة واحدة. سلّمها لصاحب الحساب عبر قناة آمنة واطلب تغييرها.',h('code',{},r.phone||r.email),h('code',{},r.temporary_password)));}),result),h('h3',{},'الحسابات'),h('div',{class:'record-list'},x.users.map(u=>h('div',{class:'record-line'},u.name,u.phone||u.email,u.role,h('span',{class:'tag'},u.active?'نشط':'موقوف'),button('إعادة تعيين كلمة المرور',()=>resetManagedPassword(u.id),'text-btn'),button(u.active?'إيقاف':'تفعيل',async()=>{await api('/api/admin/sites/'+current.id+'/users/'+u.id,{active:!u.active},'PATCH');toast(u.active?'تم إيقاف الحساب وإنهاء جلساته.':'تم تفعيل الحساب.');await renderTab();},'text-btn')))),h('h3',{},'طلبات الموقع'),h('div',{class:'record-list'},x.requests.map(r=>h('div',{class:'record-line'},r.name,r.email,h('span',{class:'tag'},r.status),r.status==='pending'?h('span',{class:'actions'},button('تعبئة لإنشاء حساب',()=>{name.input.value=r.name;phone.input.value=r.phone||'';},'text-btn'),button('رفض الطلب',async()=>{await api('/api/admin/sites/'+current.id+'/access-requests/'+r.id,{status:'rejected'},'PATCH');toast('تم رفض الطلب.');await renderTab();},'text-btn')):null))));const signupPanel=await signupRequestsPanel();if(signupPanel)host.append(signupPanel);}
+async function users(){
+  if(user.role==='agency'){host.append(h('p',{},'إنشاء الحسابات يتم بواسطة المنظم.'));return;}
+  const sid=current.id,endpoint='/api/admin/sites/'+sid+'/users';
+  let data;
+  try{data=await api(endpoint);}catch(e){host.append(h('p',{},msg(e)));return;}
+  const name=field('اسم المستخدم'),phone=field('رقم الهاتف','tel','',{required:true,maxlength:40,inputmode:'tel',dir:'ltr'});
+  const result=h('div',{'aria-live':'polite'}),list=h('div',{class:'record-list'});
+  const pending=h('div',{class:'record-list'}),history=h('div',{class:'record-list'}),refreshStatus=h('div',{'aria-live':'polite'});
+  const statusLabel=status=>({pending:'بانتظار الموافقة',approved:'معتمد',rejected:'مرفوض',expired:'منتهي الصلاحية',cancelled:'ملغى'})[status]||status;
+  function requestRow(r){
+    return h('div',{class:'record-line'},r.name,r.phone||r.email,h('span',{class:'tag'},statusLabel(r.status)),r.status==='pending'?h('span',{class:'actions'},
+      button('تعبئة لإنشاء حساب',()=>{name.input.value=r.name;phone.input.value=r.phone||'';},'text-btn'),
+      button('رفض الطلب',async()=>{await api('/api/admin/sites/'+sid+'/access-requests/'+r.id,{status:'rejected'},'PATCH');toast('تم رفض الطلب.');await refresh();},'text-btn')):null);
+  }
+  function draw(x){
+    list.replaceChildren(...x.users.map(u=>h('div',{class:'record-line'},u.name,u.phone||u.email,u.role,h('span',{class:'tag'},u.active?'نشط':'موقوف'),
+      button('إعادة تعيين كلمة المرور',()=>resetManagedPassword(u.id),'text-btn'),
+      button(u.active?'إيقاف':'تفعيل',async()=>{await api(endpoint+'/'+u.id,{active:!u.active},'PATCH');toast(u.active?'تم إيقاف الحساب وإنهاء جلساته.':'تم تفعيل الحساب.');await refresh();},'text-btn'))));
+    if(!x.users.length)list.append(h('p',{class:'muted'},'لا توجد حسابات في هذه المساحة.'));
+    const requests=x.requests||[];
+    pending.replaceChildren(...requests.filter(r=>r.status==='pending').map(requestRow));
+    if(!pending.childNodes.length)pending.append(h('p',{class:'muted'},'لا توجد طلبات معلقة.'));
+    history.replaceChildren(...requests.filter(r=>r.status!=='pending').map(requestRow));
+  }
+  async function refresh(){
+    try{const x=await api(endpoint);draw(x);refreshStatus.replaceChildren();}
+    catch(e){refreshStatus.replaceChildren(h('div',{class:'notice',role:'alert'},'تعذر تحديث القائمة: '+msg(e)+' لم تُعد عملية الحفظ. ',button('إعادة تحميل القائمة',refresh,'btn secondary')));}
+  }
+  host.append(h('div',{class:'card form-card'},h('h3',{},'حساب مستقل لهذه المساحة'),h('p',{class:'muted'},'الصلاحية تُحدد في الخادم حسب المساحة. لا تمنح طلبات الموقع أي صلاحيات دون اعتماد.'),name.node,phone.node,
+    button('إنشاء الحساب',async()=>{
+      const r=await api(endpoint,{name:name.input.value,phone:phone.input.value});
+      result.replaceChildren(h('div',{class:'notice'},'تم إنشاء الحساب في هذه المساحة. تظهر كلمة المرور المؤقتة مرة واحدة. سلّمها لصاحب الحساب عبر قناة آمنة واطلب تغييرها.',h('code',{},r.phone||r.email),h('code',{},r.temporary_password)));
+      toast('تم إنشاء الحساب: '+name.input.value+' · '+r.role);
+      name.input.value='';phone.input.value='';
+      await refresh();
+    }),result),refreshStatus,h('h3',{},'الحسابات'),list,
+    h('h3',{},'طلبات الوصول المعلقة'),h('p',{class:'muted'},'هذه طلبات وصول للموقع وليست حسابات دخول نشطة.'),pending,
+    h('h3',{},'سجل طلبات الوصول'),history);
+  draw(data);
+  const signupPanel=await signupRequestsPanel();if(signupPanel)host.append(signupPanel);
+}
 
 async function organizationsTab(){
   const data=await api('/api/admin/organizations');

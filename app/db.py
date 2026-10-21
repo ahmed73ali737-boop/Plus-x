@@ -244,3 +244,6 @@ notifications=Table('px_notifications',metadata,
     Column('title',String(160),nullable=False),Column('body',Text,nullable=False),
     Column('created_at',String(64),nullable=False),Column('read_at',String(64)))
 Index('px_notifications_owner_time',notifications.c.user_id,notifications.c.created_at)
+
+# Independent pending identities; registration is routed here only in later phases.
+from app import account_requests_db as _account_requests_db  # noqa: E402,F401
