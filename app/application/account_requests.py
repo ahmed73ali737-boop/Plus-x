@@ -138,7 +138,15 @@ def view(conn, record):
     result=public_account_request(record)
     ctx=context(conn,record['id'])
     supervisor=conn.execute(select(users.c.name).where(users.c.id==record['supervisor_id'])).scalar()
-    result.update(account_requested=bool(conn.execute(select(signup_requests.c.wants_account).where(signup_requests.c.id==ctx['signup_id'])).scalar()) if ctx['signup_id'] else True, purpose=ctx['purpose'], user_id=ctx['user_id'], supervisor_name=supervisor,
+    signup=conn.execute(select(signup_requests).where(signup_requests.c.id==ctx['signup_id'])).mappings().first() if ctx['signup_id'] else None
+    if record['scope_type']=='organization':
+        scope_name=conn.execute(select(organizations.c.name).where(organizations.c.id==record['scope_id'])).scalar()
+    else:
+        draft=conn.execute(select(sites.c.draft).where(sites.c.id==record['scope_id'])).scalar()
+        scope_name=(draft or {}).get('title')
+    result.update(account_requested=bool(signup['wants_account']) if signup else True,
+                  organization_name=signup['organization_name'] if signup else None,scope_name=scope_name or record['scope_id'],
+                  purpose=ctx['purpose'], user_id=ctx['user_id'], supervisor_name=supervisor,
                   setup_required=bool(ctx['setup_expires_at'] and record['status']=='approved'), setup_expired=bool(ctx['setup_expires_at'] and ctx['setup_expires_at']<=now()),
                   setup_expires_at=ctx['setup_expires_at'], result_site_id=ctx['result_site_id'], result_organization_id=ctx['result_organization_id'])
     if result['email'].startswith('tel:'):result['email']=None

@@ -185,7 +185,7 @@ async function signupRequestsPanel(){return h('div',{class:'notice'},'طلبات
 async function accountRequestsPanel(){
   const target=h('section',{class:'card form-card'});host.append(target);
   const state=selectField('حالة طلب الحساب',[['','جميع الحالات'],['pending','بانتظار الموافقة'],['approved','معتمد'],['rejected','مرفوض'],['expired','منتهي'],['cancelled','ملغى']],'pending');
-  const scope=field('النطاق — اختياري','search','',{placeholder:'معرف المؤسسة أو الفعالية'});
+  const scope=field('النطاق — اختياري','search','',{placeholder:'اسم المؤسسة أو الفعالية'});
   const kind=selectField('نوع الطلب',[['','الكل'],['personal','حساب شخصي'],['signup','حساب جهة'],['site','حساب مساحة'],['organization','عضوية مؤسسة'],['committee','تكليف لجنة'],['access','وصول لمساحة']],'');
   const rows=h('div',{class:'record-list'}),error=h('p',{role:'status','aria-live':'polite'});
   target.append(h('h2',{},'مراجعة طلبات الحسابات'),h('p',{class:'muted'},'تظهر طلبات النطاق المخوّل لك والمُعيّن لك إشرافها. الموافقة تنشئ الحساب والارتباطات معًا؛ الحساب الموجود يحتفظ بكلمة مروره وصلاحياته السابقة.'),state.node,scope.node,kind.node,button('تحديث الطلبات',draw,'btn secondary'),error,rows);
@@ -193,9 +193,10 @@ async function accountRequestsPanel(){
     const x=await api('/api/admin/account-requests'+(state.input.value?'?status='+state.input.value:''));
     rows.replaceChildren();error.textContent='';
     const combined=[...x.requests,...(x.submitted_requests||[]).filter(r=>!x.requests.some(a=>a.id===r.id))];
-    for(const r of combined.filter(r=>(!scope.input.value||r.scope_id.includes(scope.input.value.trim()))&&(!kind.input.value||r.purpose===kind.input.value))){
+    for(const r of combined.filter(r=>(!scope.input.value||(r.scope_name||r.scope_id).includes(scope.input.value.trim()))&&(!kind.input.value||r.purpose===kind.input.value))){
+      const detail=({owner:'مالك المؤسسة',admin:'مدير المؤسسة',editor:'محرر',analyst:'محلل',auditor:'مدقق',event_manager:'مدير الفعالية',reception:'الاستقبال',scanner:'مسح الدخول',committee_supervisor:'مشرف اللجان والدعوات'})[r.assignment_role||r.membership_role]||'';
       const role=({organizer:'منظم',agency:'حساب جهة',member:r.purpose==='personal'?'حساب شخصي':'عضو',platform:'مدير منصة'})[r.requested_role]||r.requested_role;
-      const row=h('article',{class:'card mini'},h('strong',{},r.name),h('p',{dir:'ltr'},r.phone||r.email||''),h('p',{},role+' · '+(r.assignment_role||r.membership_role||'')+' · '+r.scope_type+': '+r.scope_id),h('code',{},r.id),h('span',{class:'tag'},({pending:'بانتظار الموافقة',approved:'معتمد',rejected:'مرفوض',expired:'منتهي',cancelled:'ملغى'})[r.status]),h('p',{class:'muted'},'المشرف: '+r.supervisor_name+' · '+new Date(r.created_at).toLocaleString('ar-YE')));
+      const row=h('article',{class:'card mini'},h('strong',{},r.name),h('p',{dir:'ltr'},r.phone||r.email||''),h('p',{},[role,detail,r.organization_name,r.scope_name||r.scope_id].filter(Boolean).join(' · ')),h('code',{},r.id),h('span',{class:'tag'},({pending:'بانتظار الموافقة',approved:'معتمد',rejected:'مرفوض',expired:'منتهي',cancelled:'ملغى'})[r.status]),h('p',{class:'muted'},'المشرف: '+r.supervisor_name+' · '+new Date(r.created_at).toLocaleString('ar-YE')));
       if(r.decision_reason)row.append(h('p',{},r.decision_reason));
       if(r.status==='pending'&&r.requested_by!==user.id&&r.supervisor_id===user.id)row.append(button('موافقة',()=>decision(r,'approved'),'btn secondary'),button('رفض مع السبب',()=>decision(r,'rejected'),'text-btn'));
       else if(r.status==='pending')row.append(h('p',{class:'muted'},'بانتظار مراجعة المشرف المعيّن؛ لا يمكنك اعتماد طلب قدمته بنفسك.'));

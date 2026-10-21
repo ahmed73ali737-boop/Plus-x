@@ -66,7 +66,7 @@ async function requestPage(main){
   main.append(h('h1',{},'متابعة طلب الحساب'),h('p',{class:'muted'},'احتفظ بهذا الرابط بسرية لتتابع القرار وتعيّن كلمة المرور بعد الموافقة. لا توجد رسالة بريد أو SMS آلية.'),status,box,button('تحديث الحالة',draw,'btn secondary'));
   async function draw(){try{
     const r=await api('/api/account-requests/status',{tracking_token:token});box.replaceChildren();status.textContent=({pending:'بانتظار الموافقة',approved:'تم اعتماد الطلب',rejected:'رُفض الطلب',expired:'انتهت صلاحية الطلب',cancelled:'أُلغي الطلب'})[r.status]||r.status;
-    box.append(h('p',{},r.name+' · '+(r.phone||r.email||'')),h('code',{},r.id),h('p',{},'المشرف: '+r.supervisor_name),h('p',{},'النطاق: '+r.scope_type+' · '+r.scope_id));
+    box.append(h('p',{},r.name+' · '+(r.phone||r.email||'')),h('code',{},r.id),h('p',{},'المشرف: '+r.supervisor_name),h('p',{},'النطاق: '+(r.scope_name||r.scope_id)+(r.organization_name?' · '+r.organization_name:'')));
     if(r.decision_reason)box.append(h('p',{},r.decision_reason));
     if(r.status==='pending')box.append(h('p',{},'لا يمكن الدخول أو إدارة النطاق قبل الموافقة.'),button('إلغاء طلبي',async()=>{await api('/api/account-requests/cancel',{tracking_token:token});await draw();},'text-btn'));
     if(r.setup_required&&r.setup_expired)box.append(h('p',{},'انتهت صلاحية تعيين كلمة المرور. راجع المشرف لتجديدها؛ لا يمكن تسجيل الدخول بعد.'));

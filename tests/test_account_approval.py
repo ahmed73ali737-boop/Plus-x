@@ -63,7 +63,8 @@ def test_personal_request_has_no_user_session_or_access_before_approval(env):
     app,engine,client,login=env
     response=submit_public(client,role='platform',active=True,scope_id='platform')
     assert response.status_code==200,response.text
-    request=response.json();assert request['status']=='pending' and not request['grants_access']
+    request=response.json();assert request['scope_name']
+    assert request['status']=='pending' and not request['grants_access']
     assert 'csrf' not in request and 'password_hash' not in request and not client.cookies.get('px_session')
     assert client.post('/api/auth/login',json={'phone':'+967777880001','password':PASSWORD}).status_code==401
     with engine.connect() as c:
@@ -117,6 +118,7 @@ def test_signup_approval_atomically_creates_organization_site_and_account(env,ro
     response=client.post('/api/signup-request',json={'site_id':site,'requested_role':role,'organization_name':'Applied organization','contact_name':'Applicant','email':'signup@example.test','password':PASSWORD,'confirmation':PASSWORD})
     assert response.status_code==200,response.text
     request=response.json()
+    assert request['organization_name']=='Applied organization' and request['scope_name']
     with engine.connect() as c:assert not c.execute(select(users.c.id).where(users.c.email=='signup@example.test')).first()
     result=decide(login,request);assert result.status_code==200,result.text
     result=result.json();assert result['result_site_id'] and result['result_organization_id']
