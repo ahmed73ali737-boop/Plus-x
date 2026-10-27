@@ -27,7 +27,7 @@ from .application.event_visibility import require_public_event, event_id_for_sit
 from .application.access import can_manage, require_scope, organization_visible, can_read, require_read_scope, require_event_permission
 from .application.shared_authorization import authorize_organizer_action
 from .infrastructure.g_observability import install_observability
-from .application.audit_service import new_id as uid, write_audit as log
+from .application.audit_service import new_id as uid, write_audit as log, AuditedDenial, DenialAuditWriter
 from .application.publishing import publish_site_version as publish, get_site_version as get_version
 from .infrastructure.seed import seed_demo_data as seed
 from .api.middleware import install_security_middleware
@@ -97,6 +97,16 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
                 lifespan=lifespan,telemetry=FASTAPI_TELEMETRY)
     install_observability(app,"pulsex-api")
     app.state.engine=engine
+    app.state.denial_audit = DenialAuditWriter(engine)
+
+    @app.exception_handler(AuditedDenial)
+    async def audited_denial_handler(request, exc):
+        # Endpoint context managers have unwound (and rolled back) here.
+        from starlette.concurrency import run_in_threadpool
+        await run_in_threadpool(app.state.denial_audit.record, exc)
+        return JSONResponse({'detail': exc.detail}, status_code=exc.status_code,
+                            headers=exc.headers)
+
     app.state.shared_organizer_authorizer=shared_authorizer
     # Explicit ASGI/QA factory calls historically seed in-memory only unless a
     # credential file was requested. Never write a shared default file across
@@ -149,7 +159,8 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
                 matches=[] if email.startswith('tel:') else c.execute(select(users).where(func.lower(func.trim(users.c.email))==email)).mappings().all()
                 u=matches[0] if len(matches)==1 else None
             valid=password_ok(body.get('password'),u['password_hash'] if u else dummy)
-            if not u or not valid or not u['active']:fail('INVALID_CREDENTIALS',401)
+            if not u or not valid or not u['active']:
+                raise AuditedDenial('INVALID_CREDENTIALS',401,action='login_failed')
             return session_response(app,c,u)
 
     @app.get('/api/auth/me')
