@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.db import assignments, event_participations, memberships
 from app.domain import fail, now
+from app.application.audit_service import AuditedDenial
 from app.infrastructure.repository import get_site
 
 
@@ -129,15 +130,18 @@ def event_permissions(conn, user, event_id: str) -> frozenset[str]:
 
 def require_event_permission(conn, user, event_id: str, action: str):
     """Authorize one action, failing closed for unknown permission names."""
-    if action not in EVENT_PERMISSIONS or action not in event_permissions(conn, user, event_id):
-        fail('FORBIDDEN_EVENT_PERMISSION', 403)
+    if action not in EVENT_PERMISSIONS:
+        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', 403, action='scope_denied', user=user)
+    if action not in event_permissions(conn, user, event_id):
+        # event_permissions has resolved this scope from the database.
+        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', 403, action='scope_denied', user=user, site_id=event_id)
     return get_site(conn, event_id)
 
 
 def require_scope(conn, user, site_id: str):
     site = get_site(conn, site_id)
     if not can_manage(conn, user, site):
-        fail('FORBIDDEN_SCOPE', 403)
+        raise AuditedDenial('FORBIDDEN_SCOPE', 403, action='scope_denied', user=user, site_id=site['id'])
     return site
 
 
@@ -169,7 +173,7 @@ def can_read(conn, user, site) -> bool:
 def require_read_scope(conn, user, site_id: str):
     site = get_site(conn, site_id)
     if not can_read(conn, user, site):
-        fail('FORBIDDEN_SCOPE', 403)
+        raise AuditedDenial('FORBIDDEN_SCOPE', 403, action='scope_denied', user=user, site_id=site['id'])
     return site
 
 
