@@ -12,3 +12,7 @@ tzdata==2026.5
 # Portable Arabic shaping for platforms whose Pillow wheel lacks RAQM.
 arabic-reshaper==3.0.1
 python-bidi==0.6.12
+
+# Local PDF rasterization, isolated per certificate upload.
+pypdfium2==5.14.0
+fonttools==4.67.0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text as sql_text
 
@@ -32,7 +32,7 @@ def create_health_router(engine) -> APIRouter:
         return {"status": "ok", "version": APP_VERSION, "build": BUILD_LABEL}
 
     @router.get("/api/health/ready")
-    def readiness():
+    def readiness(request: Request):
         details = {
             "database": engine.dialect.name,
             "version": APP_VERSION,
@@ -87,6 +87,12 @@ def create_health_router(engine) -> APIRouter:
                         }
                     )
 
+            runtime=getattr(request.app.state,'self_certificate_runtime',None)
+            if runtime is not None and hasattr(runtime,'readiness'):
+                component=runtime.readiness()
+                details['certificates']={key:component[key] for key in ('ready','capabilities','probe_cache_seconds')}
+                if not component['ready']:
+                    return JSONResponse({'status':'not_ready',**details,'reason':'CERTIFICATE_CAPABILITY_UNAVAILABLE'},status_code=503)
             return {"status": "ready", **details}
         except Exception as exc:
             # Exception type separates DB transport failures without logging SQL/URLs.

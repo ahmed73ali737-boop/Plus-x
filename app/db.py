@@ -209,6 +209,14 @@ def ensure_compat_schema(engine):
     """Small additive compatibility migration for local upgrades; production uses versioned SQL migrations."""
     from sqlalchemy import inspect, text as sa_text
     insp=inspect(engine)
+    from app.self_certificates_db import ensure_sqlite_branding_schema
+    ensure_sqlite_branding_schema(engine)
+    from app.self_certificates_db import ensure_sqlite_export_schema
+    ensure_sqlite_export_schema(engine)
+    from app.self_certificates_db import ensure_sqlite_link_inputs
+    ensure_sqlite_link_inputs(engine)
+    from app.application.self_certificate_integrity import ensure_sqlite_owner_chain
+    ensure_sqlite_owner_chain(engine)
     if engine.dialect.name=='sqlite' and 'px_account_requests' in insp.get_table_names():
         # create_all does not add indexes to an existing phase-1 table.
         from tools.migrate_postgres import execute_script
@@ -252,3 +260,6 @@ Index('px_notifications_owner_time',notifications.c.user_id,notifications.c.crea
 
 # Independent pending identities; registration is routed here only in later phases.
 from app import account_requests_db as _account_requests_db  # noqa: E402,F401
+
+# Independent account-owned self-service certificate register.
+from app import self_certificates_db as _self_certificates_db  # noqa: E402,F401

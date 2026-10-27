@@ -323,11 +323,82 @@
   "/api/public/invitations/{token}/rsvp": [
     "post"
   ],
+  "/api/public/self-certificates/receive/{token}": [
+    "get"
+  ],
+  "/api/public/self-certificates/receive/{token}/download": [
+    "get"
+  ],
+  "/api/public/self-certificates/receive/{token}/image": [
+    "get"
+  ],
+  "/api/public/self-certificates/request/{token}": [
+    "post"
+  ],
+  "/api/public/self-certificates/request/{token}/mine": [
+    "get"
+  ],
+  "/api/public/self-certificates/request/{token}/prepare": [
+    "post"
+  ],
+  "/api/public/self-certificates/verify/{serial}": [
+    "get"
+  ],
   "/api/public/site/{slug}": [
     "get"
   ],
   "/api/public/site/{slug}/results": [
     "get"
+  ],
+  "/api/self-certificates/access": [
+    "get"
+  ],
+  "/api/self-certificates/assets": [
+    "post"
+  ],
+  "/api/self-certificates/assets/{ident}": [
+    "get"
+  ],
+  "/api/self-certificates/branding/rts.png": [
+    "get"
+  ],
+  "/api/self-certificates/design-options": [
+    "get"
+  ],
+  "/api/self-certificates/exports": [
+    "get",
+    "post"
+  ],
+  "/api/self-certificates/exports/{ident}/download": [
+    "get"
+  ],
+  "/api/self-certificates/links": [
+    "get",
+    "post"
+  ],
+  "/api/self-certificates/links/{ident}/qr": [
+    "get"
+  ],
+  "/api/self-certificates/links/{ident}/state": [
+    "post"
+  ],
+  "/api/self-certificates/models": [
+    "get",
+    "post"
+  ],
+  "/api/self-certificates/models/{ident}": [
+    "delete",
+    "get",
+    "put"
+  ],
+  "/api/self-certificates/preview": [
+    "post"
+  ],
+  "/api/self-certificates/requests": [
+    "get"
+  ],
+  "/api/self-certificates/requests/{ident}/retry": [
+    "post"
   ],
   "/api/signup-request": [
     "post"
