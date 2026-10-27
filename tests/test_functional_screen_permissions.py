@@ -110,7 +110,13 @@ def test_screen_commands_commit_only_with_exact_permission(system,role,action,pe
     elif action=='onsite':route+='/on-site-registration';body={'name':'Synthetic onsite '+unique,'phone':'+96777'+str(uuid.uuid4().int)[:7],'consent':True}
     elif action=='review':route+='/invitations/'+prepared['invitation']['id']+'/review';body={'decision':'approve','revision':prepared['revision']}
     elif action=='checkin':route+='/guest-checkins';body={'guest_number':prepared['number'],'scan_id':str(uuid.uuid4()),'quantity':1,'mode':'entry'}
-    else:route+='/committee';body={'user_id':'functional-subject','role':'scanner'}
+    else:
+        # Each role requests a different target: a prior pending approval for
+        # the shared target must not change a permission test into a duplicate test.
+        subject='functional-target-'+unique
+        with app.state.engine.begin() as conn:
+            conn.execute(insert(users).values(id=subject,email=subject+'@example.test',name='Synthetic assignment target',role='member',scope_id='event-demo',password_hash='unused',active=1,must_change_password=0))
+        route+='/committee';body={'user_id':subject,'role':'scanner'}
     before=counts(app);response=actor.request(method,route,json=body)
     expected=200 if permission in GRANTS[role] else 401 if role=='anonymous' else 403
     assert response.status_code==expected,(role,action,response.text)
@@ -126,7 +132,8 @@ def test_screen_commands_commit_only_with_exact_permission(system,role,action,pe
         assert response.json()['status']=='accepted'
         assert counts(app)[2]==before[2]+1 and counts(app)[3]==before[3]+1
     elif action=='committee':
-        with app.state.engine.connect() as conn:assert conn.execute(select(users.c.role).where(users.c.id=='functional-subject')).scalar_one()=='member'
+        with app.state.engine.connect() as conn:assert conn.execute(select(users.c.role).where(users.c.id==subject)).scalar_one()=='member'
+        assert counts(app)[4]==before[4], 'Pending account request must not grant an assignment before approval'
     else:assert response.json()['policy']['visibility']=='private'
 
 

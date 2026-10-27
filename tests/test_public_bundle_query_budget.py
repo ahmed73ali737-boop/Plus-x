@@ -6,7 +6,11 @@ from app.infrastructure.seed import seed_demo_data
 from harness_support import app_client
 
 
-def test_70_children_use_bounded_queries_and_published_content(tmp_path):
+def test_70_children_use_bounded_queries_and_published_content(tmp_path,monkeypatch):
+    # Measure the HTTP projection alone; elected background jobs use their own
+    # connections and have separate lifecycle/lease/load acceptance tests.
+    from app.application.self_certificate_runtime import CertificateWorkers
+    monkeypatch.setattr(CertificateWorkers,'start',lambda self:None)
     app=create_app('sqlite:///'+str(tmp_path/'seventy.sqlite'),origin='http://testserver',seed_demo=False)
     with app_client(app) as client:
         seed_demo_data(app.state.engine,count=70)
