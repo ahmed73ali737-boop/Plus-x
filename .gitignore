@@ -11,3 +11,10 @@ android/*.jks
 android/*.keystore
 /codex-audit-artifacts/
 tests/offline-runtime/node_modules/
+
+# ملفات تشغيل ومحلية — لا تُفهرس
+*.log
+server.log
+*.sqlite
+*.db
+secrets.*
