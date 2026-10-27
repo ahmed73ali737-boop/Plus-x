@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import time
 from collections import defaultdict, deque
+from urllib.parse import urlsplit
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -24,18 +25,41 @@ def _valid_host_header(value: str | None) -> bool:
     return port is None or 0 < int(port) <= 65535
 
 
-def install_security_middleware(app, public_origin: str) -> None:
+def _origin_matches(request_origin: str, public_origin: str, allow_local_loopback_origins: bool) -> bool:
+    if request_origin == public_origin:
+        return True
+    if not allow_local_loopback_origins:
+        return False
+    try:
+        requested = urlsplit(request_origin)
+        public = urlsplit(public_origin)
+        requested_port = requested.port or (443 if requested.scheme == "https" else 80)
+        public_port = public.port or (443 if public.scheme == "https" else 80)
+    except ValueError:
+        return False
+    loopback_hosts = {"localhost", "127.0.0.1", "::1"}
+    if (requested.scheme != public.scheme or requested.hostname not in loopback_hosts or
+            public.hostname not in loopback_hosts or requested.username is not None or
+            requested.password is not None or requested.path or requested.query or requested.fragment):
+        return False
+    # The local Compose setup publishes the app on 2282 and its proxy on 2283.
+    # Accept either loopback entry point locally; production remains exact-origin only.
+    return requested_port == public_port or requested_port in {2282, 2283}
+
+
+def install_security_middleware(app, public_origin: str, *, allow_local_loopback_origins: bool = False) -> None:
     limits = defaultdict(deque)
     secure = public_origin.startswith("https://")
     app.state.cookie_secure = secure
 
     def harden(response, path: str):
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if response.status_code==429:response.headers.setdefault("Retry-After","60")
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' https: data:; media-src 'self' https:; connect-src 'self'; "
+            "img-src 'self' https: data: blob:; media-src 'self' https:; connect-src 'self'; "
             "frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
         )
         if secure:
@@ -43,7 +67,7 @@ def install_security_middleware(app, public_origin: str) -> None:
         if path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-PulseX-API-Version"] = "1"
-        if path.startswith(('/certificate/', '/verify/certificate/', '/api/public/certificates/')):
+        if path.startswith(('/certificate/', '/verify/certificate/', '/api/public/certificates/', '/certificates', '/api/self-certificates', '/api/public/self-certificates')):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Referrer-Policy'] = 'no-referrer'
             response.headers['X-Robots-Tag'] = 'noindex, nofollow'
@@ -63,7 +87,8 @@ def install_security_middleware(app, public_origin: str) -> None:
             content_length = int(request.headers.get("content-length", "0") or 0)
         except ValueError:
             return harden(JSONResponse({"detail": "CONTENT_LENGTH_INVALID"}, 400), path)
-        if content_length > MAX_REQUEST_BYTES:
+        request_limit = (999999 if request.query_params.get('kind')=='stamp' else 3000000) if path=='/api/self-certificates/assets' else 32768 if path.startswith(('/api/public/self-certificates/','/api/self-certificates/')) else MAX_REQUEST_BYTES
+        if content_length > request_limit:
             return harden(JSONResponse({"detail": "REQUEST_LIMIT"}, 413), path)
 
         if request.method in ("POST", "PUT", "PATCH"):
@@ -71,20 +96,20 @@ def install_security_middleware(app, public_origin: str) -> None:
             size = 0
             async for chunk in request.stream():
                 size += len(chunk)
-                if size > MAX_REQUEST_BYTES:
+                if size > request_limit:
                     return harden(JSONResponse({"detail": "REQUEST_LIMIT"}, 413), path)
                 chunks.append(chunk)
             request._body = b"".join(chunks)
 
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             request_origin = request.headers.get("origin")
-            if request_origin and request_origin != public_origin:
+            if request_origin and not _origin_matches(request_origin, public_origin, allow_local_loopback_origins):
                 return harden(JSONResponse({"detail": "ORIGIN_FORBIDDEN"}, 403), path)
 
         if path.startswith("/api/"):
             ip = request.client.host if request.client else "unknown"
             bucket = (
-                "auth"
+                "self-certificate" if path.startswith("/api/public/self-certificates/") else "auth"
                 if path.startswith("/api/auth/") and request.method != "GET"
                 else "signup"
                 if path in ("/api/signup-request", "/api/access-request")
@@ -105,7 +130,7 @@ def install_security_middleware(app, public_origin: str) -> None:
             current = time.monotonic()
             while queue and current - queue[0] > 60:
                 queue.popleft()
-            limit = 60 if bucket == "account-read" else 20 if bucket == "account-write" else 20 if bucket == "auth" else 10 if bucket == "signup" else 15 if bucket == "certificate-render" else 300 if bucket in ("guest", "certificate") else 12000
+            limit = 120000 if bucket == "self-certificate" else 60 if bucket == "account-read" else 20 if bucket == "account-write" else 20 if bucket == "auth" else 10 if bucket == "signup" else 15 if bucket == "certificate-render" else 300 if bucket in ("guest", "certificate") else 12000
             if len(queue) >= limit:
                 return harden(
                     JSONResponse({"detail": "RATE_LIMIT"}, 429, headers={"Retry-After": "60"}),

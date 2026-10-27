@@ -14,6 +14,7 @@ export async function accountPage(){
   try{
     const state=await api('/api/auth/me');setCSRF(state.csrf);
     if(state.user.must_change_password){location.replace('/admin');return;}
+    try{const certificates=await api("/api/self-certificates/access");if(certificates.can_manage||certificates.has_history)document.querySelector(".access-header").append(h("a",{href:"/certificates",class:"text-btn"},"خدمة الشهادات"));}catch{}
     return profile(main,state.user);
   }catch(error){
     if(error.status===401){location.replace('/admin');return;}

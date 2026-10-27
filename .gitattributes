@@ -20,3 +20,8 @@ requirements/locks/*.in text eol=lf
 android/gradlew text eol=lf
 # Withdraw the reported APK from distributable source/candidate archives.
 artifacts/android/*.apk export-ignore
+
+# These resources/fixtures are addressed by their exact original byte hash.
+app/resources/fonts/noto-manifest.json -text
+app/resources/fonts/catalogs/*.json -text
+tests/fixtures/certificates/pre_v3_schema.py.txt -text

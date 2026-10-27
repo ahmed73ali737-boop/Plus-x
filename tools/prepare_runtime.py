@@ -71,7 +71,7 @@ def environment_probe(profile: str) -> dict:
     # Python 3.11 ensurepip can include setuptools/wheel. They are bootstrap
     # tooling; application and optional profile packages still match exactly.
     unexpected = sorted(set(installed) - set(expected) - {'setuptools', 'wheel'})
-    modules = ['fastapi', 'sqlalchemy', 'uvicorn', 'qrcode', 'PIL']
+    modules = ['fastapi', 'sqlalchemy', 'uvicorn', 'qrcode', 'PIL', 'fontTools', 'pypdfium2']
     if selected in ('postgres', 'qa-postgres', 'postgres-observability'):
         modules.append('psycopg')
     if selected in ('qa', 'qa-postgres'):

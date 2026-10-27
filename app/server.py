@@ -48,6 +48,7 @@ from .api.invitation_routes import install_invitation_routes
 from .api.admission_access_routes import install_admission_access_routes
 from .api.account_routes import install_account_routes
 from .api.certificate_routes import install_certificate_routes
+from .api.self_certificate_routes import install_self_certificate_routes
 from tools.production_gate import assert_production_ready
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -75,23 +76,21 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     async def lifespan(_app):
         import threading
         import logging
+        import os
         from .application.certificate_batches import process_pending
-        stop = threading.Event()
-        def work():
-            while not stop.wait(1):
-                try: process_pending(engine)
-                except Exception:
-                    logging.getLogger(__name__).warning('CERTIFICATE_WORKER_RETRY')
-        worker = threading.Thread(target=work, name='certificate-issuance', daemon=True)
-        # StaticPool in-memory QA uses one shared SQLite connection; do not
-        # introduce concurrent background transactions on that connection.
-        background_enabled = not (engine.dialect.name == 'sqlite' and engine.url.database in (None, '', ':memory:'))
-        if background_enabled: worker.start()
+        from .application.self_certificate_runtime import CertificateWorkers
+        try:certificate_workers=int(os.environ.get('PX_SELF_CERTIFICATE_WORKERS','6'))
+        except ValueError as error:raise RuntimeError('INVALID_SELF_CERTIFICATE_WORKERS') from error
+        if not 1<=certificate_workers<=6:raise RuntimeError('INVALID_SELF_CERTIFICATE_WORKERS')
+        background_enabled=not (engine.dialect.name=='sqlite' and engine.url.database in (None,'',':memory:'))
+        runtime=app.state.self_certificate_runtime
+        runtime.background_enabled=background_enabled
+        service=CertificateWorkers(engine,runtime,lambda:process_pending(engine),certificate_workers)
+        if background_enabled:service.start()
         try:
             yield
         finally:
-            stop.set()
-            if background_enabled: worker.join(timeout=10)
+            if background_enabled:service.close()
             engine.dispose()
 
     app=FastAPI(title=APP_NAME,version=APP_VERSION,docs_url=None,redoc_url=None,
@@ -110,7 +109,11 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     media_dir=settings.media_dir;media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
 
-    install_security_middleware(app, public_origin)
+    install_security_middleware(
+        app,
+        public_origin,
+        allow_local_loopback_origins=(settings.environment == "local" and not settings.production_mode),
+    )
 
     app.include_router(create_health_router(engine))
     app.include_router(create_download_router(ROOT))
@@ -131,6 +134,7 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
     install_admission_access_routes(app, engine, identify=identify)
     install_account_routes(app, engine, identify=identify)
     install_certificate_routes(app, engine, public_origin, identify=identify, log=log)
+    install_self_certificate_routes(app, engine, settings, identify, log)
 
 
     @app.post('/api/auth/login')

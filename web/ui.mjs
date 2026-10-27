@@ -10,7 +10,7 @@ export function button(t,fn,cls='btn'){return h('button',{type:'button',class:cl
 export function field(label,type='text',value='',attrs={}){const input=h(type==='textarea'?'textarea':'input',{type:type==='textarea'?undefined:type,value: value??'','aria-label':label,...attrs});const node=h('label',{class:'field'},h('span',{},label),input);return {node,input};}
 export function selectField(label,options,value){const el=h('select',{'aria-label':label});for(const o of options){const pair=Array.isArray(o)?o:[o,o];el.append(h('option',{value:pair[0]},pair[1]));}el.value=value??'';return{node:h('label',{class:'field'},h('span',{},label),el),input:el};}
 export function check(label,value=false){const el=h('input',{type:'checkbox',checked:value});return{node:h('label',{class:'check'},el,label),input:el};}
-export function modal(title,body,wide=false){const d=h('dialog',{class:wide?'modal wide':'modal'},h('header',{},h('h2',{},title),button('×',()=>d.close(),'icon-btn')),body);document.body.append(d);d.addEventListener('close',()=>d.remove());d.showModal();return d;}
+export function modal(title,body,wide=false){const invoker=document.activeElement,id='dialog-'+newRequestKey();const d=h('dialog',{class:wide?'modal wide':'modal','aria-labelledby':id},h('header',{},h('h2',{id},title),button('×',()=>d.close(),'icon-btn')),body);document.body.append(d);d.addEventListener('close',()=>{d.remove();if(invoker?.isConnected)invoker.focus({preventScroll:true});});d.showModal();return d;}
 export function download(name,data,type='application/json'){const a=h('a',{href:URL.createObjectURL(new Blob([data],{type})),download:name});a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 export const labels={participant:'المشاركون',sponsor:'الرعاة',session:'البرنامج والأحداث',place:'الأماكن والمخططات',fact:'الحقائق والإحصائيات',service:'الخدمات',question:'الأسئلة والاستبيانات',poll:'التصويت',offer:'العروض',ad:'الإعلانات',media:'مكتبة العرض',contact:'التواصل',news:'المستجدات'};
 export const types={single_choice:'اختيار واحد',multiple_choice:'اختيارات متعددة',image_choice:'اختيار بالصور',yes_no:'نعم / لا',short_text:'نص قصير',long_text:'نص طويل',number:'رقم',rating:'تقييم رقمي',nps:'مؤشر التوصية NPS',slider:'شريط تدريجي',ranking:'ترتيب الخيارات',matrix:'مصفوفة تقييم',emoji:'تقييم تعبيري',date:'تاريخ',time:'وقت',datetime:'تاريخ ووقت',email:'بريد إلكتروني',phone:'رقم هاتف',url:'رابط',consent:'موافقة',allocation:'توزيع 100 نقطة',quiz:'اختبار / إجابة صحيحة'};
@@ -21,3 +21,13 @@ export function isoToLocalInput(v){if(!v)return'';const d=new Date(v);if(Number.
 export function localInputToISO(v){if(!v)return'';const d=new Date(v);if(Number.isNaN(d.getTime()))throw new Error('DATETIME_INVALID');return d.toISOString();}
 
 export function newRequestKey(){const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
+
+export async function apiFile(path,body,json=false,method='POST',options={}){
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),35000),abort=()=>ctl.abort();
+ if(options.signal?.aborted)ctl.abort();else options.signal?.addEventListener('abort',abort,{once:true});
+ try{
+  const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:ctl.signal,headers:{...(csrf?{'X-CSRF':csrf}:{}),...(json?{'Content-Type':'application/json'}:{'Content-Type':'application/octet-stream'})},body:json?JSON.stringify(body):body});
+  if(!r.ok){let x;try{x=await r.json();}catch{x={detail:'SERVER_RESPONSE_INVALID'};}const e=new Error(typeof x.detail==='string'?x.detail:'CERTIFICATE_INPUT_INVALID');e.status=r.status;throw e;}
+  return r;
+ }finally{clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
+}

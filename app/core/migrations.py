@@ -22,6 +22,13 @@ MIGRATION_PATHS = (
     ROOT / "ops/013_account_requests.sql",
     ROOT / "ops/014_account_request_workflows.sql",
     ROOT / "ops/015_platform_account_invites.sql",
+    ROOT / "ops/016_self_certificates.sql",
+    ROOT / "ops/017_self_certificate_branding.sql",
+    ROOT / "ops/018_self_certificate_export_leases.sql",
+    ROOT / "ops/019_self_certificate_link_inputs.sql",
+    ROOT / "ops/020_self_certificate_export_snapshots.sql",
+    ROOT / "ops/021_self_certificate_owner_chain.sql",
+    ROOT / "ops/022_self_certificate_model_operations.sql",
 )
 
 

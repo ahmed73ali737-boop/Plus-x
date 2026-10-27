@@ -3,9 +3,10 @@ ARG PULSEX_SOURCE_SHA=unrecorded
 LABEL org.opencontainers.image.revision="${PULSEX_SOURCE_SHA}"
 ENV PULSEX_BUILD_LABEL=git-${PULSEX_SOURCE_SHA}
 WORKDIR /app
-COPY requirements/locks/bootstrap.txt requirements/locks/postgres.txt ./requirements/locks/
+COPY requirements/locks/bootstrap.txt requirements/locks/postgres.txt requirements/locks/certificates.txt ./requirements/locks/
 RUN python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements/locks/bootstrap.txt && \
     python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements/locks/postgres.txt && \
+    python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements/locks/certificates.txt && \
     python -m pip check && useradd --uid 10001 --create-home pulsex
 COPY app ./app
 COPY web ./web
