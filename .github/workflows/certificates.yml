@@ -62,7 +62,7 @@ jobs:
         env:
           PX_SELF_CERTIFICATE_BROWSER_ACCEPTANCE: 'YES'
           CERTIFICATE_BROWSER_EVIDENCE: qa/certificates/browser
-        run: python -m pytest -q tests/test_self_certificate_browser_improvements.py --junitxml=qa/certificates/browser.xml
+        run: python -m pytest -q tests/test_self_certificate_browser_improvements.py tests/test_self_certificate_preview_share_browser.py --junitxml=qa/certificates/browser.xml
       - name: Bounded native PostgreSQL load smoke
         env:
           CERTIFICATE_TEST_POSTGRES: 'true'

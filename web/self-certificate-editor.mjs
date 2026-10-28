@@ -15,7 +15,7 @@ export async function openSelfCertificateEditor(model,onSaved){
  stage.append(background,rendered,fallback,nameBox,stampBox);
  const emptyWorkspace=h('div',{class:'selfcert-editor-empty'},h('strong',{},'ابدأ بخلفية شهادتك'),h('p',{},'ارفع صورة أو PDF من لوحة الخصائص، ثم حرّك مساحة الاسم والختم داخل المعاينة.'));
  const viewport=h('div',{class:'selfcert-viewport'},stage,emptyWorkspace);
- const zoom=selectField('تكبير المعاينة',[['fit','ملاءمة'],['0.5','50%'],['0.75','75%'],['1','100%']], 'fit');
+ const zoom=selectField('تكبير المعاينة',[['width','ملاءمة العرض'],['fit','عرض الصفحة كاملة'],['0.5','50%'],['0.75','75%'],['1','100%']], 'width');
  const undo=button('تراجع عن تعديل',()=>step(-1),'btn secondary'),redo=button('إعادة تعديل',()=>step(1),'btn secondary');
  const sample=button('عينة إنجليزية',()=>{sampleEnglish=!sampleEnglish;sample.textContent=sampleEnglish?'عينة عربية':'عينة إنجليزية';schedule();},'btn secondary');
  const name=field('اسم النموذج','text',draft.name,{maxLength:160});
@@ -69,8 +69,14 @@ export async function openSelfCertificateEditor(model,onSaved){
   emptyWorkspace.hidden=Boolean(meta);
   if(!meta){stage.hidden=true;return;}
   stage.hidden=false;stage.style.aspectRatio=meta.width+'/'+meta.height;
-  const fit=Math.min(viewport.clientWidth-20,(viewport.clientHeight-20)*meta.width/meta.height,meta.width);
-  stage.style.width=Math.max(50,zoom.input.value==='fit'?fit:meta.width*Number(zoom.input.value))+'px';
+  const style=getComputedStyle(viewport),space=(...keys)=>keys.reduce((sum,key)=>sum+(parseFloat(style[key])||0),0);
+  const width=Math.max(1,viewport.clientWidth-space('paddingLeft','paddingRight'));
+  const height=Math.max(1,viewport.clientHeight-space('paddingTop','paddingBottom'));
+  const ratio=meta.width/meta.height,mode=zoom.input.value;
+  // Display scale only: neither native pixels nor saved geometry are changed.
+  const displayWidth=mode==='width'?width:mode==='fit'?Math.min(width,height*ratio):meta.width*Number(mode);
+  stage.style.width=Math.max(1,displayWidth)+'px';
+  stage.style.height=Math.max(1,displayWidth/ratio)+'px';
   background.src=meta.background_url;
   place(fallback,meta.branding_manifest.card_rect);fallback.hidden=!rendered.hidden;
   place(nameBox,draft.config?.name_rect);place(stampBox,draft.stamp_asset_id?draft.config?.stamp_rect:null);

@@ -1,5 +1,5 @@
 import {root,h,button,api,field,check} from './ui.mjs';
-import {P,message,footer,browserSeed,copy} from './self-certificate-client.mjs';
+import {P,message,footer,browserSeed} from './self-certificate-client.mjs';
 const states={registered:'سُجل طلبك ويجري تجهيزه.',processing:'يجري إعداد صورة شهادتك.',failed:'تعذر تجهيز شهادتك. احتفظ بالرابط وراجع الجهة المنظمة.'};
 const preparedFiles=new WeakMap();
 const issuedDate=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'غير متاح':new Intl.DateTimeFormat('ar',{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(date)+' UTC';};
@@ -84,45 +84,87 @@ export async function selfCertificatePublic(kind,token){
   area.append(form,h('p',{class:'muted'},'مسح بيانات المتصفح ينهي التذكّر قبل السنة. رابط الاستلام الخاص يبقى وسيلة مستقلة للوصول؛ لا تنشره علنًا.'));
  }catch(e){notice(main,message(e));main.append(button('إعادة المحاولة',()=>location.reload(),'btn secondary'));}
 }
+function certificateHeader(main,value){
+ const valid=value.status==='valid',title=main.querySelector('h1');
+ const badge=h('span',{class:'selfcert-validity'+(valid?' is-valid':' is-invalid')},valid?'الشهادة سليمة':'تعذر التحقق من الشهادة');
+ const heading=h('div',{class:'selfcert-certificate-heading'},title,badge);
+ const details=h('dl',{class:'selfcert-certificate-details'},
+  h('div',{},h('dt',{},'الفعالية'),h('dd',{},value.event_name)),
+  h('div',{},h('dt',{},'وقت الإصدار'),h('dd',{},h('bdi',{},issuedDate(value.issued_at)))));
+ const verification=h('section',{class:'selfcert-verification','aria-labelledby':'selfcert-verification-title'},
+  h('h3',{id:'selfcert-verification-title'},'رمز التحقق الخاص بالشهادة'),
+  h('code',{class:'selfcert-serial',dir:'ltr','aria-labelledby':'selfcert-verification-title'},value.serial),
+  h('p',{class:'muted'},'يعرّف هذا الرمز الشهادة في صفحة التحقق العامة.'),
+  h('a',{class:'text-btn',href:value.verification_url},'فتح صفحة التحقق'));
+ main.append(h('header',{class:'selfcert-certificate-header'},heading,h('h2',{class:'selfcert-recipient'},value.name_printed),details,verification),
+  h('p',{class:'notice',role:'status'},valid?'منحت هذه الشهادة بناءً على إقرار المشارك بالمشاركة.':'تعذر التحقق من سلامة الملف. راجع الجهة المنظمة.'));
+}
 async function showCertificate(main,value,privateView){
- main.append(h('h2',{},value.name_printed),h('p',{},value.event_name),h('p',{dir:'ltr'},value.serial),
-  h('p',{},'وقت الإصدار: ',h('bdi',{},issuedDate(value.issued_at))),h('p',{class:'notice'},value.status==='valid'?'الشهادة سليمة، ومنحت بناءً على إقرار المشارك.':'تعذر التحقق من سلامة الملف. راجع الجهة المنظمة.'));
+ certificateHeader(main,value);
  if(!privateView||value.status!=='valid')return;
  main.append(h('img',{class:'selfcert-result',src:value.image_url,alt:'معاينة شهادة '+value.name_printed}),
-  h('a',{class:'btn',href:value.download_url,download:''},'تنزيل الصورة الأصلية'),
-  h('a',{class:'text-btn',href:value.verification_url},'صفحة التحقق العامة'));
- const text=field('نص المشاركة','textarea',value.share_text,{readOnly:true});main.append(text.node,button('نسخ نص المشاركة',()=>copy(value.share_text),'btn secondary'));
- const status=notice(main,'مشاركة الصورة اختيارية وتنشر الاسم الظاهر عليها. يُشارك رابط التحقق فقط، ويظل رابط الاستلام خاصًا.');
- const safeText=limitText(value.share_text,650),link=value.verification_url,open=url=>window.open(url,'_blank','noopener,noreferrer');
- const instagram=button('إنستغرام',e=>shareFile(value,status,'إنستغرام',e.currentTarget));
- const device=button('مشاركة الصورة عبر الجهاز',e=>shareFile(value,status,'التطبيق المطلوب',e.currentTarget),'btn secondary');
+  h('a',{class:'btn',href:value.download_url,download:''},'تنزيل الصورة الأصلية'));
+ const status=notice(main,'مشاركة الصورة اختيارية وتنشر الاسم الظاهر عليها. يُرفق النص المعتمد حيث يدعمه التطبيق ورابط التحقق العام؛ يظل رابط الاستلام خاصًا.');
+ const link=value.verification_url;
  main.append(h('div',{class:'selfcert-share'},
-  button('واتساب',()=>{open('https://wa.me/?text='+encodeURIComponent(safeText+'\n'+link));status.textContent='فُتح محرر النص والرابط. لإرفاق الصورة نزّلها ثم أرفقها بنفسك؛ لم يتم إثبات نشر.';}),
-  button('إكس',()=>{open('https://twitter.com/intent/tweet?text='+encodeURIComponent(limitText(value.share_text,180))+'&url='+encodeURIComponent(link));status.textContent='راجع النص وأرفق الصورة المنزلة إذا أردت. فتح المحرر لا يعني النشر.';}),
-  button('فيسبوك',()=>{open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(link));status.textContent='يمكنك مشاركة رابط التحقق؛ لا يمكن فرض النص داخل فيسبوك. انسخ النص ونزّل الصورة للإرفاق اليدوي.';}),
-  instagram,device));
+  button('واتساب',e=>shareWeb(value,status,'واتساب',e.currentTarget)),
+  button('إكس',e=>shareWeb(value,status,'إكس',e.currentTarget)),
+  button('فيسبوك',()=>openShare('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(link),status,'فُتحت مشاركة رابط التحقق. لإرفاق الصورة استخدم تنزيل الصورة أو مشاركة الجهاز؛ قد لا يقبل التطبيق النص المعتمد.')),
+  button('إنستغرام',e=>shareFile(value,status,'إنستغرام',e.currentTarget)),
+  button('مشاركة الصورة عبر الجهاز',e=>shareFile(value,status,'التطبيق المطلوب',e.currentTarget),'btn secondary')));
 }
-function limitText(text,count){const segments=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('ar',{granularity:'grapheme'}).segment(text)].map(x=>x.segment):Array.from(text);return segments.slice(0,count).join('')+(segments.length>count?'…':'');}
+function openShare(url,status,label){
+ // noopener may return null even after opening: never treat it as proof of posting.
+ window.open(url,'_blank','noopener,noreferrer');
+ status.textContent=label+' فتح نافذة المشاركة لا يؤكد النشر؛ إذا لم تفتح فاسمح بالنوافذ المنبثقة أو استخدم تنزيل الصورة.';
+}
+function shareWeb(value,status,target,control){
+ const text=value.share_text+'\n'+value.verification_url;
+ const url=target==='واتساب'?'https://wa.me/?text='+encodeURIComponent(text):
+  'https://twitter.com/intent/tweet?text='+encodeURIComponent(value.share_text)+'&url='+encodeURIComponent(value.verification_url);
+ // Conservative UI routing budgets, not promises about a platform's limits.
+ // Route long text to the full device payload instead of silently truncating it.
+ const fits=url.length<=2000&&(target!=='إكس'||Array.from(value.share_text).length<=180);
+ if(!fits){
+  if(navigator.share&&navigator.canShare)return shareFile(value,status,target,control);
+  status.textContent='النص المعتمد أطول من مسار المشاركة المباشر هنا. يمكنك تنزيل الصورة أو مشاركة رابط التحقق عبر الخيارات المتاحة.';return;
+ }
+ openShare(url,status,'جُهّز النص المعتمد ورابط التحقق في مسار '+target+'. هذا المسار لا يرفق الصورة تلقائيًا؛ يمكنك تنزيلها لإرفاقها.');
+}
 async function shareFile(value,status,target,control){
+ let prepared=preparedFiles.get(value);
+ if(prepared?.busy)return;
+ if(!navigator.share||!navigator.canShare){status.textContent='مشاركة الملفات غير متاحة هنا. نزّل الصورة وأرفقها في '+target+'، أو استخدم مشاركة رابط التحقق المتاحة.';return;}
+ if(!prepared){prepared={file:null,busy:false};preparedFiles.set(value,prepared);}
+ const controls=[...control.closest('.selfcert-share').querySelectorAll('button')];
+ prepared.busy=true;controls.forEach(node=>{node.disabled=true;});
+ let sharing=false;
  try{
-  if(!navigator.share||!navigator.canShare){status.textContent='المشاركة بالملفات غير متاحة هنا. نزّل الصورة وانسخ النص ثم أرفقهما في '+target+' بنفسك.';return;}
-  let prepared=preparedFiles.get(value);
-  if(!prepared){
+  if(!prepared.file){
    status.textContent='جارٍ تجهيز الصورة الأصلية للمشاركة…';
-   const response=await fetch(value.download_url,{credentials:'same-origin',cache:'no-store'});
-   if(!response.ok)throw new Error('FINAL_FILE_UNAVAILABLE');
-   const file=new File([await response.blob()],'certificate-'+value.serial+'.png',{type:'image/png'});
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),35000);
+   let content;
+   try{
+    const response=await fetch(value.download_url,{credentials:'same-origin',cache:'no-store',signal:controller.signal});
+    if(!response.ok)throw new Error('FINAL_FILE_UNAVAILABLE');
+    content=await response.blob();
+   }finally{clearTimeout(timeout);}
+   const file=new File([content],'certificate-'+value.serial+'.png',{type:'image/png'});
    if(!navigator.canShare({files:[file]})){status.textContent='هذا المتصفح لا يشارك ملفات PNG. نزّل الصورة وأرفقها في التطبيق بنفسك.';return;}
-   prepared={file};preparedFiles.set(value,prepared);
-   if(control.isConnected)control.textContent=target==='إنستغرام'?'مشاركة الصورة إلى إنستغرام':'مشاركة الصورة الجاهزة عبر الجهاز';
+   prepared.file=file;
+   if(control.isConnected)control.textContent=target==='التطبيق المطلوب'?'مشاركة الصورة الجاهزة عبر الجهاز':'مشاركة الصورة إلى '+target;
    status.textContent='الصورة جاهزة. اضغط زر المشاركة مرة أخرى لاختيار '+target+' من قائمة الجهاز إن ظهر.';
    return;
   }
-  // No asynchronous fetch occurs before this call: preserve this click's
-  // transient user activation on browsers that require it.
-  const operation=navigator.share({files:[prepared.file],text:value.share_text+'\n'+value.verification_url});
-  status.textContent='اختر '+target+' من قائمة الجهاز إذا ظهر. قبول الصورة والنص معًا يعتمد على التطبيق.';
+  const full={files:[prepared.file],text:value.share_text+'\n'+value.verification_url};
+  const withText=navigator.canShare(full),payload=withText?full:{files:[prepared.file]};
+  // No await/fetch before share: preserve the fresh click's transient activation.
+  sharing=true;
+  const operation=navigator.share(payload);
+  status.textContent=withText?'اختر '+target+' من قائمة الجهاز إذا ظهر. قبول الصورة والنص معًا يعتمد على التطبيق.':
+   'هذا المتصفح يقبل الصورة فقط في المشاركة؛ لا يمكن تمرير النص المعتمد بهذا المسار.';
   await operation;
-  status.textContent='أغلقت واجهة المشاركة. لا يؤكد النظام نشر الصورة.';
- }catch(e){status.textContent=e.name==='AbortError'?'أُلغيت المشاركة؛ شهادتك لم تتغير.':message(e);}
+  status.textContent='أغلقت واجهة المشاركة. لا يؤكد النظام نشر الصورة.'+(withText?'':' طلب المشاركة احتوى الصورة وحدها دون النص.');
+ }catch(e){status.textContent=e.name==='AbortError'?(sharing?'أُلغيت المشاركة؛ شهادتك لم تتغير.':'انتهت مهلة تجهيز الصورة. تحقق من الاتصال وأعد المحاولة أو نزّل الصورة.'):message(e);}
+ finally{prepared.busy=false;controls.forEach(node=>{node.disabled=false;});}
 }
