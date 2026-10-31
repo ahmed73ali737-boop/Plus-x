@@ -1,0 +1,66 @@
+{
+  "schema": "system.assets/1",
+  "repository": "ahmed73ali737-boop/Plus-x",
+  "baselineRevision": "5a960ab18d439a3f70928ae4e79b45ad2f994d8d",
+  "coverage": "observed-reusable-roots",
+  "runtimeVerified": false,
+  "productionReady": false,
+  "assets": [
+    {
+      "id": "baseline.components",
+      "path": "components",
+      "upstreamRepository": "ahmed73ali737-boop/Plus-x",
+      "upstreamRevision": "5a960ab18d439a3f70928ae4e79b45ad2f994d8d",
+      "localVersion": "1.0.0",
+      "ownership": "system-local",
+      "origin": "self",
+      "updatePolicy": "explicit-reviewed-upgrade",
+      "files": {
+        "g-observability/source-lock.json": {
+          "gitBlob": "54be131a6cf32e3af37213c5beea0a8d6830de9e",
+          "executable": false
+        }
+      }
+    },
+    {
+      "id": "baseline.sdk",
+      "path": "sdk",
+      "upstreamRepository": "ahmed73ali737-boop/Plus-x",
+      "upstreamRevision": "5a960ab18d439a3f70928ae4e79b45ad2f994d8d",
+      "localVersion": "1.0.0",
+      "ownership": "system-local",
+      "origin": "self",
+      "updatePolicy": "explicit-reviewed-upgrade",
+      "files": {
+        "README.md": {
+          "gitBlob": "66802b4fc328453d9991fb361e458cf3f6b7e68a",
+          "executable": false
+        },
+        "javascript/index.mjs": {
+          "gitBlob": "e9e37ffe300cedbfe9179da2130ae0775b788283",
+          "executable": false
+        },
+        "javascript/package.json": {
+          "gitBlob": "8e63bbb15d2412d955f32937924e355907be0885",
+          "executable": false
+        },
+        "python/pulsex_sdk/__init__.py": {
+          "gitBlob": "6da4a01f8bba4cd1cc38761ab59512e185ac472a",
+          "executable": false
+        },
+        "python/pulsex_sdk/client.py": {
+          "gitBlob": "fa4ca210e86730e61609647ef1ad5387bcb31a72",
+          "executable": false
+        },
+        "python/pulsex_sdk/party_network.py": {
+          "gitBlob": "c8c76d9216e9cb2379bf1d09ef3fd3b46d10237a",
+          "executable": false
+        },
+        "python/pyproject.toml": {
+          "gitBlob": "18455075f178379ac275d712379bbf7406d884c1",
+          "executable": false
+        }
+      }
+    }
+  ]
+}

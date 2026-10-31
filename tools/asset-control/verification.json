@@ -1,0 +1,17 @@
+{
+  "schema": "system.asset-control-verification/1",
+  "scope": "asset-control-tool-only",
+  "author": "Codex /root",
+  "tests": 15,
+  "failures": 0,
+  "skipped": 0,
+  "command": "python -m unittest -v test_asset_control.py",
+  "python": "3.12.14",
+  "testedFiles": {
+    "asset_control.py": "28be59c18c8b67c61dd9eadd1dbad77ba4272ba21f698725bafea31c1c21770a",
+    "test_asset_control.py": "0c2e0f03a00b593aec71d65bc088e0b5a38270f25c46b6bb11c642b9efab4cd1"
+  },
+  "nativeApplicationTests": "not_run",
+  "runtimeVerified": false,
+  "productionReady": false
+}
