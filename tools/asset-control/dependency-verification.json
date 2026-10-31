@@ -1,0 +1,19 @@
+{
+  "schema": "system.dependency-audit-verification/1",
+  "scope": "source-metadata-tool-only",
+  "author": "Codex /root",
+  "tests": 26,
+  "failed": 0,
+  "skipped": 0,
+  "python": "3.12.14",
+  "testedFiles": {
+    "dependency_audit.py": "efe789f2ced221488128e3b9ea718b60429def86cf2c5f9ca6c73f7515ad3fd7",
+    "test_dependency_audit.py": "da473eea3b078657a72f59eaff00b4805898a4fb47940f863cdd5093d3bf6511"
+  },
+  "inspectedSource": "5be07d8abfcbb69a77a6d7065a468e5a2580694c",
+  "sourceStatus": "source-boundaries-checked",
+  "metadata": 3,
+  "nativeApplicationTests": "not_run",
+  "runtimeVerified": false,
+  "productionReady": false
+}

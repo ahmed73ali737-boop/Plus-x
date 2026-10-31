@@ -1,0 +1,17 @@
+{
+  "schema": "system.dependencies-result/1",
+  "repository": "ahmed73ali737-boop/Plus-x",
+  "revision": "5be07d8abfcbb69a77a6d7065a468e5a2580694c",
+  "scope": "source-metadata-only",
+  "coverage": "full-tree",
+  "metadataCompleteWithinTree": true,
+  "inspectedMetadata": 3,
+  "workspaceDirty": null,
+  "referenceCount": 0,
+  "references": [],
+  "findings": [],
+  "status": "source-boundaries-checked",
+  "inputSha256": "d22b966e015da07ca7bb24d1ca9e121e48a190401622616c1e3b9b06175ab4ea",
+  "runtimeVerified": false,
+  "productionReady": false
+}
