@@ -45,6 +45,15 @@ jobs:
           python -m pip check
       - name: Install Chromium and native browser libraries
         run: python -m playwright install --with-deps chromium
+      - name: Install a pg_dump/pg_restore client matching the PostgreSQL 18 service
+        # Ubuntu 24.04's own apt repo only ships postgresql-client-16; pg_dump/pg_restore
+        # refuse to talk to a newer server ("server version mismatch"). postgresql-common's
+        # pg_wrapper auto-selects the newest installed client when no local cluster is in
+        # play (as here, over --host/--port), so no PATH or tool changes are needed once
+        # postgresql-client-18 is installed.
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
       - name: Require actual Linux confinement before acceptance
         run: python -c "from app.application.self_certificate_sandbox import availability; assert availability(), 'Landlock ABI3+ and libseccomp are required; skipping isolation is not acceptance'"
       - name: Certificate and legacy contracts on SQLite
