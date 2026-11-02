@@ -52,12 +52,20 @@ jobs:
       - name: Certificate contracts on native PostgreSQL
         env:
           CERTIFICATE_TEST_POSTGRES: 'true'
-        run: >-
-          python -m pytest -q tests -o 'python_files=test_self_certificate*.py'
-          --ignore=tests/test_self_certificate_restore.py
-          --ignore=tests/test_self_certificate_browser_improvements.py
-          --ignore=tests/test_self_certificate_native_excel_fixture.py
-          --junitxml=qa/certificates/postgres.xml
+          PX_CERTIFICATE_NATIVE_RESTORE_COORDINATED: 'YES'
+        run: |
+          python tools/native_restore_coordinator.py --area qa/certificates/native-journey --ready-timeout 180 &
+          COORD_PID=$!
+          set +e
+          python -m pytest -q tests -o 'python_files=test_self_certificate*.py' \
+            --ignore=tests/test_self_certificate_restore.py \
+            --ignore=tests/test_self_certificate_browser_improvements.py \
+            --ignore=tests/test_self_certificate_native_excel_fixture.py \
+            --junitxml=qa/certificates/postgres.xml
+          PYTEST_STATUS=$?
+          set -e
+          wait "$COORD_PID" || true
+          exit "$PYTEST_STATUS"
       - name: Actual editor, participant and prepared-share browser journey
         env:
           PX_SELF_CERTIFICATE_BROWSER_ACCEPTANCE: 'YES'
@@ -67,9 +75,15 @@ jobs:
         env:
           CERTIFICATE_TEST_POSTGRES: 'true'
           RUN_CERTIFICATE_LOAD: '1000'
+          RUN_CERTIFICATE_LARGE_IMAGES: 'YES'
           CERTIFICATE_LOAD_COUNT: '100'
           CERTIFICATE_LOAD_REPORT: qa/certificates/load-100.json
-        run: python -m pytest -q tests/test_self_certificate_load_acceptance.py --junitxml=qa/certificates/load.xml
+        run: >-
+          python -m pytest -q
+          tests/test_self_certificate_load_acceptance.py
+          tests/test_self_certificate_load.py
+          "tests/test_self_certificate_operational_improvements.py::test_six_concurrent_eighteen_megapixel_outputs_preserve_dimensions"
+          --junitxml=qa/certificates/load.xml
       - name: Seal certificate evidence and source identity
         if: always()
         run: >-
