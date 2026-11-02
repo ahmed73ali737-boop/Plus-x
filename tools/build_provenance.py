@@ -106,8 +106,24 @@ def installed_packages() -> list[dict]:
                    if distribution.metadata.get("Name")), key=lambda row: row["name"].lower())
 
 
-def report_verdict(path: Path, system: str = "") -> dict:
-    """Validate designated acceptance reports, never intentional failure attachments."""
+def xml_passed_case_names(path: Path) -> set[str]:
+    """Qualified names of testcases that genuinely ran and passed in a JUnit report."""
+    document = ElementTree.parse(path).getroot()
+    return {case.get("classname", "") + "." + case.get("name", "")
+            for case in document.iter("testcase")
+            if case.find("skipped") is None and case.find("failure") is None
+            and case.find("error") is None}
+
+
+def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = frozenset()) -> dict:
+    """Validate designated acceptance reports, never intentional failure attachments.
+
+    A skip is tolerated only if it is the one documented platform exclusion, or if
+    the exact same test genuinely passed in another required report from this same
+    job (e.g. a browser-only case skipped under the SQLite report but executed for
+    real by the browser report) -- a skip never covered by any required report is
+    still a real gap and still fails.
+    """
     if path.suffix == ".xml":
         document = ElementTree.parse(path).getroot()
         cases = list(document.iter("testcase"))
@@ -117,7 +133,7 @@ def report_verdict(path: Path, system: str = "") -> dict:
         suites = list(document.iter("testsuite"))
         failed = any(case.find("failure") is not None or case.find("error") is not None for case in cases)
         failed |= any(int(suite.get("failures", 0)) or int(suite.get("errors", 0)) for suite in suites)
-        failed |= any(name not in allowed for name in skipped)
+        failed |= any(name not in allowed and name not in peer_passed for name in skipped)
         return {"verified": bool(cases) and len(cases) > len(skipped) and not failed,
                 "kind": "junit", "executed_passes": len(cases) - len(skipped) if not failed else None,
                 "excluded_not_passed": skipped}
@@ -212,13 +228,21 @@ def snapshot(args, root: Path = ROOT) -> int:
         failures.append("ENVIRONMENT_PROBE_FAILED:" + type(exc).__name__)
     required_reports = []
     by_source = {item["source_path"]: item for item in evidence}
+    peer_passed: set[str] = set()
+    for name in args.require_pass:
+        item = by_source.get(name)
+        if item and Path(item["path"]).suffix == ".xml":
+            try:
+                peer_passed |= xml_passed_case_names(output.parent / item["path"])
+            except (OSError, ValueError, ElementTree.ParseError):
+                pass
     for name in args.require_pass:
         item = by_source.get(name)
         if not item:
             failures.append("REQUIRED_REPORT_NOT_ATTACHED:" + name)
             continue
         try:
-            verdict = report_verdict(output.parent / item["path"], environment.get("system", ""))
+            verdict = report_verdict(output.parent / item["path"], environment.get("system", ""), frozenset(peer_passed))
         except (OSError, ValueError, ElementTree.ParseError):
             verdict = {"verified": False, "kind": "invalid_report"}
         required_reports.append({"path": item["path"], "source_path": name, **verdict})
@@ -273,11 +297,20 @@ def validate(evidence_root: Path, required_jobs: list[str], verify_ci: bool = Fa
         attached = {item["path"] for item in record.get("evidence", [])}
         if not record.get("required_reports"):
             failures.append("NO_ACCEPTANCE_REPORTS:" + str(job))
+        peer_passed: set[str] = set()
+        for report in record.get("required_reports", []):
+            report_path = path.parent / report["path"]
+            if report["path"] in attached and report_path.suffix == ".xml" \
+                    and report_path.resolve().is_relative_to(path.parent.resolve()):
+                try:
+                    peer_passed |= xml_passed_case_names(report_path)
+                except (OSError, ValueError, ElementTree.ParseError):
+                    pass
         for report in record.get("required_reports", []):
             report_path = path.parent / report["path"]
             try:
                 safe = report["path"] in attached and report_path.resolve().is_relative_to(path.parent.resolve())
-                verdict = report_verdict(report_path, record.get("environment", {}).get("system", "")) if safe else {"verified": False}
+                verdict = report_verdict(report_path, record.get("environment", {}).get("system", ""), frozenset(peer_passed)) if safe else {"verified": False}
             except (OSError, ValueError, ElementTree.ParseError):
                 verdict = {"verified": False}
             if not verdict["verified"]:
