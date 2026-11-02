@@ -70,12 +70,12 @@ def restore(admin_url, source_name: str, restore_name: str) -> dict:
     dump_seconds = time.monotonic() - started
     restored_started = time.monotonic()
     restore_proc = subprocess.run(['pg_restore', '--format=custom', '--dbname', restore_name,
-                                    '--no-owner', '--no-privileges', '--clean', '--if-exists', *common],
+                                    '--no-owner', '--no-privileges', '--clean', '--if-exists', '--exit-on-error', *common],
                                    input=dump_proc.stdout, capture_output=True, timeout=120, env=env)
-    # pg_restore --clean warns (exit 1) about objects that don't exist yet on an
-    # empty target database; only a genuinely fatal restore is treated as a failure.
+    # --if-exists already handles absent objects. A nonzero status means the
+    # restore was not completed and must never produce a restored.json receipt.
     stderr_text = restore_proc.stderr.decode(errors='replace')
-    if restore_proc.returncode not in (0, 1) or 'FATAL' in stderr_text:
+    if restore_proc.returncode != 0:
         raise RuntimeError('pg_restore_FAILED:' + stderr_text[-2000:])
     restore_seconds = time.monotonic() - restored_started
     return {'backup': {'bytes': len(dump_proc.stdout), 'seconds': round(dump_seconds, 3)},
