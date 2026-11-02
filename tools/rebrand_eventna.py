@@ -11,6 +11,10 @@ from app.core.build_info import APP_NAME
 from app.db import make_engine, sites, versions
 from app.domain import now
 
+# The legacy brand's own titles always follow "PulseX — <tagline>"; a customer's
+# title that merely starts with the bare word "PulseX" (no em dash) is not ours.
+LEGACY_BRAND_PREFIX = 'PulseX —'
+
 
 def rebrand(engine, *, apply=False):
     changes = []
@@ -20,13 +24,13 @@ def rebrand(engine, *, apply=False):
         for site in platforms:
             draft = deepcopy(site['draft'])
             updates = {}
-            if draft.get('title', '').startswith('PulseX'):
+            if draft.get('title', '').startswith(LEGACY_BRAND_PREFIX):
                 draft['title'] = APP_NAME
                 updates.update(draft=draft, draft_rev=site['draft_rev'] + 1)
             published = conn.execute(select(versions).where(
                 versions.c.site_id == site['id'],
                 versions.c.version == site['published_version'])).mappings().first()
-            if published and published['config'].get('title', '').startswith('PulseX'):
+            if published and published['config'].get('title', '').startswith(LEGACY_BRAND_PREFIX):
                 config = deepcopy(published['config'])
                 config['title'] = APP_NAME
                 updates['published_version'] = site['published_version'] + 1
