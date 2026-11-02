@@ -189,6 +189,40 @@ def test_platform_exclusion_is_explicit_and_not_counted_as_a_pass(tmp_path):
     assert provenance.report_verdict(report, "Linux")["verified"] is False
 
 
+def test_skip_covered_by_a_sibling_required_report_is_not_a_failure(tmp_path):
+    """A browser-only case skipped under the SQLite report still counts once the
+    same case genuinely passes in another required report from the same job --
+    this is how certificates.yml's sqlite/postgres/browser/load split behaves."""
+    sqlite_report = tmp_path / "sqlite.xml"
+    sqlite_report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                              '<testcase classname="tests.test_browser" name="test_editor"><skipped/></testcase>'
+                              '</testsuite></testsuites>')
+    browser_report = tmp_path / "browser.xml"
+    browser_report.write_text('<testsuites><testsuite failures="0">'
+                               '<testcase classname="tests.test_browser" name="test_editor"/>'
+                               '</testsuite></testsuites>')
+    peer_passed = provenance.xml_passed_case_names(browser_report)
+    assert provenance.report_verdict(sqlite_report)["verified"] is False
+    result = provenance.report_verdict(sqlite_report, peer_passed=peer_passed)
+    assert result["verified"] is True
+    assert result["executed_passes"] == 1
+
+
+def test_skip_never_passing_in_any_sibling_report_still_fails(tmp_path):
+    """A skip that no required report ever actually executes and passes is still
+    a real gap, not something a sibling report can wave through by its presence."""
+    sqlite_report = tmp_path / "sqlite.xml"
+    sqlite_report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                              '<testcase classname="tests.test_browser" name="test_editor"><skipped/></testcase>'
+                              '</testsuite></testsuites>')
+    browser_report = tmp_path / "browser.xml"
+    browser_report.write_text('<testsuites><testsuite failures="0">'
+                               '<testcase classname="tests.test_other" name="test_unrelated"/>'
+                               '</testsuite></testsuites>')
+    peer_passed = provenance.xml_passed_case_names(browser_report)
+    assert provenance.report_verdict(sqlite_report, peer_passed=peer_passed)["verified"] is False
+
+
 @pytest.mark.parametrize("key", ["passed", "verified"])
 def test_contradictory_green_json_is_rejected(tmp_path, key):
     report = tmp_path / "result.json"
