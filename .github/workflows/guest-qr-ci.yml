@@ -15,6 +15,11 @@ env:
   PYTHONUTF8: "1"
   SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
   PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
+concurrency:
+  # Cancel only a pull request run superseded by a newer commit; default-branch runs always finish.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   guest-identity-and-offline-contract:
     runs-on: ubuntu-24.04
