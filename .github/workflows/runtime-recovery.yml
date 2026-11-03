@@ -9,6 +9,11 @@ permissions:
 env:
   SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
   PYTHONUTF8: "1"
+concurrency:
+  # Cancel only a pull request run superseded by a newer commit; default-branch runs always finish.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   recovery:
     runs-on: ubuntu-latest

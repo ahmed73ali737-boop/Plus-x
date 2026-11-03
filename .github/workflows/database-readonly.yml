@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Cancel only a pull request run superseded by a newer commit; default-branch runs always finish.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   source-safety:
     runs-on: ubuntu-latest
