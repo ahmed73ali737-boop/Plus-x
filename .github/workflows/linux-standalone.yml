@@ -251,11 +251,11 @@ jobs:
           .venv/bin/python -m tools.prepare_runtime --profile qa-postgres --check
       - name: ARM64 backend, DB and source QA
         run: |
-          .venv/bin/python -m pytest -q --junitxml=qa/ci/arm64-qa/junit.xml
           .venv/bin/python tests/native_acceptance.py
           .venv/bin/python tests/postgres_native_acceptance.py
           .venv/bin/python tests/postgres_invitations_acceptance.py
           .venv/bin/python tests/postgres_capacity_smoke.py
+          .venv/bin/python -m pytest -q --junitxml=qa/ci/arm64-qa/junit.xml
       - name: Build and inspect native Linux ARM64 container
         run: |
           docker build --platform linux/arm64 --build-arg "PULSEX_SOURCE_SHA=$SOURCE_HEAD" -f ops/Dockerfile -t pulsex-arm64-ci .
