@@ -266,7 +266,7 @@ jobs:
         run: |
           evidence_python=python
           if [ -x .venv/bin/python ]; then evidence_python=.venv/bin/python; fi
-          "$evidence_python" tools/build_provenance.py snapshot --baseline qa/ci/arm64-qa/baseline.json --output qa/ci/arm64-qa/bundle/provenance.json --verify-ci --profile qa-postgres --job-id arm64-qa --job-status '${{ job.status }}' --probe-postgres --evidence 'qa/ci/arm64-qa/source-locks.json' --evidence 'qa/ci/arm64-qa/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/postgres-invitations-acceptance.json' --require-pass 'qa/ci/arm64-qa/source-locks.json' --require-pass 'qa/ci/arm64-qa/junit.xml' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/postgres-invitations-acceptance.json' --evidence 'qa/contracts'
+          "$evidence_python" tools/build_provenance.py snapshot --baseline qa/ci/arm64-qa/baseline.json --output qa/ci/arm64-qa/bundle/provenance.json --verify-ci --profile qa-postgres --job-id arm64-qa --job-status '${{ job.status }}' --probe-postgres --evidence 'qa/ci/arm64-qa/source-locks.json' --evidence 'qa/ci/arm64-qa/junit.xml' --evidence 'qa/contracts/invitations-ui-contract.json' --evidence 'qa/postgres-invitations-acceptance.json' --require-pass 'qa/ci/arm64-qa/source-locks.json' --require-pass 'qa/contracts/invitations-ui-contract.json' --require-pass 'qa/postgres-invitations-acceptance.json' --evidence 'qa/contracts'
       - name: Upload same-run source and acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
