@@ -22,6 +22,55 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 1
 
+DEFERRED_ACCEPTANCE_SKIPS = {
+    "tests.test_self_certificate_browser_improvements.test_editor_admin_participant_and_prepared_share":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_data.test_postgres_twenty_concurrent_requests_keep_one_request_and_one_job":
+        "Native PostgreSQL concurrency acceptance",
+    "tests.test_self_certificate_improvements.test_uncommitted_older_transaction_is_outside_export_snapshot":
+        "Requires independent PostgreSQL MVCC transactions",
+    "tests.test_self_certificate_limits.test_postgres_limit_is_shared_across_engines_and_survives_worker_restart":
+        "isolated PostgreSQL shared-counter rehearsal is opt-in",
+    "tests.test_self_certificate_load.test_1000_distributed_participant_requests_issue_once_and_export_concurrently":
+        "isolated 1000 participant rehearsal is opt-in",
+    "tests.test_self_certificate_load_acceptance.test_distributed_participant_load_with_request_snapshot_and_final_assets":
+        "Explicit isolated load rehearsal required",
+    "tests.test_self_certificate_migration_improvements.test_sql_only_new_schema_matches_metadata_columns_keys_constraints":
+        "SQL-only native PostgreSQL acceptance",
+    "tests.test_self_certificate_migration_improvements.test_ownership_migration_stops_without_reassigning_legacy_bad_row":
+        "SQL-only native PostgreSQL acceptance",
+    "tests.test_self_certificate_native_upgrade_restore.test_historical_upgrade_then_native_backup_restore_and_rollback":
+        "Dedicated native PostgreSQL with host dump/restore coordination required",
+    "tests.test_self_certificate_operational_improvements.test_postgres_lease_uses_database_clock_when_application_clock_is_wrong":
+        "Native database clock acceptance",
+    "tests.test_self_certificate_operational_improvements.test_six_concurrent_eighteen_megapixel_outputs_preserve_dimensions":
+        "Explicit bounded 18MP memory acceptance",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PNG-size0]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PNG-size1]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PNG-size2]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[JPEG-size3]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[JPEG-size4]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[JPEG-size5]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PDF-size6]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PDF-size7]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PDF-size8]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_editor_width_fit_scroll_zoom_and_original_geometry[PNG-size9]":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_participant_header_and_share_text_absence_on_all_fallbacks":
+        "Explicit browser acceptance with installed Chromium required",
+    "tests.test_self_certificate_preview_share_browser.test_long_text_single_preparation_rejection_and_invalid_header":
+        "Explicit browser acceptance with installed Chromium required",
+}
+
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -115,7 +164,15 @@ def xml_passed_case_names(path: Path) -> set[str]:
             and case.find("error") is None}
 
 
-def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = frozenset()) -> dict:
+def deferred_acceptance_skips(profile: str, job_id: str) -> dict[str, str]:
+    """Known opt-in certificate scenarios excluded from the standalone QA jobs."""
+    if (profile, job_id) in {("qa", "linux-qa"), ("qa-postgres", "arm64-qa")}:
+        return DEFERRED_ACCEPTANCE_SKIPS
+    return {}
+
+
+def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = frozenset(),
+                   expected_deferred_skips: dict[str, str] | None = None) -> dict:
     """Validate designated acceptance reports, never intentional failure attachments.
 
     A skip is tolerated only if it is the one documented platform exclusion, or if
@@ -127,13 +184,18 @@ def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = f
     if path.suffix == ".xml":
         document = ElementTree.parse(path).getroot()
         cases = list(document.iter("testcase"))
-        skipped = [case.get("classname", "") + "." + case.get("name", "")
-                   for case in cases if case.find("skipped") is not None]
+        skipped_cases = [(case.get("classname", "") + "." + case.get("name", ""),
+                          case.find("skipped").get("message") or case.find("skipped").text or "")
+                         for case in cases if case.find("skipped") is not None]
+        skipped = [name for name, _ in skipped_cases]
         allowed = {"tests.test_linux_standalone_contract.test_credentials_are_exclusive_and_0600_under_permissive_umask"} if system == "Windows" else set()
         suites = list(document.iter("testsuite"))
         failed = any(case.find("failure") is not None or case.find("error") is not None for case in cases)
         failed |= any(int(suite.get("failures", 0)) or int(suite.get("errors", 0)) for suite in suites)
-        failed |= any(name not in allowed and name not in peer_passed for name in skipped)
+        expected_deferred_skips = expected_deferred_skips or {}
+        failed |= any(name not in allowed and name not in peer_passed
+                      and expected_deferred_skips.get(name) != reason
+                      for name, reason in skipped_cases)
         return {"verified": bool(cases) and len(cases) > len(skipped) and not failed,
                 "kind": "junit", "executed_passes": len(cases) - len(skipped) if not failed else None,
                 "excluded_not_passed": skipped}
@@ -242,7 +304,9 @@ def snapshot(args, root: Path = ROOT) -> int:
             failures.append("REQUIRED_REPORT_NOT_ATTACHED:" + name)
             continue
         try:
-            verdict = report_verdict(output.parent / item["path"], environment.get("system", ""), frozenset(peer_passed))
+            verdict = report_verdict(output.parent / item["path"], environment.get("system", ""),
+                                     frozenset(peer_passed),
+                                     deferred_acceptance_skips(args.profile, args.job_id))
         except (OSError, ValueError, ElementTree.ParseError):
             verdict = {"verified": False, "kind": "invalid_report"}
         required_reports.append({"path": item["path"], "source_path": name, **verdict})
@@ -310,7 +374,10 @@ def validate(evidence_root: Path, required_jobs: list[str], verify_ci: bool = Fa
             report_path = path.parent / report["path"]
             try:
                 safe = report["path"] in attached and report_path.resolve().is_relative_to(path.parent.resolve())
-                verdict = report_verdict(report_path, record.get("environment", {}).get("system", ""), frozenset(peer_passed)) if safe else {"verified": False}
+                verdict = report_verdict(
+                    report_path, record.get("environment", {}).get("system", ""),
+                    frozenset(peer_passed),
+                    deferred_acceptance_skips(record.get("profile", ""), str(job))) if safe else {"verified": False}
             except (OSError, ValueError, ElementTree.ParseError):
                 verdict = {"verified": False}
             if not verdict["verified"]:

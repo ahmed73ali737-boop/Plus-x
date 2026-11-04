@@ -32,11 +32,11 @@ def repository(tmp_path, monkeypatch):
     return root, context
 
 
-def args(root: Path, *, final: bool = False):
-    folder = root / "evidence" / "python-core"
+def args(root: Path, *, final: bool = False, profile: str = "qa", job_id: str = "python-core"):
+    folder = root / "evidence" / job_id
     return Namespace(output=str(folder / ("provenance.json" if final else "baseline.json")),
                      baseline=str(folder / "baseline.json") if final else None,
-                     profile="qa", job_id="python-core", job_status="success" if final else "running",
+                     profile=profile, job_id=job_id, job_status="success" if final else "running",
                      verify_ci=True, evidence=["qa/result.json"] if final else [],
                      require_pass=["qa/result.json"] if final else [],
                      probe_browser=False, probe_postgres=False)
@@ -187,6 +187,51 @@ def test_platform_exclusion_is_explicit_and_not_counted_as_a_pass(tmp_path):
     assert result["executed_passes"] == 1
     assert len(result["excluded_not_passed"]) == 1
     assert provenance.report_verdict(report, "Linux")["verified"] is False
+
+
+def test_standalone_jobs_record_expected_deferred_acceptance_skips(repository):
+    root, context = repository
+    context["job"] = "linux-qa"
+    report_path = root / "qa" / "junit.xml"
+    report_path.parent.mkdir()
+    skipped_name = (
+        "tests.test_self_certificate_browser_improvements."
+        "test_editor_admin_participant_and_prepared_share"
+    )
+    skipped_reason = "Explicit browser acceptance with installed Chromium required"
+    report_path.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="passed"/>'
+        f'<testcase classname="tests.test_self_certificate_browser_improvements" '
+        f'name="test_editor_admin_participant_and_prepared_share"><skipped message="{skipped_reason}"/>'
+        '</testcase></testsuite></testsuites>'
+    )
+    initial = args(root, profile="qa", job_id="linux-qa")
+    assert provenance.snapshot(initial, root) == 0
+    final = args(root, final=True, profile="qa", job_id="linux-qa")
+    final.evidence = ["qa/junit.xml"]
+    final.require_pass = ["qa/junit.xml"]
+    assert provenance.snapshot(final, root) == 0
+
+    record = json.loads(Path(final.output).read_text())
+    report = record["required_reports"][0]
+    assert report["verified"] is True
+    assert report["executed_passes"] == 1
+    assert report["excluded_not_passed"] == [skipped_name]
+    assert provenance.validate(root / "evidence", ["linux-qa"], True, context, root)["verified"] is True
+
+
+def test_deferred_skip_allowlist_is_scoped_and_reason_sensitive(tmp_path):
+    report = tmp_path / "junit.xml"
+    report.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="passed"/>'
+        '<testcase classname="tests.test_self_certificate_browser_improvements" '
+        'name="test_editor_admin_participant_and_prepared_share">'
+        '<skipped message="unexpected environment skip"/></testcase></testsuite></testsuites>'
+    )
+    allowed = provenance.deferred_acceptance_skips("qa", "linux-qa")
+    assert provenance.report_verdict(report, expected_deferred_skips=allowed)["verified"] is False
+    assert provenance.deferred_acceptance_skips("qa", "other-job") == {}
+    assert provenance.deferred_acceptance_skips("other-profile", "linux-qa") == {}
 
 
 def test_skip_covered_by_a_sibling_required_report_is_not_a_failure(tmp_path):
