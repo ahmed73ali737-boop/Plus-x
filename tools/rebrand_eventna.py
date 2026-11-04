@@ -20,13 +20,13 @@ def rebrand(engine, *, apply=False):
         for site in platforms:
             draft = deepcopy(site['draft'])
             updates = {}
-            if draft.get('title', '').startswith('PulseX'):
+            if draft.get('title', '').startswith('PulseX — '):
                 draft['title'] = APP_NAME
                 updates.update(draft=draft, draft_rev=site['draft_rev'] + 1)
             published = conn.execute(select(versions).where(
                 versions.c.site_id == site['id'],
                 versions.c.version == site['published_version'])).mappings().first()
-            if published and published['config'].get('title', '').startswith('PulseX'):
+            if published and published['config'].get('title', '').startswith('PulseX — '):
                 config = deepcopy(published['config'])
                 config['title'] = APP_NAME
                 updates['published_version'] = site['published_version'] + 1
