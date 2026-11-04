@@ -30,8 +30,14 @@ def run():
             assert page.locator('html').get_attribute('data-appearance')=='dark'
             assert page.locator('.preference-card .field>span').first.evaluate('(el)=>getComputedStyle(el).color')=='rgb(220, 233, 239)'
             page.get_by_role('button',name='إغلاق الإعدادات',exact=True).wait_for()
-            page.set_viewport_size({'width':390,'height':844})
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            # The inline help action must wrap with the header, including at
+            # enlarged text size, rather than pushing the page off the phone.
+            for width in (320, 360, 390):
+                page.set_viewport_size({'width':width,'height':844})
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+                help_button = page.locator('header.access-header #uhef-help')
+                assert help_button.is_visible()
+                assert help_button.evaluate('(el)=>{const r=el.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth}')
             page.screenshot(path=str(evidence/'mobile-settings.png'))
             page.reload();assert page.locator('html').get_attribute('data-appearance')=='dark'
             admin=next(x for x in app.state.seed_credentials if x['email']=='admin@pulsex.test')
@@ -57,3 +63,4 @@ def run():
         temporary.cleanup()
 
 if __name__=='__main__':run()
+
