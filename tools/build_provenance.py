@@ -115,28 +115,54 @@ def xml_passed_case_names(path: Path) -> set[str]:
             and case.find("error") is None}
 
 
+def accepted_skip_reasons(system: str = "") -> frozenset[str]:
+    """Committed, reviewed skip reasons from qa/accepted-skip-exclusions.json.
+
+    Each entry names the gate that genuinely executes the excluded coverage; an
+    entry with a "platforms" list applies only on those platforms. A missing or
+    unreadable manifest yields no tolerated reasons, so the gate stays strict.
+    """
+    try:
+        manifest = json.loads((ROOT / "qa" / "accepted-skip-exclusions.json").read_text(encoding="utf-8"))
+        return frozenset(item["reason"] for item in manifest.get("exclusions", [])
+                         if isinstance(item, dict) and item.get("reason") and item.get("covered_by")
+                         and (not item.get("platforms") or system in item["platforms"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return frozenset()
+
+
 def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = frozenset()) -> dict:
     """Validate designated acceptance reports, never intentional failure attachments.
 
-    A skip is tolerated only if it is the one documented platform exclusion, or if
-    the exact same test genuinely passed in another required report from this same
-    job (e.g. a browser-only case skipped under the SQLite report but executed for
-    real by the browser report) -- a skip never covered by any required report is
+    A skip is tolerated only if its skip message is a documented platform/profile
+    exclusion committed in qa/accepted-skip-exclusions.json (each one names the
+    gate that really executes that coverage), or if the exact same test genuinely
+    passed in another required report from this same job (e.g. a browser-only case
+    skipped under the SQLite report but executed for real by the browser report)
+    -- a skip never covered by any required report or documented exclusion is
     still a real gap and still fails.
     """
     if path.suffix == ".xml":
         document = ElementTree.parse(path).getroot()
         cases = list(document.iter("testcase"))
-        skipped = [case.get("classname", "") + "." + case.get("name", "")
-                   for case in cases if case.find("skipped") is not None]
+        reasons = accepted_skip_reasons(system)
         allowed = {"tests.test_linux_standalone_contract.test_credentials_are_exclusive_and_0600_under_permissive_umask"} if system == "Windows" else set()
+        skipped, undocumented = [], []
+        for case in cases:
+            marker = case.find("skipped")
+            if marker is None:
+                continue
+            name = case.get("classname", "") + "." + case.get("name", "")
+            skipped.append(name)
+            if name not in allowed and name not in peer_passed and (marker.get("message") or "") not in reasons:
+                undocumented.append(name)
         suites = list(document.iter("testsuite"))
         failed = any(case.find("failure") is not None or case.find("error") is not None for case in cases)
         failed |= any(int(suite.get("failures", 0)) or int(suite.get("errors", 0)) for suite in suites)
-        failed |= any(name not in allowed and name not in peer_passed for name in skipped)
+        failed |= bool(undocumented)
         return {"verified": bool(cases) and len(cases) > len(skipped) and not failed,
                 "kind": "junit", "executed_passes": len(cases) - len(skipped) if not failed else None,
-                "excluded_not_passed": skipped}
+                "excluded_not_passed": skipped, "undocumented_skips": undocumented}
     report = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(report, dict):
         return {"verified": False, "kind": "json"}
