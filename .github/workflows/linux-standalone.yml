@@ -48,6 +48,8 @@ jobs:
         run: |
           python3 -m tools.prepare_runtime --profile qa
           .venv/bin/python -m tools.prepare_runtime --profile qa --check
+      - name: Chromium on Ubuntu 24.04
+        run: .venv/bin/python -m playwright install --with-deps chromium
       - name: Syntax and QA suite
         run: |
           .venv/bin/python -m compileall -q app tools tests run.py
@@ -86,8 +88,6 @@ jobs:
           source tools/ci_shutdown_gate.sh
           pulsex_assert_sigterm_shutdown "$pid" http://127.0.0.1:43257/api/health/live
           trap - EXIT
-      - name: Chromium on Ubuntu 24.04
-        run: .venv/bin/python -m playwright install --with-deps chromium
       - name: Real browser and offline journeys
         run: |
           .venv/bin/python tests/browser_smoke.py

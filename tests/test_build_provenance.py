@@ -223,6 +223,52 @@ def test_skip_never_passing_in_any_sibling_report_still_fails(tmp_path):
     assert provenance.report_verdict(sqlite_report, peer_passed=peer_passed)["verified"] is False
 
 
+def test_deferred_skip_is_scoped_to_exact_profile_job_and_reason(tmp_path):
+    report = tmp_path / "junit.xml"
+    case = "tests.test_self_certificate_data.test_postgres_twenty_concurrent_requests_keep_one_request_and_one_job"
+    classname, name = case.rsplit(".", 1)
+    report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                      f'<testcase classname="{classname}" name="{name}">'
+                      '<skipped message="Native PostgreSQL concurrency acceptance"/>'
+                      '</testcase></testsuite></testsuites>')
+
+    result = provenance.report_verdict(report, profile="qa", job_id="linux-qa")
+    assert result["verified"] is True
+    assert result["executed_passes"] == 1
+    assert result["excluded_not_passed"] == [case]
+    assert provenance.report_verdict(report, profile="qa", job_id="postgres-qa")["verified"] is False
+
+    report.write_text(report.read_text().replace(
+        "Native PostgreSQL concurrency acceptance", "unexpected skip reason"))
+    assert provenance.report_verdict(report, profile="qa", job_id="linux-qa")["verified"] is False
+    report.write_text(report.read_text().replace(
+        "unexpected skip reason", "Native PostgreSQL concurrency acceptance").replace(
+            name, "test_unlisted_case"))
+    assert provenance.report_verdict(report, profile="qa", job_id="linux-qa")["verified"] is False
+
+
+def test_profile_deferred_skip_survives_provenance_validation(repository):
+    root, context = repository
+    context["job"] = "linux-qa"
+    baseline = args(root)
+    baseline.job_id = "linux-qa"
+    assert provenance.snapshot(baseline, root) == 0
+
+    (root / "qa").mkdir()
+    (root / "qa/result.xml").write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        '<testcase classname="tests.test_self_certificate_data" '
+        'name="test_postgres_twenty_concurrent_requests_keep_one_request_and_one_job">'
+        '<skipped message="Native PostgreSQL concurrency acceptance"/></testcase>'
+        '</testsuite></testsuites>')
+    final = args(root, final=True)
+    final.job_id = "linux-qa"
+    final.evidence = ["qa/result.xml"]
+    final.require_pass = ["qa/result.xml"]
+    assert provenance.snapshot(final, root) == 0
+    assert provenance.validate(root / "evidence", ["linux-qa"], True, context, root)["verified"] is True
+
+
 @pytest.mark.parametrize("key", ["passed", "verified"])
 def test_contradictory_green_json_is_rejected(tmp_path, key):
     report = tmp_path / "result.json"
