@@ -76,6 +76,8 @@ jobs:
           node tests/storyboard_ui_contract.mjs
       - name: Verify first-login session safety UI
         run: node tests/session_ui_contract.mjs
+      - name: Verify UHEF contextual help engine contract
+        run: node tests/uhef_help_contract.mjs
       - name: Run Python SDK real HTTP smoke
         run: python tests/sdk_native_smoke.py
       - name: Upload hardening and capacity evidence
@@ -167,6 +169,8 @@ jobs:
         run: python tests/browser_phone_accounts.py
       - name: Verify admin P1 navigation and account list refresh
         run: python tests/browser_admin_p1.py
+      - name: Verify UHEF help on every screen and Studio tab in Chromium
+        run: python tests/browser_uhef_help.py
       - name: Verify independent account approval, applicant setup and every crew role
         run: python tests/browser_account_approval.py
       - name: Run Windows full question control roundtrip
@@ -186,6 +190,7 @@ jobs:
             qa/app-entry/
             qa/phone-accounts/
             qa/admin-p1/
+            qa/uhef-help/
             qa/account-approval/
             qa/browser-smoke.json
             qa/browser-platform-diagnostic.json
