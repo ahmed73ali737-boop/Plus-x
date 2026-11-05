@@ -189,6 +189,46 @@ def test_platform_exclusion_is_explicit_and_not_counted_as_a_pass(tmp_path):
     assert provenance.report_verdict(report, "Linux")["verified"] is False
 
 
+@pytest.mark.parametrize(("job_id", "classname", "reason"), [
+    ("python-core", "tests.test_self_certificate_browser_improvements",
+     "Explicit browser acceptance with installed Chromium required"),
+    ("windows-core", "tests.test_self_certificate_assets",
+     "Isolated Linux decoder required; dedicated Linux CI covers this module"),
+])
+def test_job_deferred_skip_is_allowed_but_not_counted_as_a_pass(tmp_path, job_id, classname, reason):
+    report = tmp_path / "junit.xml"
+    report.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        f'<testcase classname="{classname}" name="deferred"><skipped message="{reason}"/>'
+        '</testcase></testsuite></testsuites>')
+    result = provenance.report_verdict(report, "Windows", job_id=job_id, profile="qa")
+    assert result["verified"] is True
+    assert result["executed_passes"] == 1
+    assert result["excluded_not_passed"] == [f"{classname}.deferred"]
+
+
+def test_job_deferred_skip_is_rejected_outside_its_job_and_profile(tmp_path):
+    report = tmp_path / "junit.xml"
+    report.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        '<testcase classname="tests.test_self_certificate_assets" name="deferred">'
+        '<skipped message="Isolated Linux decoder required; dedicated Linux CI covers this module"/>'
+        '</testcase></testsuite></testsuites>')
+    assert provenance.report_verdict(report, "Windows", job_id="python-core", profile="qa")["verified"] is False
+    assert provenance.report_verdict(report, "Windows", job_id="windows-core", profile="runtime")["verified"] is False
+    assert provenance.report_verdict(report, "Windows", job_id="windows-core", profile="qa")["verified"] is True
+
+
+def test_job_deferred_skip_requires_the_expected_test_and_reason(tmp_path):
+    report = tmp_path / "junit.xml"
+    report.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        '<testcase classname="tests.test_self_certificate_assets" name="deferred">'
+        '<skipped message="unexpected skip"/>'
+        '</testcase></testsuite></testsuites>')
+    assert provenance.report_verdict(report, "Windows", job_id="windows-core", profile="qa")["verified"] is False
+
+
 def test_skip_covered_by_a_sibling_required_report_is_not_a_failure(tmp_path):
     """A browser-only case skipped under the SQLite report still counts once the
     same case genuinely passes in another required report from the same job --
@@ -221,6 +261,22 @@ def test_skip_never_passing_in_any_sibling_report_still_fails(tmp_path):
                                '</testsuite></testsuites>')
     peer_passed = provenance.xml_passed_case_names(browser_report)
     assert provenance.report_verdict(sqlite_report, peer_passed=peer_passed)["verified"] is False
+
+
+def test_job_deferred_skip_survives_provenance_validation(repository):
+    root, context = repository
+    assert provenance.snapshot(args(root), root) == 0
+    (root / "qa").mkdir()
+    (root / "qa/junit.xml").write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        '<testcase classname="tests.test_self_certificate_browser_improvements" name="deferred">'
+        '<skipped message="Explicit browser acceptance with installed Chromium required"/>'
+        '</testcase></testsuite></testsuites>')
+    options = args(root, final=True)
+    options.evidence = ["qa/junit.xml"]
+    options.require_pass = ["qa/junit.xml"]
+    assert provenance.snapshot(options, root) == 0
+    assert check(repository)["verified"] is True
 
 
 @pytest.mark.parametrize("key", ["passed", "verified"])
