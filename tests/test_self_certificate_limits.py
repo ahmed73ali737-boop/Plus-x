@@ -13,13 +13,17 @@ from app.self_certificates_db import rate_buckets
 def _assert_shared_bucket(url):
     timeout_option = 'timeout' if url.startswith('sqlite:') else 'connect_timeout'
     engines = [create_engine(url, connect_args={timeout_option: 20}) for _ in range(2)]
+    # A one-hour window keeps every consume in this test inside the same bucket.
+    # With the production 60s window the test starts near a window boundary once
+    # in a while, the counter resets mid-test and the expected 429 never comes.
+    window_seconds = 3600
     try:
         rate_buckets.create(engines[0])
 
         def attempt(index):
             engine = engines[index % len(engines)]
             try:
-                consume(engine, 'certificate-submit', 'synthetic-browser', limit=30)
+                consume(engine, 'certificate-submit', 'synthetic-browser', limit=30, seconds=window_seconds)
                 return True
             except HTTPException as error:
                 assert error.status_code == 429 and error.detail == 'RATE_LIMIT'
@@ -36,7 +40,7 @@ def _assert_shared_bucket(url):
         restarted = create_engine(url, connect_args={timeout_option: 20})
         try:
             with pytest.raises(HTTPException) as error:
-                consume(restarted, 'certificate-submit', 'synthetic-browser', limit=30)
+                consume(restarted, 'certificate-submit', 'synthetic-browser', limit=30, seconds=window_seconds)
             assert error.value.status_code == 429
             assert error.value.detail == 'RATE_LIMIT'
         finally:
