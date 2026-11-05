@@ -171,11 +171,10 @@ def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = f
                    job_id: str = "", profile: str = "") -> dict:
     """Validate designated acceptance reports, never intentional failure attachments.
 
-    A skip is tolerated only if it is the one documented platform exclusion, or if
-    the exact same test genuinely passed in another required report from this same
-    job (e.g. a browser-only case skipped under the SQLite report but executed for
-    real by the browser report) -- a skip never covered by any required report is
-    still a real gap and still fails.
+    A skip is tolerated only if it is a documented platform exclusion, an exact
+    job/profile-scoped deferral, or if the same test genuinely passed in another
+    required report from this job. Every skipped case remains excluded from the
+    pass count.
     """
     if path.suffix == ".xml":
         document = ElementTree.parse(path).getroot()
@@ -189,9 +188,12 @@ def report_verdict(path: Path, system: str = "", peer_passed: frozenset[str] = f
         suites = list(document.iter("testsuite"))
         failed = any(case.find("failure") is not None or case.find("error") is not None for case in cases)
         failed |= any(int(suite.get("failures", 0)) or int(suite.get("errors", 0)) for suite in suites)
-        failed |= any(name not in allowed and name not in peer_passed
-                      and deferred.get(name) != (skipped_node.get("message") or "")
-                      for (case, skipped_node), name in zip(skipped_cases, skipped))
+        for case, skipped_node in skipped_cases:
+            name = case.get("classname", "") + "." + case.get("name", "")
+            if name not in allowed and name not in peer_passed \
+                    and deferred.get(name) != (skipped_node.get("message") or ""):
+                failed = True
+                break
         return {"verified": bool(cases) and len(cases) > len(skipped) and not failed,
                 "kind": "junit", "executed_passes": len(cases) - len(skipped) if not failed else None,
                 "excluded_not_passed": skipped}
