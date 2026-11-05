@@ -176,6 +176,39 @@ def test_failed_junit_rejected_even_if_suite_claims_zero_failures(tmp_path):
     assert provenance.report_verdict(report)["verified"] is False
 
 
+def test_documented_skip_reason_is_tolerated_but_not_counted_as_a_pass(tmp_path):
+    """A skip whose message exactly matches a committed entry of
+    qa/accepted-skip-exclusions.json is tolerated (the manifest names the gate
+    that really executes it); an unknown skip reason still fails the gate."""
+    report = tmp_path / "junit.xml"
+    report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                      '<testcase classname="tests.test_self_certificate_data" name="test_native_concurrency">'
+                      '<skipped type="pytest.skip" message="Dedicated PostgreSQL required"/></testcase>'
+                      '</testsuite></testsuites>')
+    result = provenance.report_verdict(report, "Linux")
+    assert result["verified"] is True
+    assert result["executed_passes"] == 1
+    assert result["excluded_not_passed"] == ["tests.test_self_certificate_data.test_native_concurrency"]
+    assert result["undocumented_skips"] == []
+    report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                      '<testcase classname="tests.test_new" name="test_case">'
+                      '<skipped type="pytest.skip" message="a reason nobody reviewed"/></testcase>'
+                      '</testsuite></testsuites>')
+    result = provenance.report_verdict(report, "Linux")
+    assert result["verified"] is False
+    assert result["undocumented_skips"] == ["tests.test_new.test_case"]
+
+
+def test_windows_only_manifest_exclusion_does_not_apply_on_linux(tmp_path):
+    report = tmp_path / "junit.xml"
+    report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+                      '<testcase classname="tests.test_posix" name="test_bits">'
+                      '<skipped type="pytest.skip" message="POSIX permission bits"/></testcase>'
+                      '</testsuite></testsuites>')
+    assert provenance.report_verdict(report, "Windows")["verified"] is True
+    assert provenance.report_verdict(report, "Linux")["verified"] is False
+
+
 def test_platform_exclusion_is_explicit_and_not_counted_as_a_pass(tmp_path):
     report = tmp_path / "junit.xml"
     report.write_text('<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
