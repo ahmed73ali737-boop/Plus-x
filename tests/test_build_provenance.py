@@ -223,6 +223,34 @@ def test_skip_never_passing_in_any_sibling_report_still_fails(tmp_path):
     assert provenance.report_verdict(sqlite_report, peer_passed=peer_passed)["verified"] is False
 
 
+@pytest.mark.parametrize(
+    ("job_id", "profile", "reason"),
+    [
+        ("linux-qa", "qa", "Explicit browser acceptance with installed Chromium required"),
+        ("postgres-qa", "qa-postgres", "Explicit browser acceptance with installed Chromium required"),
+        ("linux-qa", "qa-postgres", "Explicit browser acceptance with installed Chromium required"),
+        ("linux-qa", "qa", "Unexpected skip reason"),
+    ],
+)
+def test_deferred_skip_requires_exact_case_reason_and_job_profile(tmp_path, job_id, profile, reason):
+    report = tmp_path / "junit.xml"
+    report.write_text(
+        '<testsuites><testsuite failures="0"><testcase name="real_pass"/>'
+        '<testcase classname="tests.test_self_certificate_browser_improvements" '
+        'name="test_editor_admin_participant_and_prepared_share">'
+        f'<skipped message="{reason}"/></testcase></testsuite></testsuites>'
+    )
+    result = provenance.report_verdict(report, "Linux", job_id=job_id, profile=profile)
+    if job_id == "linux-qa" and profile == "qa" and reason != "Unexpected skip reason":
+        assert result["verified"] is True
+        assert result["executed_passes"] == 1
+        assert result["excluded_not_passed"] == [
+            "tests.test_self_certificate_browser_improvements.test_editor_admin_participant_and_prepared_share"
+        ]
+    else:
+        assert result["verified"] is False
+
+
 @pytest.mark.parametrize("key", ["passed", "verified"])
 def test_contradictory_green_json_is_rejected(tmp_path, key):
     report = tmp_path / "result.json"
