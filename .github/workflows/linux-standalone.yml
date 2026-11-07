@@ -16,8 +16,9 @@ env:
   PULSEX_CONTRACT_ARTIFACT_DIR: qa/contracts
 
 concurrency:
-  group: linux-standalone-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded automatic verification shares a group; manual verification is isolated.
+  group: ci-linux-standalone-${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch') && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')) || github.event_name == 'schedule' || github.event_name == 'merge_group' }}
 
 jobs:
   linux-qa:

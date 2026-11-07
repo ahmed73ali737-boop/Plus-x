@@ -9,10 +9,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  # Cancel only a pull request run superseded by a newer commit; default-branch runs always finish.
-  # A non-PR run gets its own group: a queued default-branch run is never displaced by a newer one.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Superseded automatic verification shares a group; manual verification is isolated.
+  group: ci-android-apk-${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch') && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')) || github.event_name == 'schedule' || github.event_name == 'merge_group' }}
 
 jobs:
   android-preview:

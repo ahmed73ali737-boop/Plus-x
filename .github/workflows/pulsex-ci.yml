@@ -15,8 +15,9 @@ env:
   PYTHONUTF8: "1"
 
 concurrency:
-  group: pulsex-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Superseded automatic verification shares a group; manual verification is isolated.
+  group: ci-pulsex-ci-${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch') && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')) || github.event_name == 'schedule' || github.event_name == 'merge_group' }}
 
 jobs:
   python-core:
