@@ -1,6 +1,0 @@
-{
-  "status": "passed",
-  "checks": 8,
-  "transport": "real localhost HTTP",
-  "sdk": "python"
-}

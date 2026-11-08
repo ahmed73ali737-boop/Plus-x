@@ -1,7 +1,0 @@
-.venv
-.env
-data
-qa
-tests
-reference
-__pycache__
