@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "policy_id": "ci-cost-controls-v2",
+  "repository": "ahmed73ali737-boop/Plus-x",
+  "mode": "free-standard-only",
+  "standard_public_runner_compute": "exempt",
+  "paid_ci_admission": "none",
+  "paid_ci_policy": "Continue authorized local work until an explicit owner allocation and implemented finite admission exist.",
+  "grant_locator": {
+    "repository": "ahmed73ali737-boop/Plus-x",
+    "ref": "refs/heads/ci-cost-policy",
+    "path": "ci-cost-policy.json"
+  },
+  "native_paid_budget_required_usd": "0",
+  "renewal": "none",
+  "accepted_evidence_requires_exact_source_and_actual_success": true,
+  "does_not_configure_server_merge_protection": true
+}
