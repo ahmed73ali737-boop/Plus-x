@@ -1,0 +1,218 @@
+{
+  "version": "1.3",
+  "description": "Demo accounts for UHEF v1.3 testing - each demonstrates a different role and screen access pattern",
+  "accounts": [
+    {
+      "id": "demo-visitor-001",
+      "role": "visitor",
+      "name": "زائر عام",
+      "email": "visitor@demo.eventna.test",
+      "password": "demo-visitor-2026",
+      "access_path": [
+        "public.platform",
+        "public.event",
+        "public.agency",
+        "access.start",
+        "cert.verify",
+        "app.error"
+      ],
+      "scenario": "جديد على المنصة، يستكشف الفعاليات المتاحة"
+    },
+    {
+      "id": "demo-guest-001",
+      "role": "guest",
+      "name": "ضيف فعالية",
+      "email": "guest@demo.eventna.test",
+      "password": "demo-guest-2026",
+      "access_path": [
+        "public.event",
+        "guest.register",
+        "guest.pass",
+        "invite.rsvp",
+        "cert.access",
+        "live.wall"
+      ],
+      "scenario": "مسجل في فعالية، يشارك ويحصل على شهادة"
+    },
+    {
+      "id": "demo-agency-staff-001",
+      "role": "agency_staff",
+      "name": "موظف جهة",
+      "email": "staff@demo.eventna.test",
+      "password": "demo-staff-2026",
+      "access_path": [
+        "public.event",
+        "account.profile"
+      ],
+      "scenario": "يدير حسابه والعروض الأساسية للجهة"
+    },
+    {
+      "id": "demo-agency-admin-001",
+      "role": "agency_admin",
+      "name": "مدير الجهة",
+      "email": "manager@demo.eventna.test",
+      "password": "demo-admin-2026",
+      "access_path": [
+        "account.profile",
+        "account.invite",
+        "admin.login",
+        "admin.password",
+        "admin.overview",
+        "admin.guests",
+        "admin.invitations",
+        "admin.metrics",
+        "admin.settings"
+      ],
+      "scenario": "يدير جهة كاملة، يدعو الموظفين ويراقب الأداء"
+    },
+    {
+      "id": "demo-event-organizer-001",
+      "role": "event_organizer",
+      "name": "منظم الفعالية",
+      "email": "organizer@demo.eventna.test",
+      "password": "demo-organizer-2026",
+      "access_path": [
+        "account.profile",
+        "account.invite",
+        "admin.login",
+        "admin.overview",
+        "admin.guests",
+        "admin.questions",
+        "admin.sections",
+        "admin.storyboard",
+        "admin.preview",
+        "live.wall"
+      ],
+      "scenario": "ينظم فعالية كاملة مع أسئلة وأقسام وعرض مباشر"
+    },
+    {
+      "id": "demo-content-mgr-001",
+      "role": "content_manager",
+      "name": "مدير المحتوى",
+      "email": "content@demo.eventna.test",
+      "password": "demo-content-2026",
+      "access_path": [
+        "admin.login",
+        "admin.questions",
+        "admin.polls",
+        "admin.ratings",
+        "admin.storyboard",
+        "admin.sections",
+        "admin.content",
+        "admin.ads",
+        "admin.facts"
+      ],
+      "scenario": "ينشئ ويدير المحتوى والأسئلة والعروض الترويجية"
+    },
+    {
+      "id": "demo-cert-issuer-001",
+      "role": "certificate_issuer",
+      "name": "مُصدر الشهادات",
+      "email": "certifier@demo.eventna.test",
+      "password": "demo-cert-2026",
+      "access_path": [
+        "admin.login",
+        "admin.certificates"
+      ],
+      "scenario": "يدير إصدار الشهادات الذاتية والتحقق منها"
+    },
+    {
+      "id": "demo-gate-op-001",
+      "role": "gate_operator",
+      "name": "مشغّل البوابة",
+      "email": "gateop@demo.eventna.test",
+      "password": "demo-gate-2026",
+      "access_path": [
+        "gate.scan"
+      ],
+      "scenario": "يفحص ويسجل الزوار في البوابة الفعلية"
+    },
+    {
+      "id": "demo-platform-admin-001",
+      "role": "platform_admin",
+      "name": "مسؤول المنصة",
+      "email": "admin@demo.eventna.test",
+      "password": "demo-platform-2026",
+      "access_path": [
+        "admin.login",
+        "admin.password",
+        "admin.overview",
+        "admin.audit",
+        "admin.users",
+        "admin.organizations",
+        "admin.account_requests",
+        "admin.devices",
+        "admin.identity",
+        "admin.settings",
+        "gate.scan"
+      ],
+      "scenario": "مسؤول كامل النظام، يدير المستخدمين والأجهزة والإعدادات"
+    },
+    {
+      "id": "demo-support-agent-001",
+      "role": "support_agent",
+      "name": "وكيل الدعم",
+      "email": "support@demo.eventna.test",
+      "password": "demo-support-2026",
+      "access_path": [
+        "admin.overview",
+        "admin.audit",
+        "admin.users"
+      ],
+      "scenario": "يدعم المستخدمين ويراقب سجلات النشاط"
+    },
+    {
+      "id": "demo-analytics-001",
+      "role": "analytics_viewer",
+      "name": "عارض التحليلات",
+      "email": "analytics@demo.eventna.test",
+      "password": "demo-analytics-2026",
+      "access_path": [
+        "admin.metrics"
+      ],
+      "scenario": "يعرض التحليلات والإحصائيات فقط"
+    }
+  ],
+  "test_scenarios": [
+    {
+      "name": "الزائر الجديد",
+      "role": "visitor",
+      "steps": [
+        "افتح الصفحة الرئيسية (public.platform)",
+        "استكشف الفعاليات المتاحة",
+        "افتح فعالية معينة (public.event)",
+        "تحقق من شهادة (cert.verify)"
+      ]
+    },
+    {
+      "name": "ضيف الفعالية",
+      "role": "guest",
+      "steps": [
+        "سجل كضيف جديد (guest.register)",
+        "احصل على بطاقة الضيف (guest.pass)",
+        "رد على الدعوة (invite.rsvp)",
+        "اطلب شهادة (cert.access)"
+      ]
+    },
+    {
+      "name": "مدير الجهة",
+      "role": "agency_admin",
+      "steps": [
+        "انتقل إلى لوحة الإدارة (admin.login)",
+        "أدر قائمة الضيوف (admin.guests)",
+        "ادعُ موظفين جدد (account.invite)",
+        "اعرض المقاييس (admin.metrics)"
+      ]
+    },
+    {
+      "name": "منظم الفعالية",
+      "role": "event_organizer",
+      "steps": [
+        "انتقل إلى لوحة الإدارة (admin.login)",
+        "قم بإنشاء أسئلة واستبيانات (admin.questions)",
+        "صمم صفحة الفعالية (admin.sections, admin.storyboard)",
+        "افتح العرض المباشر (live.wall)"
+      ]
+    }
+  ]
+}
