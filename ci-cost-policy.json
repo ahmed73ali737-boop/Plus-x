@@ -5,8 +5,8 @@
   "period_start": "2026-11-08T00:00:00Z",
   "period_end": "2026-12-01T00:00:00Z",
   "timezone": "Asia/Aden",
-  "allocation_cents": 0,
-  "daily_reservation_cents": 0,
+  "allocation_cents": 50,
+  "daily_reservation_cents": 50,
   "max_batches_per_day": 1,
   "minimum_batch_interval_minutes": 120,
   "grants": []
