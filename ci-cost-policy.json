@@ -1,13 +1,29 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "repository": "ahmed73ali737-boop/Plus-x",
-  "mode": "enforce",
-  "period_start": "2026-11-08T00:00:00Z",
-  "period_end": "2026-12-01T00:00:00Z",
-  "timezone": "Asia/Aden",
-  "allocation_cents": 50,
-  "daily_reservation_cents": 50,
-  "max_batches_per_day": 1,
-  "minimum_batch_interval_minutes": 120,
-  "grants": []
+  "mode": "retired",
+  "internal_grant_admission_required": false,
+  "retirement": {
+    "authorization": "Owner instruction: remove all internal grant controls",
+    "requested_date": "2026-11-10",
+    "scope": "Internal CI grants, allocations and per-run admission only",
+    "native_github_billing_budgets_changed": false,
+    "required_security_test_release_checks_unchanged": true,
+    "historical_record_only": true,
+    "previous_policy_commit": "82226f3a39dbe0b42582b6ea92051fb75def66c8",
+    "previous_policy_blob": "6f64d5a0c338f96e0f614060bb4cac6c957a88dd"
+  },
+  "historical_policy": {
+    "schema_version": 1,
+    "repository": "ahmed73ali737-boop/Plus-x",
+    "mode": "enforce",
+    "period_start": "2026-11-08T00:00:00Z",
+    "period_end": "2026-12-01T00:00:00Z",
+    "timezone": "Asia/Aden",
+    "allocation_cents": 50,
+    "daily_reservation_cents": 50,
+    "max_batches_per_day": 1,
+    "minimum_batch_interval_minutes": 120,
+    "grants": []
+  }
 }
