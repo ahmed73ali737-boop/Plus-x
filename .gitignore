@@ -18,3 +18,5 @@ server.log
 *.sqlite
 *.db
 secrets.*
+
+/secrets.development/
