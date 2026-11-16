@@ -1,0 +1,498 @@
+[
+ {
+  "branch": "ci-cost-policy",
+  "tip_sha": "f03e1be236d6fbf878aef0270b40dd792bed16ba",
+  "last_commit_date": "2026-11-11T04:04:39+03:00",
+  "class": "SUPERSEDED",
+  "reason": "3 commits introducing/retiring the internal CI grant policy; main already retired it (706884d). Branch tree also deletes ~785 files relative to main",
+  "pr": null
+ },
+ {
+  "branch": "uhef-v1.3",
+  "tip_sha": "ebd5902339933ce2c69949ba77551d9f41e72912",
+  "last_commit_date": "2026-11-09T04:57:47+00:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "claude/uhef-help-20261104",
+  "tip_sha": "60c20caae26154189721c6583d376dd43db1f4db",
+  "last_commit_date": "2026-11-05T23:04:29+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/qa-gate-documented-skip-exclusions",
+  "tip_sha": "233acece847469cd0f4a7a857a03021d31b2d473",
+  "last_commit_date": "2026-11-05T04:26:34+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feat/close-certificates-ci-coverage-gaps",
+  "tip_sha": "9cfb7105abb565232a889a763d1313c655cd69f5",
+  "last_commit_date": "2026-11-05T01:49:29+00:00",
+  "class": "SUPERSEDED",
+  "reason": "squash-merged as #50 (761dd67 on main); remaining merge commit only",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-github-actions-job-another-one",
+  "tip_sha": "fff32d9f82c84476ba9907697f3d9583c63d6312",
+  "last_commit_date": "2026-11-05T01:48:50+00:00",
+  "class": "SUPERSEDED",
+  "reason": "Copilot CI skip-policy attempt; replaced by #55 (233acec) documented skip exclusions on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-github-actions-job-again",
+  "tip_sha": "ae5fa677a5ca1402e44c3e71f6e67d847fed4831",
+  "last_commit_date": "2026-11-05T01:48:36+00:00",
+  "class": "SUPERSEDED",
+  "reason": "Copilot CI skip-policy attempt on top of #50 work; replaced by #50 + #55 on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-failing-github-actions-job-another-one",
+  "tip_sha": "6ff22e03699b6ac5d3a361a2a3680c4a98d98cd7",
+  "last_commit_date": "2026-11-05T01:47:28+00:00",
+  "class": "SUPERSEDED",
+  "reason": "Copilot JUnit provenance attempt on top of #50 work; replaced by #50 + #55 on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-failing-github-actions-job-again",
+  "tip_sha": "20780483f22513e8c30c797dd8cc9355faac1134",
+  "last_commit_date": "2026-11-04T14:29:52+00:00",
+  "class": "SUPERSEDED",
+  "reason": "Copilot deferred-skip classification attempt; replaced by #55 on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-github-actions-job",
+  "tip_sha": "a1436852657190cdc98541775ca5d66779c7c42f",
+  "last_commit_date": "2026-11-04T14:26:19+00:00",
+  "class": "SUPERSEDED",
+  "reason": "one-line ARM64 JUnit workflow tweak; failed agent run, CI paths since reworked on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/fix-failing-github-actions-job",
+  "tip_sha": "8e0ad4499a87a646c10f62b7a5722b424dd62cc7",
+  "last_commit_date": "2026-11-04T09:35:41+00:00",
+  "class": "SUPERSEDED",
+  "reason": "one-line ARM64 JUnit workflow tweak; failed agent run, CI paths since reworked on main",
+  "pr": null
+ },
+ {
+  "branch": "copilot/task-336713477-1400764561-43e5fdf4-b577-4dd6-ab16-48f80c634dc9",
+  "tip_sha": "b58dd3d34bedc303dcb9895a8a256858d92fbb9f",
+  "last_commit_date": "2026-11-04T07:09:37+00:00",
+  "class": "SUPERSEDED",
+  "reason": "legacy title match fix; main has fix/rebrand-exact-legacy-title-match (6b10488, ancestor)",
+  "pr": null
+ },
+ {
+  "branch": "claude/ci-cost-runid",
+  "tip_sha": "42f33cb79bfd02050b6d4c60d25ef7594ef42916",
+  "last_commit_date": "2026-11-03T05:31:23+00:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "claude/ci-cost-minimal",
+  "tip_sha": "2dcb047432eef0f6d3fbc6a21bb09e3acc443f55",
+  "last_commit_date": "2026-11-03T04:22:33+00:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/rebrand-exact-legacy-title-match",
+  "tip_sha": "6b1048815761c289c2331778d7e8195ed0ca2148",
+  "last_commit_date": "2026-11-02T18:08:59+00:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/certificate-provenance-cross-report-skip-tolerance",
+  "tip_sha": "ba75d2f69506a8b509a874173e92c98401d64d1e",
+  "last_commit_date": "2026-11-02T08:10:43+00:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/certificates-preview-share-ux",
+  "tip_sha": "bdfe145f8e544f3534df96fb5ed4ffe0211ff5b6",
+  "last_commit_date": "2026-10-28T03:23:17+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/b02-denial-audit",
+  "tip_sha": "d7a9e94143c11ec18d6ff51b605dd7675667731b",
+  "last_commit_date": "2026-10-27T17:07:33+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/certificates-self-service-v3",
+  "tip_sha": "f120dfb20f40e88d2623d342a789baa6503a4238",
+  "last_commit_date": "2026-10-27T06:41:01+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/account-requests-phase1",
+  "tip_sha": "771daa3ff96a9f0c555b2c3c7908bc4db1e09a4d",
+  "last_commit_date": "2026-10-21T07:23:59+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/certificates-20261021",
+  "tip_sha": "a9f94e92eba1a48f83c296d45da30823749cb4fc",
+  "last_commit_date": "2026-10-21T02:49:39+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/android-security-review-20261020",
+  "tip_sha": "57d61dba2b1de472e5163e590543633687a95c19",
+  "last_commit_date": "2026-10-20T07:54:12+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/phone-account-journey",
+  "tip_sha": "f702c32fbf501573b85989ae33a9548bb58fceb3",
+  "last_commit_date": "2026-10-20T06:36:43+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/account-settings-inbox-20261020",
+  "tip_sha": "0b25901f527cbf7849984b9bdf62b6625c54838c",
+  "last_commit_date": "2026-10-20T06:20:09+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/eventna-brand-domain",
+  "tip_sha": "730c54253917651523e17d41f8b1bfd21f1c0f06",
+  "last_commit_date": "2026-10-20T04:48:23+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/live-delivery-check-20261020",
+  "tip_sha": "2f56fe1e4482a80996cd1132cdbddea5d57d9af9",
+  "last_commit_date": "2026-10-20T04:15:08+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/phase01-test-handoff-20261020",
+  "tip_sha": "d9162a2a222cfe0b6de4645491848fdc74067e7d",
+  "last_commit_date": "2026-10-20T03:46:33+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/phases02-08-app-entry-20261020",
+  "tip_sha": "54705535fcdd7bc20a6253ef6d4e4e6e10ef1a1b",
+  "last_commit_date": "2026-10-20T03:22:55+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "docs/offline-ci-evidence-20261020",
+  "tip_sha": "2b9122bddb1731def261f0919a5fb5b886864e11",
+  "last_commit_date": "2026-10-20T02:34:17+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/clean-checkout-offline-20261020",
+  "tip_sha": "cebc056aeb1ebc6c7c0804178219234d74d14aad",
+  "last_commit_date": "2026-10-20T02:31:27+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/offline-merge-verification-20261020",
+  "tip_sha": "785f16a2a8c6946b59d518497d50bce1742dfde8",
+  "last_commit_date": "2026-10-20T02:28:02+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/android-apk-20261020",
+  "tip_sha": "cc9dcd9a757bbb740c46c252e03d5f6c2584337f",
+  "last_commit_date": "2026-10-20T01:57:53+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/phase01-baseline-20261020",
+  "tip_sha": "a9599c48fc26e506e72898767c68089c4e3ba5b9",
+  "last_commit_date": "2026-10-20T01:25:07+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "work/invitations-completion-20261019",
+  "tip_sha": "a822727501c0979011aa21e94380295db6681a45",
+  "last_commit_date": "2026-10-19T22:34:28+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/reactivate-pulsex-ci-20261019",
+  "tip_sha": "86b06ff4bc77e4b2ee81435f4484b216c63de403",
+  "last_commit_date": "2026-10-19T21:57:31+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/29-uip-guest-status-preview",
+  "tip_sha": "eb0a63647f98bc6ad8d3275e0afef28c21ba5e65",
+  "last_commit_date": "2026-10-17T01:03:02-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "integration/pulsex-consolidated-20261014",
+  "tip_sha": "71c6689ef10d22624de1b5c2e1425dac85fdb303",
+  "last_commit_date": "2026-10-14T15:08:25-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/27-auth-self-service-session-revoke-20261014",
+  "tip_sha": "a02bb93e6f695e2a5afc063e4236c8105bcc2b19",
+  "last_commit_date": "2026-10-14T14:35:18-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "review/pulsex-two-version-requirements-20261013",
+  "tip_sha": "2f0bec559f7518ecc4895de0f9d5b23a6e2f55ff",
+  "last_commit_date": "2026-10-13T17:35:19-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "release/linux-ubuntu2404-standalone-candidate-20261010",
+  "tip_sha": "35f3347e5aeaa256a47e1898f7b0229c9526419a",
+  "last_commit_date": "2026-10-13T00:44:38-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "codex/database-observability-safety-20261012",
+  "tip_sha": "56630410da1b60524a08f829760f4626ea955aa8",
+  "last_commit_date": "2026-10-11T20:16:29-07:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "integration/shared-observability-20261011",
+  "tip_sha": "bb31d562abb462d68e19f863a1118b5a19d2c798",
+  "last_commit_date": "2026-10-11T08:21:19+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "review/pulsex-sqlite-url-win-r23-20261010",
+  "tip_sha": "ae40111bccc72a211d160138b2331698743057e8",
+  "last_commit_date": "2026-10-10T07:34:20+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "review/pulsex-shutdown-gate-r22-20261010",
+  "tip_sha": "df19dd383630410ab7b0b5d044b555aad3e4d19a",
+  "last_commit_date": "2026-10-10T07:27:17+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/pulsex-party-evidence-r15-20261009",
+  "tip_sha": "e220ee57f33906ec50ab4d7557f65b6c006d63e6",
+  "last_commit_date": "2026-10-10T00:07:13+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/useas-party-network-consumer-v1",
+  "tip_sha": "b252b7be4aeb8423b68be38391cef1a2954bf4ed",
+  "last_commit_date": "2026-10-09T09:49:51+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/party-network-asset-consumer-v1",
+  "tip_sha": "78eafc1880976138d78ee301e1177186247ead23",
+  "last_commit_date": "2026-10-09T08:53:29+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/enterprise-adoption-compose-r1",
+  "tip_sha": "2a67a833ac471783bcb88e74fcb450a8fb323e0b",
+  "last_commit_date": "2026-10-09T08:44:38+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/iam-consumer-adoption-v1",
+  "tip_sha": "6a5a515506881c98018cb9c792d48aafee4a85cd",
+  "last_commit_date": "2026-10-09T08:29:49+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/audit-update1-release-admission-20261008",
+  "tip_sha": "208ba752b7a4d349bb48acdd96a6a4d02baf3bde",
+  "last_commit_date": "2026-10-08T07:35:21+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "release/v1.0.1-delivery-pack",
+  "tip_sha": "6d0455e397cc53e9688a19d1af1cf6ffbbdaae2c",
+  "last_commit_date": "2026-10-07T06:19:55+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "release/unified-v1.0.1",
+  "tip_sha": "d47dd315234c52441537b83a29ef2ea65cc7d71c",
+  "last_commit_date": "2026-10-07T06:07:08+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/audit-2026-10-07-p0",
+  "tip_sha": "55ea74d7f92bf66862f138bed2f55ed2c036bc00",
+  "last_commit_date": "2026-10-07T06:00:24+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feature/public-experience-v2",
+  "tip_sha": "5e593e96da332166c6c7c3efd481c356440d813e",
+  "last_commit_date": "2026-10-07T05:55:08+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "fix/audit-2026-10-07-360-regressions",
+  "tip_sha": "ceb84ccc5a36963b4f0d1e3210148567a1257189",
+  "last_commit_date": "2026-10-07T04:42:38+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "release/v1.0.0",
+  "tip_sha": "99a3709a278c2ba096f0ee6f17de1713d3a18bda",
+  "last_commit_date": "2026-10-06T22:12:10+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "docs/closure-evidence-20261006",
+  "tip_sha": "a9c1e5e72506d207fe6c9a719cad952d51aff42e",
+  "last_commit_date": "2026-10-06T10:45:41+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "feat/guest-qr-offline-brand-sites",
+  "tip_sha": "29422416a40a824ac0b933b8bc6f2f3bc6e93cdd",
+  "last_commit_date": "2026-10-06T09:42:41+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "windows-native-gate-v1",
+  "tip_sha": "7516485c11222e1dc0ec1d064de9ad7c68e66f72",
+  "last_commit_date": "2026-10-06T06:18:18+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "reuse-manifest-v1",
+  "tip_sha": "9371fa2cb2d7ed1258b73a885c1424a5d3d22821",
+  "last_commit_date": "2026-10-06T03:13:17+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "audit/2026-10-05-structure-qa",
+  "tip_sha": "5a00b06731a7e1d3418dc9e2940e4b026f094db9",
+  "last_commit_date": "2026-10-05T22:07:05+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ },
+ {
+  "branch": "ci/windows11-verification-20261005",
+  "tip_sha": "124e0597665bdd604202a5fe4cec4d6ffc88cde4",
+  "last_commit_date": "2026-10-05T18:33:28+03:00",
+  "class": "MERGED",
+  "reason": "tip is an ancestor of the default branch",
+  "pr": null
+ }
+]
