@@ -48,7 +48,7 @@ services:
       PX_SELF_CERTIFICATE_MIN_FREE_BYTES: ${PX_SELF_CERTIFICATE_MIN_FREE_BYTES:-268435456}
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
       GUEST_ID_SECRET: ${GUEST_ID_SECRET:?Required}
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@eventna.app}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?Set first platform administrator email}
       BOOTSTRAP_ADMIN_NAME: Eventna Administrator
       BOOTSTRAP_CREDENTIALS_PATH: /app/data/bootstrap-admin.json
     volumes:
