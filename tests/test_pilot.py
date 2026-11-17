@@ -3,7 +3,7 @@ from account_approval_support import prepare_review_admin, approve_request
 import base64, copy, csv, io, json, uuid, zipfile
 from pathlib import Path
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
 from fastapi.testclient import TestClient
 from sqlalchemy import select, func
 from app.server import create_app
@@ -138,12 +138,12 @@ def test_question_type_supported(qtype):
 def test_safe_branch_logic():
     c=default_config('Branches');c['records']=[{'kind':'question','code':'Q1','title':'سؤال','options':['A','B'],'qtype':'single_choice','required':True,'order':1},{'kind':'question','code':'Q2','title':'مشروط','qtype':'short_text','required':True,'order':2,'show_if':{'code':'Q1','equals':'o2'}}];c=normalize_config(c)
     assert survey_answers(c,'main',{'Q1':'o1'})=={'Q1':'o1'}
-    with pytest.raises(HTTPException):survey_answers(c,'main',{'Q1':'o2'})
+    with pytest.raises(DomainError):survey_answers(c,'main',{'Q1':'o2'})
 def test_branch_cycle_rejected():
     c=default_config('Branches');c['records']=[{'kind':'question','code':'Q1','title':'سؤال','qtype':'short_text','show_if':{'code':'Q1','equals':'x'}}]
-    with pytest.raises(HTTPException):normalize_config(c)
+    with pytest.raises(DomainError):normalize_config(c)
 def test_script_url_rejected():
-    with pytest.raises(HTTPException):normalize_record({'kind':'ad','code':'X','title':'x','url':'javascript:alert(1)'})
+    with pytest.raises(DomainError):normalize_record({'kind':'ad','code':'X','title':'x','url':'javascript:alert(1)'})
 def test_media_svg_upload_rejected(client,app):
     login(client,app,2);r=client.post('/api/admin/media',json={'base64':base64.b64encode(b'<svg><script>alert(1)</script></svg>').decode()});assert r.status_code==422
 def test_qr_created(client,app):

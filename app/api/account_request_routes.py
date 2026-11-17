@@ -1,11 +1,15 @@
 """Thin HTTP boundary for scoped reviews and applicant capability links."""
-from fastapi import Request, HTTPException
+from fastapi import Request
+
+from app.api.errors import install_error_handlers
 from app.application import account_requests as service
 from app.application.audit_service import write_audit
-from app.domain import fail
+from app.domain import DomainError, Forbidden, NotFound, fail
 
 
 def install_account_request_routes(app, engine, identify):
+    install_error_handlers(app)
+
     @app.post('/api/admin/platform-account-invites')
     def invite_platform(body: dict, request: Request):
         with engine.begin() as conn:
@@ -24,7 +28,7 @@ def install_account_request_routes(app, engine, identify):
     def platform_request(body: dict, request: Request):
         with engine.begin() as conn:
             actor,_=identify(request,conn,True)
-            if actor['role']!='platform':fail('FORBIDDEN_ROLE',403)
+            if actor['role']!='platform':fail('FORBIDDEN_ROLE', Forbidden)
             return service.submit(conn,actor=actor,body=body,purpose='site',scope_type='site',scope_id='platform',role='platform')
 
     @app.post('/api/admin/account-requests/{rid}/setup-link')
@@ -48,8 +52,8 @@ def install_account_request_routes(app, engine, identify):
             with engine.begin() as conn:
                 actor,_=identify(request,conn,True)
                 return service.review(conn,actor,rid,body.get('status'),body.get('reason'))
-        except HTTPException as error:
-            if actor and error.status_code in (403,404):
+        except DomainError as error:
+            if actor and isinstance(error,(Forbidden,NotFound)):
                 with engine.begin() as conn:
                     write_audit(conn,actor,None,'account_request_review_denied',{'request_id':rid[:64]})
             raise

@@ -3,7 +3,7 @@ from copy import deepcopy
 from io import BytesIO
 import math,re,unicodedata
 from PIL import Image,ImageDraw
-from app.domain import fail
+from app.domain import fail, Unavailable
 from app.application import self_certificate_fonts as fonts
 from app.application import self_certificate_branding as branding
 
@@ -61,7 +61,7 @@ def measurement(value,config,saved_fonts,size):
         max(b[2] for b in bounds),max(b[3] for b in bounds)]
 
 def fit_name(value,config,saved_fonts,brand,renderer_version=VERSION):
-    if renderer_version not in SUPPORTED_VERSIONS:fail('RENDERER_VERSION_UNAVAILABLE',503)
+    if renderer_version not in SUPPORTED_VERSIONS:fail('RENDERER_VERSION_UNAVAILABLE', Unavailable)
     normalized=normalize_name(value,saved_fonts)
     rect=config['name_rect'];pad=2
     if rect['width']<=2*pad or rect['height']<=2*pad:fail('NAME_CANNOT_FIT')
@@ -90,7 +90,7 @@ def fit_name(value,config,saved_fonts,brand,renderer_version=VERSION):
 
 def render(revision,background,stamp,layout):
     if revision['schema_version']!=2 or revision['renderer_version'] not in SUPPORTED_VERSIONS:
-        fail('RENDERER_VERSION_UNAVAILABLE',503)
+        fail('RENDERER_VERSION_UNAVAILABLE', Unavailable)
     with Image.open(BytesIO(background)) as source:
         source.load();image=source.convert('RGBA')
     if image.width*image.height>18_000_000:fail('IMAGE_PIXEL_LIMIT')

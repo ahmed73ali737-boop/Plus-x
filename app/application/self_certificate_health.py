@@ -1,11 +1,9 @@
 """Capability readiness; saved downloads do not require current render resources."""
 import hashlib, importlib.util, logging, os, secrets, threading, time, shutil
 from pathlib import Path
-from sqlalchemy import select,func
-from fastapi import HTTPException
-from app.self_certificates_db import links, certificates,jobs,exports
-from app.application.self_certificate_clock import lease_now
+from app.application.ports import persistence
 from app.application.self_certificate_slots import active_slots
+from app.domain import DomainError
 from app.application import self_certificate_metrics as metrics
 from datetime import datetime,timezone
 from app.core.certificate_features import certificate_features
@@ -50,26 +48,26 @@ class CertificateReadiness:
         features=certificate_features()
         accepting=features.accept_new_requests
         designing=features.admin_enabled
-        with self.engine.connect() as conn:
-            has_history=bool(conn.execute(select(links.c.id).limit(1)).first()
-                or conn.execute(select(certificates.c.id).limit(1)).first())
-            key_versions=conn.execute(select(links.c.key_version).union(select(certificates.c.key_version))).scalars().all()
-            queue=dict(conn.execute(select(jobs.c.status,func.count()).group_by(jobs.c.status)).all())
-            pending=sum(queue.get(status,0) for status in ('pending','retry_wait','leased'))
-            oldest=conn.execute(select(func.min(jobs.c.created_at)).where(jobs.c.status.in_(('pending','retry_wait','leased')))).scalar_one()
-            queue_age=0
-            if oldest:
-                try:
-                    now_value=datetime.fromisoformat(lease_now(conn))
-                    oldest_value=datetime.fromisoformat(oldest)
-                    if now_value.tzinfo is None:now_value=now_value.replace(tzinfo=timezone.utc)
-                    if oldest_value.tzinfo is None:oldest_value=oldest_value.replace(tzinfo=timezone.utc)
-                    queue_age=max(0,(now_value-oldest_value).total_seconds())
-                except (ValueError,TypeError):
-                    # Corrupt historical time must alert without crashing delivery health.
-                    queue_age=121
-                    log.warning('SELF_CERTIFICATE_QUEUE_TIMESTAMP_INVALID')
-            export_pending=conn.execute(select(func.count()).select_from(exports).where(exports.c.status.in_(('pending','processing')))).scalar_one()
+        with persistence.transactions.read(self.engine) as tx:
+            facts=persistence.self_certificates.readiness_facts(tx)
+        has_history=facts['has_history']
+        key_versions=facts['key_versions']
+        queue=facts['queue']
+        pending=sum(queue.get(status,0) for status in ('pending','retry_wait','leased'))
+        oldest=facts['oldest_job_created_at']
+        queue_age=0
+        if oldest:
+            try:
+                now_value=datetime.fromisoformat(facts['now'])
+                oldest_value=datetime.fromisoformat(oldest)
+                if now_value.tzinfo is None:now_value=now_value.replace(tzinfo=timezone.utc)
+                if oldest_value.tzinfo is None:oldest_value=oldest_value.replace(tzinfo=timezone.utc)
+                queue_age=max(0,(now_value-oldest_value).total_seconds())
+            except (ValueError,TypeError):
+                # Corrupt historical time must alert without crashing delivery health.
+                queue_age=121
+                log.warning('SELF_CERTIFICATE_QUEUE_TIMESTAMP_INVALID')
+        export_pending=facts['export_pending']
         metrics.gauge('failed_jobs',queue.get('failed',0))
         try:metrics.gauge('active_slots',active_slots(self.store.root))
         except OSError:
@@ -107,7 +105,7 @@ class CertificateReadiness:
             try:
                 keyring=self.keys()
                 for version in key_versions:keyring.sign('readiness','pinned-resource',version)
-            except HTTPException:key_ok=False
+            except DomainError:key_ok=False
         resource_ok=True
         resource_code='OK'
         try:
@@ -124,9 +122,9 @@ class CertificateReadiness:
             from app.application.self_certificate_sandbox import availability
             if not availability() or importlib.util.find_spec('resource') is None or importlib.util.find_spec('pypdfium2') is None:
                 raise RuntimeError('CERTIFICATE_ISOLATION_UNAVAILABLE')
-        except (OSError,ValueError,KeyError,RuntimeError,HTTPException) as error:
+        except (OSError,ValueError,KeyError,RuntimeError,DomainError) as error:
             resource_ok=False
-            resource_code=(error.detail if isinstance(error,HTTPException) else str(error) if isinstance(error,RuntimeError) else 'CERTIFICATE_RESOURCE_UNAVAILABLE')
+            resource_code=(error.code if isinstance(error,DomainError) else str(error) if isinstance(error,RuntimeError) else 'CERTIFICATE_RESOURCE_UNAVAILABLE')
         worker_required=bool(getattr(self.runtime,'background_enabled',False))
         threads=getattr(self.runtime,'worker_threads',())
         worker_ok=not worker_required or bool(threads) and all(t.is_alive() for t in threads)

@@ -29,12 +29,12 @@
     {
       "source_pr": 14,
       "path": "app/application/shared_authorization.py",
-      "blob_sha": "6892bc380a659fefb9acaa2dfc12d95723e386d2"
+      "blob_sha": "e96a101143be57710e5a5e4be28fd6fbbe7c70a2"
     },
     {
       "source_pr": 14,
       "path": "tests/test_shared_organizer_authorization.py",
-      "blob_sha": "b98d95afbfc8e8737f5ea43f6ffdc82ea9ce5d25"
+      "blob_sha": "0f72b5c7148943b777a5170ad709caf520ba9428"
     },
     {
       "source_pr": 14,

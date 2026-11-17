@@ -46,10 +46,11 @@ def test_revisions_stay_fixed_when_library_is_edited_and_really_deleted(db):
     v2=model(db,model_id=v1['id'],row_version=1);l2=link(db,v2['revision']['id'],'link2')
     assert l1['revision_id']!=l2['revision_id']
     assert repo.list_models(db,{'id':'b'})['total']==0
-    from fastapi import HTTPException
-    with pytest.raises(HTTPException):repo.get_model(db,{'id':'b'},v1['id'])
-    with pytest.raises(HTTPException) as exc:model(db,model_id=v1['id'],row_version=1)
-    assert exc.value.status_code==409
+    from app.domain import DomainError
+    from app.api.errors import http_status
+    with pytest.raises(DomainError):repo.get_model(db,{'id':'b'},v1['id'])
+    with pytest.raises(DomainError) as exc:model(db,model_id=v1['id'],row_version=1)
+    assert http_status(exc.value)==409
     repo.delete_model(db,{'id':'a'},v1['id'],2)
     assert db.execute(select(func.count()).select_from(models)).scalar_one()==0
     assert db.execute(select(func.count()).select_from(links)).scalar_one()==2
@@ -57,8 +58,8 @@ def test_revisions_stay_fixed_when_library_is_edited_and_really_deleted(db):
     assert db.execute(select(func.count()).select_from(assets)).scalar_one()==5
 
 def test_asset_reference_must_belong_to_the_calling_account(db):
-    from fastapi import HTTPException
-    with pytest.raises(HTTPException):
+    from app.domain import DomainError
+    with pytest.raises(DomainError):
         repo.save_model(db,{'id':'a'},name='bad',background_asset_id='bg-b',stamp_asset_id=None,config={})
 
 def test_database_rejects_duplicate_request_job_and_certificate_and_freezes_identity(db):

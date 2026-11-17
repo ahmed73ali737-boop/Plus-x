@@ -6,7 +6,7 @@ import json,re,os
 from pathlib import Path
 from fontTools.ttLib import TTFont
 from PIL import ImageFont
-from app.domain import fail
+from app.domain import fail, Unavailable
 
 RESOURCE_ROOT=Path(os.environ.get('PX_SELF_CERTIFICATE_RESOURCE_ROOT') or Path(__file__).resolve().parents[1]/'resources').resolve()
 ROOT=RESOURCE_ROOT/'fonts'
@@ -19,10 +19,10 @@ _ISOLATED_COVERAGE={}
 
 @lru_cache(maxsize=24)
 def _verified(path,modified,changed,size,digest,maximum):
-    if size>maximum:fail('FONT_FILE_UNAVAILABLE',503)
+    if size>maximum:fail('FONT_FILE_UNAVAILABLE', Unavailable)
     try:raw=Path(path).read_bytes()
-    except OSError:fail('FONT_FILE_UNAVAILABLE',503)
-    if len(raw)!=size or sha256(raw).hexdigest()!=digest:fail('FONT_FILE_UNAVAILABLE',503)
+    except OSError:fail('FONT_FILE_UNAVAILABLE', Unavailable)
+    if len(raw)!=size or sha256(raw).hexdigest()!=digest:fail('FONT_FILE_UNAVAILABLE', Unavailable)
     return raw
 
 def _read(path,digest,maximum=8*1024*1024):
@@ -30,13 +30,13 @@ def _read(path,digest,maximum=8*1024*1024):
     try:
         stat=path.stat()
         return _verified(str(path),stat.st_mtime_ns,stat.st_ctime_ns,stat.st_size,digest,maximum)
-    except OSError:fail('FONT_FILE_UNAVAILABLE',503)
+    except OSError:fail('FONT_FILE_UNAVAILABLE', Unavailable)
 
 def catalog(digest=None):
     digest=digest or MANIFEST_HASH
     path=ROOT/'noto-manifest.json' if digest==MANIFEST_HASH else ROOT/'catalogs'/(digest+'.json')
     try:raw=_read(path,digest,128*1024)
-    except Exception:fail('FONT_CATALOG_UNAVAILABLE',503)
+    except Exception:fail('FONT_CATALOG_UNAVAILABLE', Unavailable)
     return {r['id']:r for r in json.loads(raw)}
 
 def font_bytes(ident,digest=None):

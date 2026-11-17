@@ -10,7 +10,7 @@ import io
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, features
 import qrcode
-from app.domain import fail
+from app.domain import fail, Gone, Unavailable
 
 FONT = Path(__file__).resolve().parents[2] / 'web/fonts/CertificateSans.ttf'
 
@@ -79,8 +79,8 @@ def image_data(raw):
 
 def render(row, verification_url, output_format='PNG'):
     from app.application.certificate_service import state, PLACEHOLDER, ALIASES
-    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', 410)
-    if row['snapshot'].get('font_hash', font_hash()) != font_hash(): fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', 503)
+    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', Gone)
+    if row['snapshot'].get('font_hash', font_hash()) != font_hash(): fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', Unavailable)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     # 3508px across a 297mm landscape page is approximately 300 DPI.
     scale = 3508 / design['width']

@@ -3,7 +3,8 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from sqlalchemy import create_engine
 
 from app.application.self_certificate_limits import consume
@@ -25,8 +26,8 @@ def _assert_shared_bucket(url):
             try:
                 consume(engine, 'certificate-submit', 'synthetic-browser', limit=30, seconds=window_seconds)
                 return True
-            except HTTPException as error:
-                assert error.status_code == 429 and error.detail == 'RATE_LIMIT'
+            except DomainError as error:
+                assert http_status(error) == 429 and error.detail == 'RATE_LIMIT'
                 return False
 
         with ThreadPoolExecutor(max_workers=20) as pool:
@@ -39,9 +40,9 @@ def _assert_shared_bucket(url):
         # the same persisted bucket, not a process-local counter.
         restarted = create_engine(url, connect_args={timeout_option: 20})
         try:
-            with pytest.raises(HTTPException) as error:
+            with pytest.raises(DomainError) as error:
                 consume(restarted, 'certificate-submit', 'synthetic-browser', limit=30, seconds=window_seconds)
-            assert error.value.status_code == 429
+            assert http_status(error.value) == 429
             assert error.value.detail == 'RATE_LIMIT'
         finally:
             restarted.dispose()

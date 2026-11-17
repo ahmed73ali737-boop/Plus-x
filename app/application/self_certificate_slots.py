@@ -4,7 +4,7 @@ import os, time
 try:import fcntl
 except ImportError:fcntl=None
 from pathlib import Path
-from app.domain import fail
+from app.domain import fail, RateLimited
 
 def try_lock(path):
     path=Path(path)
@@ -42,7 +42,7 @@ def render_slot(root,limit=6,timeout=5):
             fd=try_lock(Path(root)/'.runtime'/('render-'+str(number)+'.lock'))
             if fd is not None:break
         if fd is not None:break
-        if time.monotonic()>=deadline:fail('CERTIFICATE_RENDER_BUSY',429)
+        if time.monotonic()>=deadline:fail('CERTIFICATE_RENDER_BUSY', RateLimited)
         time.sleep(.025)
     try:yield
     finally:os.close(fd)

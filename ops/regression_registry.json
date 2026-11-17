@@ -97,7 +97,7 @@
       "invariant": "PostgreSQL readiness must prove required tables, critical columns and exact migration checksums.",
       "checks": [
         {
-          "path": "app/api/routers/health.py",
+          "path": "app/infrastructure/persistence/schema_probe.py",
           "markers": [
             "postgres_migration_status",
             "schema_migrations_current"

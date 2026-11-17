@@ -1,6 +1,12 @@
-"""Explicit public projections. Never serialize database rows to public pages."""
+"""HTTP contracts (pydantic) for the self-certificate API.
+
+Explicit public projections. Never serialize database rows to public pages.
+The participant submission rule itself is app.domain.self_certificates.
+"""
 from enum import StrEnum
-from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.domain.self_certificates import participant_submission
 
 class LinkState(StrEnum):
     ACTIVE = 'active'
@@ -52,15 +58,7 @@ class ParticipantInput(BaseModel):
 
 def parse_participant_input(body):
     """Service guard runs before any request/job insertion; no PII in errors."""
-    from app.domain import fail
-    if not isinstance(body, dict):
-        fail('PARTICIPANT_INPUT_INVALID', 422)
-    if body.get('consent') is not True:
-        fail('CONSENT_REQUIRED', 422)
-    try:
-        return ParticipantInput.model_validate(body)
-    except ValidationError:
-        fail('PARTICIPANT_INPUT_INVALID', 422)
+    return participant_submission(body)
 
 PUBLIC_CERTIFICATE_FIELDS = ('serial', 'name_printed', 'event_name', 'issued_at', 'status')
 

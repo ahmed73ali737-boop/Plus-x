@@ -2,7 +2,8 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from sqlalchemy import insert, select, update
 
 from app.application.access import can_manage, can_read, event_permissions, require_event_permission
@@ -48,9 +49,9 @@ def test_admission_roles_enforce_action_and_exact_event(db, role, allowed, block
     user = crew(db, role)
     assert require_event_permission(db, user, 'event-a', allowed)['id'] == 'event-a'
     for eid, action in [('event-a', blocked), ('event-b', allowed)]:
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(DomainError) as exc:
             require_event_permission(db, user, eid, action)
-        assert exc.value.status_code == 403
+        assert http_status(exc.value) == 403
 
 
 @pytest.mark.parametrize('role', ['scanner', 'reception', 'analyst', 'auditor', 'committee_supervisor', 'member', 'unexpected-admin'])
@@ -117,13 +118,13 @@ def test_private_events_and_children_cannot_be_read_or_discovered(db):
     listing = build_public_bundle(db, site('platform'), 'http://testserver')
     assert [event['id'] for event in listing['events']] == ['event-b']
     for sid in ('event-a', 'agency-a'):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(DomainError) as exc:
             build_public_bundle(db, site(sid), 'http://testserver')
-        assert exc.value.status_code == 404
-        with pytest.raises(HTTPException) as exc:
+        assert http_status(exc.value) == 404
+        with pytest.raises(DomainError) as exc:
             build_public_poll_results(db, site(sid))
-        assert exc.value.status_code == 404
-    with pytest.raises(HTTPException):
+        assert http_status(exc.value) == 404
+    with pytest.raises(DomainError):
         build_public_bundle(db, site('event-a'), 'http://testserver', authorized_event_id='event-b')
     assert build_public_bundle(db, site('event-a'), 'http://testserver', authorized_event_id='event-a')['id'] == 'event-a'
     assert build_public_bundle(db, site('event-a'), 'http://testserver', draft=True)['preview'] is True

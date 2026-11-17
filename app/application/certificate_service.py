@@ -12,12 +12,11 @@ import re
 import secrets
 import qrcode
 import qrcode.image.svg
-from sqlalchemy import insert, select, update
-from sqlalchemy.exc import IntegrityError
-from app.certificates_db import certificate_templates, certificates, certificate_replacements
+from xml.etree import ElementTree
 from app.core.serialization import canonical_json
 from app.application.audit_service import new_id
-from app.domain import fail, now, text, number, stamp
+from app.application.ports import persistence
+from app.domain import fail, now, text, number, stamp, NotFound, Conflict, Gone
 from app.application.certificate_rendering import image_data, font_hash, font_bytes, validate_layout
 import base64
 
@@ -93,21 +92,20 @@ def normalize_design(raw):
     return result
 
 
-def create_template(conn, event_id, body):
+def create_template(tx, event_id, body):
     row = {'id': new_id(), 'event_id': event_id, 'name': text(body.get('name'), 160, True),
            'design': normalize_design(body.get('design', default_design())), 'created_at': now()}
-    conn.execute(insert(certificate_templates).values(**row))
+    persistence.certificates.add_template(tx, row)
     return row
 
 
-def get_certificate(conn, event_id, certificate_id):
-    row = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                         certificates.c.id == certificate_id)).mappings().first()
-    if not row: fail('CERTIFICATE_NOT_FOUND', 404)
-    return dict(row)
+def get_certificate(tx, event_id, certificate_id):
+    row = persistence.certificates.certificate(tx, event_id, certificate_id)
+    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return row
 
 
-def issue(conn, event_id, body):
+def issue(tx, event_id, body):
     template_id = text(body.get('template_id'), 64, True)
     request_key = text(body.get('request_key'), 80, True)
     recipient_key = text(body.get('recipient_key'), 160, True)
@@ -122,16 +120,14 @@ def issue(conn, event_id, body):
     request_data = {'template_id': template_id, 'recipient_key': recipient_key,
                     'award_key': award_key, 'data': data, 'expires_at': expiry}
     request_hash = fingerprint({**request_data, 'timezone': zone})
-    existing = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                                    certificates.c.request_key == request_key)).mappings().first()
+    existing = persistence.certificates.by_request_key(tx, event_id, request_key)
     if existing:
         legacy_retry = zone == 'UTC' and existing['request_hash'] == fingerprint(request_data)
-        if existing['request_hash'] != request_hash and not legacy_retry: fail('CERTIFICATE_REQUEST_CONFLICT', 409)
+        if existing['request_hash'] != request_hash and not legacy_retry: fail('CERTIFICATE_REQUEST_CONFLICT', Conflict)
         return dict(existing), None, False
     if expiry and datetime.fromisoformat(expiry) <= datetime.now(timezone.utc): fail('CERTIFICATE_EXPIRY_INVALID')
-    template = conn.execute(select(certificate_templates).where(certificate_templates.c.id == template_id,
-                                   certificate_templates.c.event_id == event_id)).mappings().first()
-    if not template: fail('CERTIFICATE_TEMPLATE_NOT_FOUND', 404)
+    template = persistence.certificates.template(tx, event_id, template_id)
+    if not template: fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
     serial = 'CERT-' + secrets.token_hex(16).upper()
     issued_at = now()
     data.update(serial=serial, issue_date=datetime.fromisoformat(issued_at).astimezone(ZoneInfo(zone)).date().isoformat())
@@ -143,14 +139,11 @@ def issue(conn, event_id, body):
            'serial': serial, 'access_hash': sha256(token.encode()).hexdigest(), 'snapshot': snapshot,
            'snapshot_hash': fingerprint(snapshot), 'status': 'issued', 'issued_at': issued_at,
            'expires_at': expiry, 'revoked_at': None, 'revoke_reason': None}
-    try:
-        with conn.begin_nested(): conn.execute(insert(certificates).values(**row))
-    except IntegrityError:
+    if not persistence.certificates.add_if_absent(tx, row):
         # A concurrent retry returns the committed winner; different requests cannot duplicate an award.
-        winner = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                                      certificates.c.request_key == request_key)).mappings().first()
-        if winner and winner['request_hash'] == request_hash: return dict(winner), None, False
-        fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', 409)
+        winner = persistence.certificates.by_request_key(tx, event_id, request_key)
+        if winner and winner['request_hash'] == request_hash: return winner, None, False
+        fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', Conflict)
     return row, token, True
 
 
@@ -169,36 +162,34 @@ def public_view(row):
             'issue_timezone': row['snapshot'].get('issue_timezone', 'UTC')}
 
 
-def revoke(conn, event_id, certificate_id, reason):
+def revoke(tx, event_id, certificate_id, reason):
     reason = text(reason, 500, True)
-    row = get_certificate(conn, event_id, certificate_id)
+    row = get_certificate(tx, event_id, certificate_id)
     if row['status'] == 'revoked': return row
-    conn.execute(update(certificates).where(certificates.c.id == certificate_id, certificates.c.status == 'issued')
-                 .values(status='revoked', revoked_at=now(), revoke_reason=reason))
-    return get_certificate(conn, event_id, certificate_id)
+    persistence.certificates.revoke(tx, certificate_id, now(), reason)
+    return get_certificate(tx, event_id, certificate_id)
 
 
-def replace(conn, event_id, certificate_id, body):
-    original = get_certificate(conn, event_id, certificate_id)
+def replace(tx, event_id, certificate_id, body):
+    original = get_certificate(tx, event_id, certificate_id)
     reason = text(body.get('reason'), 500, True)
     # This internal award key represents a correction of this exact issue, not
     # another independent award. The immutable source snapshot remains intact.
-    row, token, created = issue(conn, event_id, {**body, 'recipient_key': original['recipient_key'],
+    row, token, created = issue(tx, event_id, {**body, 'recipient_key': original['recipient_key'],
         'award_key': 'replacement/'+original['id'], 'template_id': body.get('template_id', original['template_id'])})
-    link = conn.execute(select(certificate_replacements).where(certificate_replacements.c.previous_id == certificate_id)).mappings().first()
+    link = persistence.certificates.replacement_of(tx, certificate_id)
     if link:
-        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', 409)
+        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
         return row, token, created
-    try:
-        with conn.begin_nested():
-            conn.execute(insert(certificate_replacements).values(previous_id=certificate_id, replacement_id=row['id'], reason=reason, created_at=now()))
-    except IntegrityError: fail('CERTIFICATE_ALREADY_REPLACED', 409)
-    revoke(conn, event_id, certificate_id, reason)
+    if not persistence.certificates.add_replacement_if_absent(tx, {'previous_id': certificate_id, 'replacement_id': row['id'],
+                                                                      'reason': reason, 'created_at': now()}):
+        fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+    revoke(tx, event_id, certificate_id, reason)
     return row, token, created
 
 
 def render_svg(row, verification_url):
-    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', 410)
+    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', Gone)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     w, h = design['width'], design['height']
     output = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">',
@@ -218,11 +209,39 @@ def render_svg(row, verification_url):
     qr = qrcode.make(verification_url, image_factory=qrcode.image.svg.SvgPathImage)
     buffer = io.BytesIO(); qr.save(buffer)
     # Embed only the library-generated path, with a quiet zone retained in its viewBox.
-    from xml.etree import ElementTree as ET
-    qr_root = ET.fromstring(buffer.getvalue())
+    qr_root = ElementTree.fromstring(buffer.getvalue())
     pos = design['qr']
     output.append(f'<svg x="{pos["x"]}" y="{pos["y"]}" width="{pos["size"]}" height="{pos["size"]}" viewBox="{qr_root.attrib["viewBox"]}">')
     output.append('<rect width="100%" height="100%" fill="#ffffff"/>')
-    output.extend(ET.tostring(child, encoding='unicode') for child in qr_root)
+    output.extend(ElementTree.tostring(child, encoding='unicode') for child in qr_root)
     output.extend(['</svg>', '</svg>'])
     return ''.join(output)
+
+
+def list_templates(tx, event_id):
+    return persistence.certificates.templates(tx, event_id)
+
+
+def list_certificates(tx, event_id, offset, limit):
+    return persistence.certificates.page(tx, event_id, offset, limit)
+
+
+def find_certificate(tx, field, value):
+    """Public lookup by serial or by access-token hash; unknown values are concealed."""
+    if len(value) > 120: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    row = persistence.certificates.find_by(tx, field, value)
+    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return row
+
+
+def is_superseded(tx, certificate_id):
+    return persistence.certificates.replacement_of(tx, certificate_id) is not None
+
+
+def rotate_access(tx, event_id, certificate_id):
+    """Issue a new recipient access link; the previous link stops working."""
+    row = get_certificate(tx, event_id, certificate_id)
+    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', Gone)
+    token = secrets.token_urlsafe(32)
+    persistence.certificates.set_access_hash(tx, row['id'], sha256(token.encode()).hexdigest())
+    return row, token

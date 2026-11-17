@@ -3,7 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
 from fastapi.testclient import TestClient
 from sqlalchemy import insert, select, func
 from app.db import make_engine, metadata, sites, event_guests, guests
@@ -61,7 +61,7 @@ def test_policy_initial_rev_zero_and_stale_revision_rejected(store):
     with engine.begin() as conn:
         p = svc.save_policy(conn, ev['id'], {'rev': 0, 'enabled': True})
         assert p['rev'] == 1
-        with pytest.raises(HTTPException, match='ADMISSION_POLICY_REVISION_CONFLICT'):
+        with pytest.raises(DomainError, match='ADMISSION_POLICY_REVISION_CONFLICT'):
             svc.save_policy(conn, ev['id'], {'rev': 0, 'visibility': 'private'})
 
 
@@ -97,7 +97,7 @@ def test_companion_bounds_and_days_fail_before_guest_creation(store):
         policy(conn, ev)
         _, token = create(conn, ev, max_companions=1)
         for body, error in [({'companions': 2}, 'COMPANIONS_INVALID'), ({'days': []}, 'ATTENDANCE_DAYS_REQUIRED_OR_INVALID'), ({'days': ['1900-01-01']}, 'ATTENDANCE_DAYS_REQUIRED_OR_INVALID'), ({'consent': False}, 'GUEST_CONSENT_REQUIRED')]:
-            with pytest.raises(HTTPException, match=error): accept(conn, ev, token, **body)
+            with pytest.raises(DomainError, match=error): accept(conn, ev, token, **body)
         assert conn.execute(select(func.count()).select_from(guests)).scalar_one() == 0
 
 
@@ -109,7 +109,7 @@ def test_capacity_reserves_party_size_and_releases_on_decline(store):
         first, a = create(conn, ev)
         _, b = create(conn, ev, '777123457')
         accept(conn, ev, a, 2)
-        with pytest.raises(HTTPException, match='DAY_CAPACITY_FULL'): accept(conn, ev, b)
+        with pytest.raises(DomainError, match='DAY_CAPACITY_FULL'): accept(conn, ev, b)
         svc.respond(conn, ev, a, {'response': 'declined', 'consent': True, 'companions': 0, 'days': []})
         assert accept(conn, ev, b)['status'] == 'approved'
         assert conn.execute(select(event_guests.c.status).where(event_guests.c.guest_id == svc.by_token(conn, a)['guest_id'])).scalar_one() == 'cancelled'
@@ -125,11 +125,11 @@ def test_split_party_atomic_consumption_and_idempotent_replay(store):
         result = svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-1', 'quantity': 2})
         assert result['remaining'] == 1
         assert svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-1', 'quantity': 2})['duplicate']
-        with pytest.raises(HTTPException, match='SCAN_ID_CONFLICT'): svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-1', 'quantity': 1})
+        with pytest.raises(DomainError, match='SCAN_ID_CONFLICT'): svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-1', 'quantity': 1})
         svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-2'})
-        with pytest.raises(HTTPException, match='ADMISSION_ALREADY_USED'): svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-3'})
+        with pytest.raises(DomainError, match='ADMISSION_ALREADY_USED'): svc.consume_entitlement(conn, ev, guest, {'scan_id': 'scan-3'})
         assert conn.execute(select(func.count()).select_from(admission_uses)).scalar_one() == 2
-        with pytest.raises(HTTPException, match='ATTENDANCE_ALREADY_STARTED'): accept(conn, ev, token, 1)
+        with pytest.raises(DomainError, match='ATTENDANCE_ALREADY_STARTED'): accept(conn, ev, token, 1)
 
 
 def test_consumption_outer_rollback_leaves_allowance(store):
@@ -154,11 +154,11 @@ def test_rotation_revocation_and_decline(store):
         row = accept(conn, ev, token)
         old_pass = svc.public_view(conn, ev, row, '')['guest_number']
         row, new_token = svc.rotate(conn, ev['id'], row['id'])
-        with pytest.raises(HTTPException, match='INVITATION_NOT_FOUND'): svc.by_token(conn, token)
+        with pytest.raises(DomainError, match='INVITATION_NOT_FOUND'): svc.by_token(conn, token)
         assert svc.public_view(conn, ev, row, '')['guest_number'] != old_pass
         row = svc.revoke(conn, ev['id'], row['id'])
         assert row['status'] == 'revoked'
-        with pytest.raises(HTTPException, match='INVITATION_INACTIVE'): accept(conn, ev, new_token)
+        with pytest.raises(DomainError, match='INVITATION_INACTIVE'): accept(conn, ev, new_token)
         assert not svc.public_view(conn, ev, row, '').get('qr_url')
         assert conn.execute(select(event_guests.c.status)).scalar_one() == 'revoked'
 
@@ -168,9 +168,9 @@ def test_list_scope_and_phone_dedup(store):
     with engine.begin() as conn:
         policy(conn, ev)
         conn.execute(insert(guest_lists).values(id='foreign', event_id='event-b', name='VIP', created_at=svc.now()))
-        with pytest.raises(HTTPException, match='GUEST_LIST_SCOPE'): create(conn, ev, list_id='foreign')
+        with pytest.raises(DomainError, match='GUEST_LIST_SCOPE'): create(conn, ev, list_id='foreign')
         create(conn, ev)
-        with pytest.raises(HTTPException, match='INVITATION_ALREADY_EXISTS'): create(conn, ev, '+967777123456')
+        with pytest.raises(DomainError, match='INVITATION_ALREADY_EXISTS'): create(conn, ev, '+967777123456')
 
 
 def test_policy_does_not_remove_approved_days_or_shrink_reserved_capacity(store):
@@ -179,26 +179,26 @@ def test_policy_does_not_remove_approved_days_or_shrink_reserved_capacity(store)
         p = policy(conn, ev)
         _, token = create(conn, ev)
         accept(conn, ev, token, 2)
-        with pytest.raises(HTTPException, match='CAPACITY_BELOW_RESERVED'): svc.save_policy(conn, ev['id'], {'days': [{'date': p['days'][0]['date'], 'capacity': 1}]})
-        with pytest.raises(HTTPException, match='ENTRY_MODE_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'entry_mode': 'single'})
+        with pytest.raises(DomainError, match='CAPACITY_BELOW_RESERVED'): svc.save_policy(conn, ev['id'], {'days': [{'date': p['days'][0]['date'], 'capacity': 1}]})
+        with pytest.raises(DomainError, match='ENTRY_MODE_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'entry_mode': 'single'})
 
 
 def test_registration_deadline_and_private_policy(store):
     engine, ev = store
     with engine.begin() as conn:
         policy(conn, ev)
-        with pytest.raises(HTTPException, match='INVITATION_REQUIRED'): svc.assert_public_registration(conn, ev['id'])
+        with pytest.raises(DomainError, match='INVITATION_REQUIRED'): svc.assert_public_registration(conn, ev['id'])
         _, token = create(conn, ev)
         svc.save_policy(conn, ev['id'], {'rsvp_deadline': (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()})
-        with pytest.raises(HTTPException, match='RSVP_DEADLINE_PASSED'): accept(conn, ev, token)
+        with pytest.raises(DomainError, match='RSVP_DEADLINE_PASSED'): accept(conn, ev, token)
 
 
 def test_csv_parser_rejects_bad_columns_and_formula_workbooks(store):
     encoded = lambda s: base64.b64encode(s.encode()).decode()
     rows = svc.parse_guest_file('guests.csv', encoded('name,phone,max_companions,days\nGuest,777123456,2,2026-10-19;2026-10-20\n'))
     assert rows[0]['days'] == ['2026-10-19', '2026-10-20']
-    with pytest.raises(HTTPException, match='IMPORT_UNKNOWN_COLUMN'): svc.parse_guest_file('a.csv', encoded('name,phone,token\na,777123456,secret\n'))
-    with pytest.raises(HTTPException, match='IMPORT_BASE64_INVALID'): svc.parse_guest_file('a.csv', '!notbase64')
+    with pytest.raises(DomainError, match='IMPORT_UNKNOWN_COLUMN'): svc.parse_guest_file('a.csv', encoded('name,phone,token\na,777123456,secret\n'))
+    with pytest.raises(DomainError, match='IMPORT_BASE64_INVALID'): svc.parse_guest_file('a.csv', '!notbase64')
 
 
 def test_public_registration_and_import_api(tmp_path):
@@ -247,9 +247,9 @@ def test_removed_pending_day_cannot_approve_or_respond(store):
         row = accept(conn, ev, token)
         next_day = (datetime.now(ZoneInfo('Asia/Aden')) + timedelta(days=1)).date().isoformat()
         svc.save_policy(conn, ev['id'], {'days': [{'date': next_day, 'capacity': 10}]})
-        with pytest.raises(HTTPException, match='ATTENDANCE_DAYS_REQUIRED_OR_INVALID'):
+        with pytest.raises(DomainError, match='ATTENDANCE_DAYS_REQUIRED_OR_INVALID'):
             svc.review(conn, ev, row['id'], 'approve', 'reviewer', row['revision'])
-        with pytest.raises(HTTPException, match='ATTENDANCE_DAYS_REQUIRED_OR_INVALID'):
+        with pytest.raises(DomainError, match='ATTENDANCE_DAYS_REQUIRED_OR_INVALID'):
             accept(conn, ev, token, days=[old['days'][0]['date']])
 
 
@@ -261,7 +261,7 @@ def test_stale_review_cannot_approve_changed_rsvp(store):
         row = accept(conn, ev, token)
         initial = row['revision']
         updated = accept(conn, ev, token, 2)
-        with pytest.raises(HTTPException, match='INVITATION_REVISION_CONFLICT'):
+        with pytest.raises(DomainError, match='INVITATION_REVISION_CONFLICT'):
             svc.review(conn, ev, row['id'], 'approve', 'reviewer', initial)
         assert svc.review(conn, ev, row['id'], 'approve', 'reviewer', updated['revision'])['status'] == 'approved'
 
@@ -276,22 +276,22 @@ def test_revoke_after_admission_keeps_capacity_used(store):
         svc.consume_entitlement(conn, ev, {'id': row['guest_id'], 'metadata_json': {'invitation_id': row['id']}}, {'scan_id': 'arrived'})
         svc.revoke(conn, ev['id'], row['id'])
         _, another = create(conn, ev, '777123457')
-        with pytest.raises(HTTPException, match='DAY_CAPACITY_FULL'): accept(conn, ev, another)
+        with pytest.raises(DomainError, match='DAY_CAPACITY_FULL'): accept(conn, ev, another)
 
 
 def test_disabled_registration_legacy_enable_and_timezone_change_are_blocked(store):
     from app.application.guest_service import register_guest
     engine, ev = store
     with engine.begin() as conn:
-        with pytest.raises(HTTPException, match='ADMISSION_REGISTRATION_DISABLED'): svc.assert_public_registration(conn, ev['id'])
+        with pytest.raises(DomainError, match='ADMISSION_REGISTRATION_DISABLED'): svc.assert_public_registration(conn, ev['id'])
         register_guest(conn, ev, {'phone': '777888999', 'consent': True})
-        with pytest.raises(HTTPException, match='LEGACY_PASSES_REQUIRE_MIGRATION'): policy(conn, ev)
+        with pytest.raises(DomainError, match='LEGACY_PASSES_REQUIRE_MIGRATION'): policy(conn, ev)
     with engine.begin() as conn:
         other = {**ev, 'id': 'event-b', 'slug': 'event-b'}
         policy(conn, other)
         _, token = create(conn, other)
         accept(conn, other, token)
-        with pytest.raises(HTTPException, match='TIMEZONE_HAS_APPROVALS'): svc.save_policy(conn, other['id'], {'timezone': 'UTC'})
+        with pytest.raises(DomainError, match='TIMEZONE_HAS_APPROVALS'): svc.save_policy(conn, other['id'], {'timezone': 'UTC'})
 
 
 def test_public_api_unpublished_and_disabled_event_no_registration(tmp_path):
@@ -319,12 +319,12 @@ def test_schedule_clear_or_timezone_change_cannot_invalidate_admission_history(s
         policy(conn, ev)
         row, token = create(conn, ev)
         row = accept(conn, ev, token)
-        with pytest.raises(HTTPException, match='DAY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'days': []})
+        with pytest.raises(DomainError, match='DAY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'days': []})
         svc.consume_entitlement(conn, ev, {'id': row['guest_id'], 'metadata_json': {'invitation_id': row['id']}}, {'scan_id': 'historical'})
         svc.revoke(conn, ev['id'], row['id'])
-        with pytest.raises(HTTPException, match='TIMEZONE_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'timezone': 'UTC'})
-        with pytest.raises(HTTPException, match='DAY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'days': []})
-        with pytest.raises(HTTPException, match='ADMISSION_POLICY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'enabled': False})
+        with pytest.raises(DomainError, match='TIMEZONE_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'timezone': 'UTC'})
+        with pytest.raises(DomainError, match='DAY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'days': []})
+        with pytest.raises(DomainError, match='ADMISSION_POLICY_HAS_APPROVALS'): svc.save_policy(conn, ev['id'], {'enabled': False})
 
 
 def test_forged_invitation_metadata_cannot_consume_another_guests_quota(store):
@@ -334,6 +334,6 @@ def test_forged_invitation_metadata_cannot_consume_another_guests_quota(store):
         row, token = create(conn, ev)
         row = accept(conn, ev, token)
         forged = {'id': 'other-person', 'metadata_json': {'invitation_id': row['id']}}
-        with pytest.raises(HTTPException, match='ENTITLEMENT_GUEST_SCOPE'):
+        with pytest.raises(DomainError, match='ENTITLEMENT_GUEST_SCOPE'):
             svc.consume_entitlement(conn, ev, forged, {'scan_id': 'forged'})
         assert conn.execute(select(entitlements.c.consumed)).scalar_one() == 0

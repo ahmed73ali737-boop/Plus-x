@@ -18,7 +18,8 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from sqlalchemy import insert, select, update, func, inspect
 from sqlalchemy.engine import make_url
 from app.db import make_engine, sites, guests, event_guests, guest_checkins
@@ -100,7 +101,7 @@ def main():
             def run(fn):
                 barrier.wait(timeout=15)
                 try: return {'ok': True, 'value': fn()}
-                except HTTPException as exc: return {'ok': False, 'status': exc.status_code, 'error': exc.detail}
+                except DomainError as exc: return {'ok': False, 'status': http_status(exc), 'error': exc.detail}
             with ThreadPoolExecutor(max_workers=len(callables)) as pool:
                 futures = [pool.submit(run, fn) for fn in callables]
                 return [f.result(timeout=45) for f in futures]

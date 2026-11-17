@@ -3,7 +3,7 @@ from copy import deepcopy
 from io import BytesIO
 import math
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
 from PIL import Image,ImageDraw,ImageChops
 from sqlalchemy import select,func
 from app.application import self_certificate_rendering as rendering
@@ -37,7 +37,7 @@ def test_all_available_real_fonts_shape_measure_and_render_arabic_latin_mixed(fo
     ('محمد 😀','NAME_GLYPH_UNSUPPORTED')])
 def test_invalid_names_fail_before_image_generation(name,code):
     row=revision()
-    with pytest.raises(HTTPException) as exc:rendering.fit_name(name,row['config'],row['font_manifest'],row['branding_manifest'])
+    with pytest.raises(DomainError) as exc:rendering.fit_name(name,row['config'],row['font_manifest'],row['branding_manifest'])
     assert exc.value.detail==code
 
 def test_nfc_whitespace_and_original_name_are_separate():
@@ -68,7 +68,7 @@ def test_largest_fitting_size_before_deletion():
 @pytest.mark.parametrize('name',['طوييييييييييييييييييييييل','محمد العمري'])
 def test_impossible_one_or_two_words_are_rejected_without_clipping(name):
     row=revision();row['config']['name_rect']=dict(x=350,y=300,width=6,height=8)
-    with pytest.raises(HTTPException) as exc:rendering.fit_name(name,row['config'],row['font_manifest'],row['branding_manifest'])
+    with pytest.raises(DomainError) as exc:rendering.fit_name(name,row['config'],row['font_manifest'],row['branding_manifest'])
     assert exc.value.detail=='NAME_CANNOT_FIT'
 
 def test_preview_and_saved_layout_render_have_identical_bytes_and_no_legacy_frame_qr():
@@ -84,7 +84,7 @@ def test_preview_and_saved_layout_render_have_identical_bytes_and_no_legacy_fram
             draw.rectangle((rect['x'],rect['y'],rect['x']+rect['width']-1,rect['y']+rect['height']-1),fill='black')
         assert difference.getbbox() is None
     tampered=deepcopy(layout);tampered['text_origin'][0]=0
-    with pytest.raises(HTTPException):rendering.render(row,background,None,tampered)
+    with pytest.raises(DomainError):rendering.render(row,background,None,tampered)
 
 def test_stamp_alpha_and_ratio_and_original_dimensions():
     row=revision(stamp=True)
@@ -103,13 +103,13 @@ def test_overlap_or_forged_brand_rejected_before_model_or_revision_insert(db):
     config=rendering.default_config(800,600)
     config['name_rect']=deepcopy(branding.system_profile(800,600)['card_rect'])
     for bad in (config,{**rendering.default_config(800,600),'branding_manifest':{'enabled':False}}):
-        with pytest.raises(HTTPException):repo.save_model(db,{'id':'a'},name='bad',
+        with pytest.raises(DomainError):repo.save_model(db,{'id':'a'},name='bad',
             background_asset_id='bg',stamp_asset_id=None,config=bad)
     assert db.execute(select(func.count()).select_from(models)).scalar_one()==0
     assert db.execute(select(func.count()).select_from(revisions)).scalar_one()==0
 
 def test_font_manifest_is_server_derived_and_unsupported_kufi_is_not_silently_substituted():
     assert len(fonts.choices())==8
-    with pytest.raises(HTTPException) as exc:fonts.manifest('NotoKufiArabic-Regular')
+    with pytest.raises(DomainError) as exc:fonts.manifest('NotoKufiArabic-Regular')
     assert exc.value.detail=='FONT_SHAPING_UNSUPPORTED'
-    with pytest.raises(HTTPException):fonts.validate_manifest({'primary_id':'NotoSansArabic-Regular'})
+    with pytest.raises(DomainError):fonts.validate_manifest({'primary_id':'NotoSansArabic-Regular'})

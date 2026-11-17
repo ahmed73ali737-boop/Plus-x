@@ -5,7 +5,8 @@ from copy import deepcopy
 from types import SimpleNamespace
 import base64,json,os,secrets,subprocess,sys,time,shutil
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from sqlalchemy import select,insert,update,func
 from PIL import Image
 from tests.test_self_certificate_http import system,A,P,new_link,new_model,prepare,submit
@@ -39,8 +40,8 @@ def test_more_than_sixteen_key_versions_survive_restart_and_old_capability(tmp_p
     with pytest.raises(ValueError):rotate(path,'v1')
     assert path.read_bytes()==before
     (archive/'v1.json').unlink()
-    with pytest.raises(HTTPException) as error:Keyring(path).verify('receive',token)
-    assert error.value.status_code==503
+    with pytest.raises(DomainError) as error:Keyring(path).verify('receive',token)
+    assert http_status(error.value)==503
 
 
 def test_kernel_confinement_denies_network_exec_private_read_and_write(tmp_path):
@@ -193,7 +194,7 @@ def test_historical_font_catalog_resolves_after_current_catalog_changes(tmp_path
     assert fonts.validate_manifest(saved)==saved
     assert renderer.render(row,image.getvalue(),None,layout)==before
     (target/(saved['primary_sha256']+'.ttf')).unlink()
-    with pytest.raises(HTTPException):fonts.validate_manifest(saved)
+    with pytest.raises(DomainError):fonts.validate_manifest(saved)
 
 
 def test_pilot_scope_limits_new_but_keeps_previous_delivery(system,monkeypatch):

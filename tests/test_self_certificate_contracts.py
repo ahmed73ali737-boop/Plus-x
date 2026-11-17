@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from app.application.self_certificate_contracts import public_certificate, ParticipantInput, PublicRequestState
+from app.api.self_certificate_contracts import public_certificate, ParticipantInput, PublicRequestState
 from app.core.certificate_features import certificate_features
 
 def test_public_certificate_projection_never_serializes_private_fields():

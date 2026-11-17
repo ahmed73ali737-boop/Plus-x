@@ -1,40 +1,40 @@
+"""Audit trail use cases, including denials audited after request rollback."""
 from __future__ import annotations
 
-import uuid
-from sqlalchemy import insert
+import logging
+import time
+from collections import OrderedDict, deque
+from threading import Lock
 
-from app.db import audit
-from app.domain import now
+from app.application.ports import persistence
+from app.domain import DomainError, now
+from app.domain.values import new_id
+
+__all__ = ['AuditedDenial', 'DenialAuditWriter', 'new_id', 'write_audit']
 
 
-def new_id() -> str:
-    return str(uuid.uuid4())
-
-
-def write_audit(conn, user, site_id, action: str, detail=None) -> None:
-    conn.execute(
-        insert(audit).values(
-            id=new_id(),
-            user_id=user['id'] if user else None,
-            site_id=site_id,
-            action=action,
-            at=now(),
-            details=detail or {},
-        )
-    )
+def write_audit(tx, user, site_id, action: str, detail=None) -> None:
+    persistence.audit.add(tx, {
+        'id': new_id(),
+        'user_id': user['id'] if user else None,
+        'site_id': site_id,
+        'action': action,
+        'at': now(),
+        'details': detail or {},
+    })
 
 
 # Only server-selected, secret-free fields cross the rollback boundary.
-from fastapi import HTTPException
-from collections import OrderedDict, deque
-from threading import Lock
-import logging
-import time
 
 
-class AuditedDenial(HTTPException):
-    def __init__(self, code, status, *, action, user=None, site_id=None):
-        super().__init__(status_code=status, detail=code)
+class AuditedDenial(DomainError):
+    """A denial that is audited after the request transaction rolled back.
+
+    ``kind`` is the denial category (Forbidden or Unauthenticated).
+    """
+    def __init__(self, code, kind, *, action, user=None, site_id=None):
+        super().__init__(code)
+        self.kind = kind.kind
         self.audit_id = new_id()
         self.audit_action = action
         self.audit_user = {'id': user['id']} if user else None
@@ -71,8 +71,8 @@ class DenialAuditWriter:
             self.recent[key] = current
             self.window.append(current)
         try:
-            with self.engine.begin() as conn:
-                write_audit(conn, denial.audit_user, denial.audit_site_id,
+            with persistence.transactions.write(self.engine) as tx:
+                write_audit(tx, denial.audit_user, denial.audit_site_id,
                             denial.audit_action, {'reason': denial.detail})
         except Exception:
             # Never include exception text: drivers may embed SQL parameters.

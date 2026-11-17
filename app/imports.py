@@ -1,8 +1,7 @@
 """Bounded CSV/XLSX input; reused and generalized from the prior restricted OOXML reader."""
 import base64, csv, io, json, importlib.util
 from pathlib import Path
-from fastapi import HTTPException
-from .domain import fail, normalize_record, boolean
+from .domain import fail, normalize_record, boolean, DomainError
 spec=importlib.util.spec_from_file_location('restricted_xlsx',Path(__file__).with_name('xlsx_reader.py'))
 reader=importlib.util.module_from_spec(spec);spec.loader.exec_module(reader)
 SHEETS={'Participants':'participant','Sponsors':'sponsor','Sessions':'session','Places':'place','Facts':'fact','Services':'service','Polls':'poll','Offers':'offer','Ads':'ad','Media':'media','Contacts':'contact','News':'news','Questions':'question','QuestionBank':'question'}
@@ -60,7 +59,7 @@ def parse(body):
                     if not raw.get('qtype'):raw['qtype']='single_choice'
                     if not raw.get('order'):raw['order']=rowno
                 records.append(normalize_record(raw))
-            except HTTPException as e:errors.append({'sheet':sheet,'row':rowno,'error':e.detail})
+            except DomainError as e:errors.append({'sheet':sheet,'row':rowno,'error':e.code})
     if len(records)>2000: fail('IMPORT_TOTAL_LIMIT')
     if not records and not errors: errors.append({'sheet':'','row':0,'error':'NO_RECORDS'})
     codes=set()

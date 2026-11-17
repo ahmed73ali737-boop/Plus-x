@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 import os
 from PIL import Image
-from app.domain import fail
+from app.domain import fail, Unavailable
 
 ROOT = Path(__file__).resolve().parents[2]
 LOGO_SHA256 = 'f234da2551cf3ba73641ead5e6274463e60a3c8930ff77dab9909ff6c9b8f198'
@@ -47,9 +47,9 @@ def verified_bytes(path, digest, error):
     try:
         data = path.read_bytes()
     except OSError:
-        fail(error, 503)
+        fail(error, Unavailable)
     if sha256(data).hexdigest() != digest:
-        fail(error, 503)
+        fail(error, Unavailable)
     return data
 
 def system_profile(width, height, *, profile_id=PROFILE_ID):
@@ -57,13 +57,13 @@ def system_profile(width, height, *, profile_id=PROFILE_ID):
     if type(width) is not int or type(height) is not int or min(width, height) < 100:
         fail('BACKGROUND_DIMENSIONS_INVALID')
     if not isinstance(profile_id,str) or profile_id not in PROFILE_RESOURCES:
-        fail('BRANDING_PROFILE_UNAVAILABLE',503)
+        fail('BRANDING_PROFILE_UNAVAILABLE', Unavailable)
     resource=PROFILE_RESOURCES[profile_id]
     verified_bytes(logo_path(resource['logo_sha256']),resource['logo_sha256'],'BRANDING_ASSET_UNAVAILABLE')
     verified_bytes(label_font_path(resource['font_hash']),resource['font_hash'],'BRANDING_FONT_UNAVAILABLE')
     margin = max(2, round(min(width, height) * .015))
     if not isinstance(profile_id,str) or profile_id not in PROFILES:
-        fail('BRANDING_PROFILE_UNAVAILABLE',503)
+        fail('BRANDING_PROFILE_UNAVAILABLE', Unavailable)
     card_width = round(width * PROFILES[profile_id])
     padding = max(2, round(card_width * .045))
     label_size = max(6, round(card_width * .065))

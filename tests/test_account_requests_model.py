@@ -9,7 +9,9 @@ import os
 from pathlib import Path
 import uuid
 
-from fastapi import HTTPException
+from app.domain import DomainError
+
+from app.api.errors import http_status
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, func, insert, inspect, select, text, update
@@ -146,9 +148,9 @@ def test_pending_duplicates_are_scope_specific_and_recover_outer_transaction(sto
         first = add(conn)
         for overrides, detail in [({'email': ' NEW@example.test '}, 'ACCOUNT_REQUEST_PENDING'),
                                   ({'email': 'other@example.test', 'request_key': conn.scalar(select(account_requests.c.request_key))}, 'ACCOUNT_REQUEST_KEY_EXISTS')]:
-            with pytest.raises(HTTPException) as error:
+            with pytest.raises(DomainError) as error:
                 add(conn, **overrides)
-            assert error.value.status_code == 409 and error.value.detail == detail
+            assert http_status(error.value) == 409 and error.value.detail == detail
         other = add(conn, scope_id='event-two')
         assert other['id'] != first['id']
         assert conn.scalar(select(func.count()).select_from(account_requests)) == 2
@@ -157,7 +159,7 @@ def test_pending_duplicates_are_scope_specific_and_recover_outer_transaction(sto
 def test_existing_legacy_email_is_case_insensitively_rejected(store):
     engine, _ = store
     with engine.begin() as conn:
-        with pytest.raises(HTTPException) as error:
+        with pytest.raises(DomainError) as error:
             add(conn, email='  EXISTING@example.test ')
         assert error.value.detail == 'ACCOUNT_ALREADY_EXISTS'
         assert conn.scalar(select(func.count()).select_from(account_requests)) == 0
@@ -215,7 +217,7 @@ def test_database_constraints_reject_invalid_records(store, changes):
 def test_input_validation_never_persists_raw_credentials(store, changes, detail):
     engine, _ = store
     with engine.begin() as conn:
-        with pytest.raises(HTTPException) as error:
+        with pytest.raises(DomainError) as error:
             add(conn, **changes)
         assert error.value.detail == detail
         assert conn.scalar(select(func.count()).select_from(account_requests)) == 0
