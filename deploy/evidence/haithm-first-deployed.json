@@ -1,0 +1,109 @@
+{
+  "timestamp_utc": "2026-11-18T18:06:04.113401+00:00",
+  "repository": "https://github.com/ahmed73ali737-boop/Plus-x.git",
+  "path": "/project/plusx",
+  "url": "https://5.189.157.131/plusx/",
+  "branch": "main",
+  "origin_main_pulled": "ec8c98517c8f8c3e80b64e940edc5e31b168c5f5",
+  "source_commit": "814618c180113060d7d9efed9d08505ecfdc702d",
+  "final_commit": {
+    "reference": "HEAD",
+    "resolution": "The commit containing deploy/evidence/haithm-first-deployed.json; exact resulting SHA is recorded in /project/login/evidence/plusx.json. A commit cannot embed its own SHA."
+  },
+  "services": [
+    {
+      "name": "plusx-development-app-1",
+      "health": "healthy",
+      "running": true,
+      "image": "sha256:395dc66ea38be9188b287a449a40a9a01b306d314d76710d9e8ba2d6cbf34ee9",
+      "volumes": [
+        "plusx-development_plusx_development_data"
+      ],
+      "ports": {
+        "4310/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "14310"
+          }
+        ]
+      }
+    },
+    {
+      "name": "plusx-development-postgres-1",
+      "health": "healthy",
+      "running": true,
+      "image": "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "volumes": [
+        "plusx-development_postgres_development_data"
+      ],
+      "ports": {
+        "5432/tcp": null
+      }
+    }
+  ],
+  "public_https": {
+    "get_status": 200,
+    "readiness_status": 200,
+    "tls": {
+      "verified": true,
+      "protocol": "TLSv1.3",
+      "subject_alt_names": [
+        [
+          "IP Address",
+          "5.189.157.131"
+        ]
+      ],
+      "issuer": [
+        [
+          [
+            "countryName",
+            "US"
+          ]
+        ],
+        [
+          [
+            "organizationName",
+            "Let's Encrypt"
+          ]
+        ],
+        [
+          [
+            "commonName",
+            "YE1"
+          ]
+        ]
+      ],
+      "expires": "Nov 25 08:59:30 2026 GMT",
+      "verification": "Default system CA trust and IP hostname verification; no bypass"
+    }
+  },
+  "authentication": {
+    "method": "HTTPS POST api/auth/login, cookie-authenticated GET api/auth/me, POST api/auth/logout, unauthenticated GET returns 401",
+    "result": "passed",
+    "existing_credentials_reused": true,
+    "identity_and_tenant_match": true,
+    "secure_subpath_cookie": true,
+    "credential_file": "/project/login/plusx.md",
+    "credential_mode": "0600"
+  },
+  "checks": {
+    "subpath_tests": "2 passed",
+    "compose_config": "passed",
+    "docker_build": "passed",
+    "container_readiness": "passed",
+    "nginx_config": "passed"
+  },
+  "preservation": {
+    "backup_branch": "backup/pre-haithm-first-20261118",
+    "prior_deployment_merged": true,
+    "existing_volumes_reused": true,
+    "unrelated_projects_modified": false,
+    "nginx_include": "/project/plusx/ops/plusx-development.nginx.conf"
+  },
+  "limitations": [
+    "Existing local/development deployment mode retained; no production acceptance asserted.",
+    "Browser/UI smoke tests and broad core-feature suite intentionally not run.",
+    "No push or GitHub CI triggered.",
+    "Image source revision precedes the final evidence-only commit; runtime source is unchanged by that commit."
+  ]
+}
