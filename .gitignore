@@ -20,3 +20,11 @@ server.log
 secrets.*
 
 /secrets.development/
+
+# Host runtime and private credentials
+.local/
+.env.*
+!.env.*.example
+credentials.private.json
+*.pem
+*.key
