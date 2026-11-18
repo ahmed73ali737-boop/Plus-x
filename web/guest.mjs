@@ -202,7 +202,7 @@ export async function guestPage(slug,number=''){
 export function parseGuestNumber(value){
   const raw=String(value||'').trim().toUpperCase();
   if(/^G-[0-9A-F]{30}$/.test(raw))return raw;
-  try{const u=new URL(value,location.origin);if(!['http:','https:'].includes(u.protocol))return '';const m=u.pathname.toUpperCase().match(/^\/E\/[^/]+\/GUEST\/(G-[0-9A-F]{30})\/?$/);if(m)return m[1];}catch{}
+  try{const u=new URL(value,location.origin);if(!['http:','https:'].includes(u.protocol)||u.origin!==location.origin)return '';const m=u.pathname.toUpperCase().match(/^\/E\/[^/]+\/GUEST\/(G-[0-9A-F]{30})\/?$/);if(m)return m[1];}catch{}
   return '';
 }
 function gatePresenceKey(eventId,guestNumber){return eventId+':'+guestNumber;}

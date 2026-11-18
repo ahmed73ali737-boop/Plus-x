@@ -115,13 +115,13 @@ def create_app(database_url=None,origin=None,seed_demo=None,credentials_path=Non
                credentials_path is not None or os.environ.get("CREDENTIALS_PATH")
                else None)
     app.state.seed_credentials=seed(engine,seed_file) if settings.seed_demo else []
-    public_origin=settings.public_origin
+    public_origin=settings.public_base_url
     media_dir=settings.media_dir;media_dir.mkdir(parents=True,exist_ok=True)
     dummy=password_hash(secrets.token_urlsafe(20))
 
     install_security_middleware(
         app,
-        public_origin,
+        settings.public_origin,
         allow_local_loopback_origins=(settings.environment == "local" and not settings.production_mode),
     )
 

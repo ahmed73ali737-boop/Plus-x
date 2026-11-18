@@ -33,6 +33,7 @@ services:
       WEB_WORKERS: "1"
       DATA_DIR: /app/data
       PUBLIC_ORIGIN: https://5.189.157.131
+      PUBLIC_PATH_PREFIX: /plusx
       HOST: 0.0.0.0
       PORT: "4310"
     # REQUIRE_POSTGRES also enables production gates; local mode selects PostgreSQL

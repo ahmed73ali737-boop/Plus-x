@@ -1,6 +1,7 @@
 """Validated application settings shared by CLI, ASGI factory and release gate."""
 from __future__ import annotations
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -40,6 +41,11 @@ class Settings:
     media_dir: Path
     credentials_path: Path
     backup_dir: Path
+    public_path_prefix: str = ""
+
+    @property
+    def public_base_url(self) -> str:
+        return self.public_origin + self.public_path_prefix
 
 def load_settings(*, database_url: str | None = None, origin: str | None = None,
                   seed_demo: bool | None = None,
@@ -60,6 +66,9 @@ def load_settings(*, database_url: str | None = None, origin: str | None = None,
             parsed.username is not None or parsed.password is not None or
             parsed.path not in ("", "/") or parsed.query or parsed.fragment):
         raise ValueError("INVALID_PUBLIC_ORIGIN")
+    prefix = os.environ.get("PUBLIC_PATH_PREFIX", "")
+    if prefix and not re.fullmatch(r"(?:/[A-Za-z0-9_-]+)+", prefix):
+        raise ValueError("INVALID_PUBLIC_PATH_PREFIX")
     seed = env_bool("SEED_DEMO", default=local_launcher and not prod) if seed_demo is None else seed_demo
     if not isinstance(seed, bool):
         raise ValueError("SEED_DEMO_NOT_BOOLEAN")
@@ -70,4 +79,4 @@ def load_settings(*, database_url: str | None = None, origin: str | None = None,
     backup = resolve_path(os.environ["BACKUP_DIR"]) if os.environ.get("BACKUP_DIR") else resolve_path("backups")
     return Settings(environment,prod,db,public_origin.rstrip("/"),seed,
                     os.environ.get("HOST","127.0.0.1"),port,workers,
-                    data,media,creds,backup)
+                    data,media,creds,backup,prefix)

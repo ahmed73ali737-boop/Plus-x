@@ -34,7 +34,7 @@ class RedactCertificateAccess(logging.Filter):
 def install_self_certificate_routes(app,engine,settings,identify,log):
     store=CertificateStore(settings.data_dir/'private-certificates')
     keypath=Path(os.environ.get('PX_SELF_CERTIFICATE_KEYRING_PATH') or store.root/'keyring.json')
-    origin=settings.public_origin
+    origin=settings.public_base_url
     def keys(create=False):
         allow_create=False
         if not keypath.exists() and create:
