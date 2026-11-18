@@ -3,7 +3,7 @@ import {openRecovery,passwordPair,validatePasswords} from './account.mjs';
 
 export async function accountPage(){
   document.documentElement.dir='rtl';document.documentElement.lang='ar';
-  document.title='حسابي | Eventna إيفنتنا';
+  document.title='حسابي | إيفنتنا';
   if(!document.querySelector('link[data-access-style]'))document.head.append(h('link',{rel:'stylesheet',href:'/assets/access.css','data-access-style':'true'}));
   const main=h('main',{class:'access-shell account-shell',id:'main-content'});
   root.replaceChildren(h('header',{class:'access-header'},brand(),h('a',{href:'/',class:'text-btn'},'تصفح الفعاليات')),main);

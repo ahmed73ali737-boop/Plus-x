@@ -33,7 +33,7 @@ function pollCard(record, result) {
 
 export async function liveWallPage(slug) {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) throw new Error('رابط شاشة العرض غير صالح.');
-  document.title = 'شاشة النتائج الحية | Eventna إيفنتنا';
+  document.title = 'شاشة النتائج الحية | إيفنتنا';
   document.body.classList.add('livewall-mode');
   const headline = h('h1', {}, 'شاشة النتائج الحية');
   const summary = h('p', {class: 'livewall-muted', 'aria-live': 'polite'}, 'جاري التحقق من البيانات المنشورة…');

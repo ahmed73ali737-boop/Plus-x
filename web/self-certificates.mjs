@@ -21,7 +21,7 @@ export async function selfCertificateAdmin(){
  const tabs=h('nav',{class:'selfcert-tabs','aria-label':'أقسام خدمة الشهادات'});
  const summary=h('div',{class:'selfcert-summary'}),tabButtons={};
  const badge=(text,state='')=>h('span',{class:'selfcert-badge '+state},text);
- const header=h('header',{class:'selfcert-heading'},h('a',{href:'/admin',class:'selfcert-brand'},'Eventna',h('small',{},'إيفنتنا · استوديو الشهادات')),h('a',{href:'/admin',class:'btn secondary'},'العودة للإدارة'));
+ const header=h('header',{class:'selfcert-heading'},h('a',{href:'/admin',class:'selfcert-brand'},'إيفنتنا',h('small',{},'إيفنتنا · استوديو الشهادات')),h('a',{href:'/admin',class:'btn secondary'},'العودة للإدارة'));
  const main=h('main',{class:'selfcert-admin'},h('section',{class:'selfcert-hero'},h('div',{},h('span',{class:'eyebrow'},'خدمة الشهادات'),h('h1',{},'من تصميمك إلى شهادة يعتز بها المشارك'),h('p',{},'مكتبة خاصة بحسابك، وروابط طلب مستقلة، وسجل يجمع كل شهادة.')),badge(access.can_manage?'المكتبة متاحة':'السجل السابق متاح',access.can_manage?'active':'paused')),summary,tabs,filters,error,content,h('p',{class:'selfcert-privacy'},'مكتبتك وسجلك خاصان بحسابك. يمكنك إدارة النماذج دون فعالية؛ إنشاء الرابط يحتاج فعالية مخولًا بها.'),h('a',{href:'/admin?certificates=legacy',class:'selfcert-legacy-link'},'السجل وأدوات الإصدار السابقة'));
  root.replaceChildren(h('div',{class:'selfcert-dashboard'},header,main));
  for(const key of Object.keys(titles)){
