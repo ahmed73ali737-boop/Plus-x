@@ -1,0 +1,20 @@
+{
+  "utc": "20261119T213324Z",
+  "password_rotation_http": 200,
+  "fresh_login_http": 200,
+  "identity_http": 200,
+  "role": "platform",
+  "scope": "platform",
+  "logout_http": 200,
+  "after_logout_http": 401,
+  "cookies": [
+    {
+      "secure": true,
+      "path": "/plusx/",
+      "httponly": true
+    }
+  ],
+  "credentials_file": "/project/login/plusx.md",
+  "mode": "0o600",
+  "secrets_disclosed": false
+}

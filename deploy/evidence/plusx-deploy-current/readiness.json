@@ -1,0 +1,39 @@
+{
+  "status": "ready",
+  "database": "postgresql",
+  "version": "1.0.1",
+  "build": "git-0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+  "schema_tables_current": true,
+  "critical_columns_current": true,
+  "schema_migrations_current": true,
+  "migration_count": 22,
+  "migration_expected": 22,
+  "migration_missing": [],
+  "migration_checksum_mismatch": [],
+  "certificates": {
+    "ready": true,
+    "capabilities": {
+      "render": {
+        "ready": true,
+        "required": false,
+        "code": "OK"
+      },
+      "accept_new": {
+        "ready": false,
+        "required": false,
+        "code": "CERTIFICATE_REQUESTS_PAUSED"
+      },
+      "delivery": {
+        "ready": true,
+        "required": false,
+        "code": "OK"
+      },
+      "export": {
+        "ready": true,
+        "required": false,
+        "code": "OK"
+      }
+    },
+    "probe_cache_seconds": 5
+  }
+}

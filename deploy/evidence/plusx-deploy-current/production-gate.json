@@ -1,0 +1,5 @@
+{
+  "exit": 2,
+  "stdout": "{\n  \"status\": \"fail\",\n  \"checks\": {\n    \"postgresql_required\": true,\n    \"https_public_origin\": true,\n    \"demo_seed_disabled\": true,\n    \"multi_worker_configured\": false,\n    \"database_password_not_placeholder\": true,\n    \"guest_identity_secret_configured\": true,\n    \"bootstrap_admin_email_configured\": false,\n    \"native_postgres_accepted\": false,\n    \"load_accepted\": false,\n    \"security_accepted\": false,\n    \"field_offline_accepted\": false\n  },\n  \"note\": \"Release gate requires explicit evidence flags after native PostgreSQL, load, security and field/offline acceptance. Flags are acknowledgements, not tests themselves.\"\n}",
+  "stderr": ""
+}
