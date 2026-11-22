@@ -49,3 +49,8 @@ No historical acceptance can be applied to a new commit.
 Tests: `python3 -m unittest discover -s ops/tests -p test_deployment_provenance.py`.
 Rollback: discard the isolated candidate branch/worktree after retaining its
 proof. No live state is modified by these tools, so no runtime rollback is needed.
+
+The follow-on [OCI receipt workflow](RELEASE_RECEIPT.md) adds authenticated
+manifest/attestation and non-secret runtime-policy binding. Its offline preflight
+never authorizes release, and explicitly reports missing evidence. Existing
+source packaging alone still cannot establish G1.
