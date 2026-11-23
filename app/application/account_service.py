@@ -17,15 +17,22 @@ from app.core.security import (
     new_temporary_password,
     verify_password,
 )
-from app.domain import Conflict, DomainError, Forbidden, NotFound, Unauthenticated, fail, now, text
+from app.domain import DomainError, NotFound, Unauthenticated, fail, now, text
 from app.domain.accounts import (
     PREFERENCE_DEFAULTS,
     SESSION_HOURS,
     check_password_change,
     check_preferences,
+    platform_status,
+    require_credentials,
+    require_known_user,
+    require_organizer_reset_scope,
     require_platform,
+    require_reset_authority,
     require_reset_target,
+    site_user_status,
 )
+from app.domain.sites import require_not_agency
 
 SESSION_SUMMARY_TIMEOUT_SECONDS = 28800
 
@@ -84,19 +91,16 @@ def revoke_all_sessions(tx, user) -> int:
 
 
 def change_password(tx, user, body: dict) -> None:
-    if not verify_password(body.get('current'), user['password_hash']):
-        fail('INVALID_CREDENTIALS', Unauthenticated)
+    require_credentials(verify_password(body.get('current'), user['password_hash']))
     check_password_change(body)
     hashed = hash_password(body.get('password'))
-    if not persistence.identity.change_password(tx, user['id'], user['password_hash'], hashed):
-        fail('INVALID_CREDENTIALS', Unauthenticated)
+    require_credentials(persistence.identity.change_password(tx, user['id'], user['password_hash'], hashed))
     persistence.identity.delete_sessions_of(tx, user['id'])
     write_audit(tx, user, user['scope_id'], 'password_changed')
 
 
 def add_phone_login(tx, user, phone: str, current_password) -> None:
-    if not verify_password(current_password, user['password_hash']):
-        fail('INVALID_CREDENTIALS', Unauthenticated)
+    require_credentials(verify_password(current_password, user['password_hash']))
     bind_phone(tx, user['id'], phone)
     # A new login identifier ends other sessions, including this one.
     persistence.identity.delete_sessions_of(tx, user['id'])
@@ -104,14 +108,10 @@ def add_phone_login(tx, user, phone: str, current_password) -> None:
 
 
 def admin_reset_password(tx, actor, user_id: str) -> str:
-    if actor['role'] not in ('platform', 'organizer'):
-        fail('FORBIDDEN_ROLE', Forbidden)
-    target = persistence.identity.user(tx, user_id, for_update=True)
-    if not target:
-        fail('USER_NOT_FOUND', NotFound)
+    require_reset_authority(actor)
+    target = require_known_user(persistence.identity.user(tx, user_id, for_update=True))
     if actor['role'] != 'platform':
-        if target['role'] not in ('agency', 'member') or not target['scope_id']:
-            fail('FORBIDDEN_ROLE', Forbidden)
+        require_organizer_reset_scope(target)
         require_scope(tx, actor, target['scope_id'])
     require_reset_target(actor, target)
     temporary = new_temporary_password()
@@ -134,13 +134,8 @@ def _deactivate(tx, user_id: str) -> None:
 
 def set_account_status(tx, actor, user_id: str, active) -> None:
     require_platform(actor)
-    if not isinstance(active, bool):
-        fail('USER_STATUS_INVALID')
-    if user_id == actor['id']:
-        fail('CANNOT_SUSPEND_SELF', Conflict)
-    target = persistence.identity.user(tx, user_id, for_update=True)
-    if not target:
-        fail('USER_NOT_FOUND', NotFound)
+    platform_status(active, actor, user_id)
+    target = require_known_user(persistence.identity.user(tx, user_id, for_update=True))
     persistence.identity.set_active(tx, user_id, active)
     if not active:
         _deactivate(tx, user_id)
@@ -149,18 +144,15 @@ def set_account_status(tx, actor, user_id: str, active) -> None:
 
 def set_site_user_status(tx, actor, site_id: str, user_id: str, active) -> dict:
     require_scope(tx, actor, site_id)
-    if actor['role'] == 'agency':
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_not_agency(actor)
     target = persistence.identity.user(tx, user_id)
-    if not target or target['scope_id'] != site_id:
-        fail('USER_NOT_FOUND', NotFound)
-    if active not in (True, False, 0, 1):
-        fail('USER_STATUS_INVALID')
-    persistence.identity.set_active(tx, user_id, bool(active))
+    require_known_user(target if target and target['scope_id'] == site_id else None)
+    active = site_user_status(active)
+    persistence.identity.set_active(tx, user_id, active)
     if not active:
         _deactivate(tx, user_id)
-    write_audit(tx, actor, site_id, 'user_status_changed', {'user_id': user_id, 'active': bool(active)})
-    return {'id': user_id, 'active': bool(active), 'sessions_revoked': not bool(active)}
+    write_audit(tx, actor, site_id, 'user_status_changed', {'user_id': user_id, 'active': active})
+    return {'id': user_id, 'active': active, 'sessions_revoked': not active}
 
 
 def preferences(tx, user) -> dict:
