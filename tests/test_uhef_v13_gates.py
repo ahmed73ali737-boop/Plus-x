@@ -54,7 +54,8 @@ class TestSchema:
     def test_system_name(self, knowledge):
         """System name is documented."""
         assert knowledge.get('system'), 'system name not set'
-        assert 'Eventna' in knowledge['system'] or 'eventna' in knowledge['system'].lower()
+        # The knowledge base is Arabic-first: the product is named in Arabic (Latin: Eventna).
+        assert 'إيفنتنا' in knowledge['system'] or 'eventna' in knowledge['system'].lower()
 
     def test_language(self, knowledge):
         """Language is set."""
