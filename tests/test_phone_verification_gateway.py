@@ -20,6 +20,9 @@ class Gateway(http.server.ThreadingHTTPServer):
         gw = self
 
         class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(h):
+                h._send(200 if h.path == '/api/health' else 404, {'status': 'ok'})
+
             def do_POST(h):
                 raw = h.rfile.read(int(h.headers.get('Content-Length', 0))); body = json.loads(raw or b'{}')
                 gw.requests.append({'path': h.path, 'headers': {k.lower(): v for k, v in h.headers.items()}, 'body': body})

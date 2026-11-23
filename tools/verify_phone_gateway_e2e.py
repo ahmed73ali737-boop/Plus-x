@@ -29,7 +29,9 @@ def sandbox_code(timeout=20):
             if m: return m.group(1)
         time.sleep(0.5)
 tmp = tempfile.mkdtemp(prefix='pulsex-e2e-')
-env = {'PULSEX_ENV': 'test', 'REQUIRE_POSTGRES': 'false', 'PULSEX_CHANNELS_URL': GW, 'PULSEX_CHANNELS_API_KEY': KEY}
+VIA_SETTINGS = os.environ.get('E2E_VIA_SETTINGS') == '1'   # provider configured by the platform admin through the settings API, not the environment
+env = {'PULSEX_ENV': 'test', 'REQUIRE_POSTGRES': 'false'}
+env.update({'E2E_GATEWAY_KEY': KEY} if VIA_SETTINGS else {'PULSEX_CHANNELS_URL': GW, 'PULSEX_CHANNELS_API_KEY': KEY})
 with mock.patch.dict(os.environ, env):
     from fastapi.testclient import TestClient
     from app.server import create_app
@@ -37,7 +39,16 @@ with mock.patch.dict(os.environ, env):
     app = create_app('sqlite:///' + tmp + '/e2e.sqlite', origin='http://testserver', seed_demo=True)
     PHONE, PW = '+967777' + str(uuid.uuid4().int)[:6], 'My-Personal-Password-2026!'
     with TestClient(app) as client:
-        prepare_review_admin(app); register_approved(app, client, phone=PHONE, password=PW)
+        prepare_review_admin(app)
+        if VIA_SETTINGS:
+            check('pulsex: nothing configured before the admin sets a provider', client.get('/api/auth/options').json()['phone_verification_available'] is False)
+            cred = app.state.seed_credentials[0]
+            with TestClient(app) as adm:
+                a = adm.post('/api/auth/login', json={'email': cred['email'], 'password': cred['password']}); adm.headers['X-CSRF'] = a.json()['csrf']
+                r = adm.put('/api/admin/integrations/messaging', json={'provider': 'channel_gateway', 'url': GW, 'key_ref': 'env:E2E_GATEWAY_KEY'})
+                check('pulsex: admin saved the provider (key by reference)', r.status_code == 200 and r.json()['active'] is True and KEY not in r.text, (r.status_code, r.text[:200]))
+                check('pulsex: admin test reaches the live gateway', adm.post('/api/admin/integrations/messaging/test').json() == {'configured': True, 'reachable': True})
+        register_approved(app, client, phone=PHONE, password=PW)
         check('pulsex: verification advertised as available', client.get('/api/auth/options').json()['phone_verification_available'] is True)
         r = client.post('/api/auth/phone/verify/start'); check('pulsex: code requested through the gateway', r.status_code == 200 and r.json().get('sent') is True, (r.status_code, r.text))
         code = sandbox_code(); check('gateway: the SMS reached the recipient (sandbox) with a 6-digit code', code and len(code) == 6, code)

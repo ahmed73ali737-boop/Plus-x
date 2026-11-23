@@ -36,8 +36,8 @@ def enabled():
     return config() is not None
 
 
-def _call(path, body, idempotency_key=None, timeout=10):
-    cfg = config()
+def _call(path, body, idempotency_key=None, timeout=10, cfg=None):
+    cfg = cfg or config()
     if not cfg:
         raise GatewayUnavailable("not configured")
     url, key = cfg
@@ -63,37 +63,63 @@ def _call(path, body, idempotency_key=None, timeout=10):
         raise GatewayUnavailable("network") from None
 
 
-def start_verification(phone, locale="ar"):
+def start_verification(phone, locale="ar", cfg=None):
     """Sends a code by SMS. Returns {'verificationId', 'expiresAt', 'attemptsLeft'}; raises GatewayRefused/GatewayUnavailable."""
     out = _call("/api/channels/v1/verify", {"to": phone, "channel": "SMS", "codeLength": 6, "ttlSeconds": 300, "locale": locale,
-                                           "originSystem": "pulsex", "metadata": {"purpose": "verify_phone"}}, "pulsex-" + uuid.uuid4().hex)
+                                           "originSystem": "pulsex", "metadata": {"purpose": "verify_phone"}}, "pulsex-" + uuid.uuid4().hex, cfg=cfg)
     return {"verificationId": out["verificationId"], "expiresAt": out.get("expiresAt"), "attemptsLeft": out.get("attemptsLeft")}
 
 
-def check_verification(verification_id, code):
+def check_verification(verification_id, code, cfg=None):
     """True only for an approved code. A wrong code is (False, attemptsLeft); a spent/expired/unknown verification raises GatewayRefused."""
-    out = _call("/api/channels/v1/verify/check", {"verificationId": verification_id, "code": code})
+    out = _call("/api/channels/v1/verify/check", {"verificationId": verification_id, "code": code}, cfg=cfg)
     return bool(out.get("valid")) and out.get("status") == "APPROVED", out.get("attemptsLeft")
 
 
+def resolve_key_ref(ref):
+    """A key reference is `env:NAME`; the secret itself is never stored in the database."""
+    name = ref[4:] if isinstance(ref, str) and ref.startswith("env:") else ""
+    return os.environ.get(name, "").strip()
+
+
+def probe(cfg, timeout=5):
+    """Unauthenticated reachability check (GET /api/health). Sends no message."""
+    url = cfg[0]
+    handlers = [_NoRedirect()]
+    if (urllib.parse.urlsplit(url).hostname or "") in ("127.0.0.1", "localhost", "::1"):
+        handlers.append(urllib.request.ProxyHandler({}))
+    try:
+        with urllib.request.build_opener(*handlers).open(urllib.request.Request(url + "/api/health", method="GET"), timeout=timeout) as r:
+            return {"reachable": 200 <= r.status < 300}
+    except urllib.error.HTTPError as e:
+        return {"reachable": e.code < 500}
+    except Exception:
+        return {"reachable": False}
+
+
 class ChannelGatewayPhoneVerifier:
-    """Adapter for the application port: translates transport failures into the port's plain outcomes."""
+    """Adapter for the application port; `cfg` is (url, key) resolved by the application from settings, else the environment."""
 
-    def available(self):
-        return enabled()
+    def environment_config(self):
+        return config()
 
-    def start(self, phone):
+    def key_from_ref(self, ref):
+        return resolve_key_ref(ref)
+
+    def probe(self, cfg):
+        return probe(cfg)
+
+    def start(self, cfg, phone):
         try:
-            return start_verification(phone)
+            return start_verification(phone, cfg=cfg)
         except GatewayRefused as e:
             return {"refused": e.status, "code": e.code}
         except GatewayUnavailable:
             return {"unavailable": True}
 
-    def check(self, verification_id, code):
-        """Returns {'valid': bool, 'attemptsLeft': n} or {'refused': status, 'code': c} / {'unavailable': True}."""
+    def check(self, cfg, verification_id, code):
         try:
-            ok, left = check_verification(verification_id, code)
+            ok, left = check_verification(verification_id, code, cfg=cfg)
             return {"valid": ok, "attemptsLeft": left}
         except GatewayRefused as e:
             return {"refused": e.status, "code": e.code}
