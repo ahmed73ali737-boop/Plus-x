@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.domain.errors import fail
+from app.domain.errors import NotFound, fail
 from app.domain.values import stamp
 
 ASSIGNMENT_STATUSES = ('active', 'suspended', 'revoked')
@@ -36,3 +36,22 @@ def assignment_changes(current: dict, body: dict) -> dict:
     if 'role' in body and body['role'] != current['role']:
         fail('REVOKE_AND_REASSIGN_ROLE')
     return {'status': status, **validated_window(body, current)}
+
+
+def require_committee_role(role, known_roles) -> str:
+    """Only roles that carry event permissions can be assigned."""
+    if role not in known_roles:
+        fail('COMMITTEE_ROLE_INVALID')
+    return role
+
+
+def require_assignee(user_id, target) -> None:
+    """A named assignee must be an existing account."""
+    if user_id and not target:
+        fail('ACTIVE_USER_NOT_FOUND', NotFound)
+
+
+def require_assignment(row: dict | None) -> dict:
+    if not row:
+        fail('ASSIGNMENT_NOT_FOUND', NotFound)
+    return row

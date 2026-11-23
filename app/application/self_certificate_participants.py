@@ -1,6 +1,5 @@
 """Browser/link deduplication and acceptance. A request and its job commit together."""
 import hmac
-import re
 from datetime import datetime, timezone
 from hashlib import sha256
 
@@ -12,7 +11,8 @@ from app.application.self_certificate_crypto import REMEMBER_SECONDS, token_hash
 from app.application.self_certificate_links import checked_revision, revision_hash
 from app.application.self_certificate_metrics import record
 from app.application.self_certificate_rendering import fit_name
-from app.domain import Conflict, DomainError, Forbidden, Unavailable, fail
+from app.domain import DomainError, Unavailable
+from app.domain import self_certificates as rules
 from app.domain.self_certificates import (
     CONSENT_TEXT,
     CONSENT_VERSION,
@@ -37,8 +37,7 @@ def browser_expiry(row):
 def current_browser(tx, keys, cookie):
     ident, _version = keys.verify('browser', cookie or '')
     row = persistence.self_certificates.browser_session(tx, ident)
-    if not row or not hmac.compare_digest(row['token_hash'], token_hash(cookie)):
-        fail('BROWSER_SESSION_INVALID', Forbidden)
+    rules.require_browser_token(row, bool(row) and hmac.compare_digest(row['token_hash'], token_hash(cookie)))
     require_browser_not_expired(browser_expiry(row))
     return row
 
@@ -50,19 +49,17 @@ def prepare_browser(tx, keys, seed, cookie):
         except DomainError as exc:
             if isinstance(exc, Unavailable):
                 raise
-    if not isinstance(seed, str) or not re.fullmatch('[a-f0-9]{64}', seed):
-        fail('BROWSER_STORAGE_REQUIRED')
+    rules.require_browser_seed(seed)
     ident = sha256(('certificate-browser:' + seed).encode()).hexdigest()
     token = keys.token('browser', ident)
     row = persistence.self_certificates.ensure_browser_session(
         tx, dict(id=ident, token_hash=token_hash(token), created_at=utc_now(), last_seen_at=utc_now()))
     require_browser_not_expired(browser_expiry(row))
-    for version in keys.keys:
-        candidate = keys.token('browser', ident, version)
-        if hmac.compare_digest(row['token_hash'], token_hash(candidate)):
-            persistence.self_certificates.touch_browser_session(tx, ident, utc_now())
-            return row, candidate
-    fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE', Unavailable)
+    matching = next((version for version in keys.keys
+                     if hmac.compare_digest(row['token_hash'], token_hash(keys.token('browser', ident, version)))), None)
+    rules.require_key_version_available(matching)
+    persistence.self_certificates.touch_browser_session(tx, ident, utc_now())
+    return row, keys.token('browser', ident, matching)
 
 
 def find_request(tx,link_id,browser_id):
@@ -72,8 +69,7 @@ def state(tx,row,keys,origin):
     if not row:return dict(status='unregistered',error_code=None,certificate=None,receive_url=None,verification_url=None)
     result=dict(status=row['status'],error_code=row['error_code'],certificate=None,receive_url=None,verification_url=None)
     if row['status']=='issued':
-        cert=persistence.self_certificates.certificate_for_request(tx,row)
-        if not cert:fail('CERTIFICATE_STATE_UNAVAILABLE', Unavailable)
+        cert=rules.require_issued_certificate(persistence.self_certificates.certificate_for_request(tx,row))
         result.update(receive_url=origin+'/certificates/receive/'+keys.token('receive',cert['id'],cert['key_version']),
             verification_url=origin+'/certificates/verify/'+cert['serial'])
     return result
@@ -91,9 +87,9 @@ def accept(tx,link,browser,keys,body,origin,accept_enabled):
         return state(tx,existing,keys,origin),False
     require_accepting(accept_enabled, link)
     from app.core.certificate_features import certificate_features
-    if not certificate_features().link_allowed(link['owner_account_id'],link['event_id']):fail('CERTIFICATE_PILOT_UNAVAILABLE', Conflict)
+    rules.require_pilot_available(certificate_features().link_allowed(link['owner_account_id'],link['event_id']))
     lock_authority(tx,link['owner_account_id'],link['event_id'])
-    if not owner_can_accept(tx,link['owner_account_id'],link['event_id']):fail('CERTIFICATE_LINK_UNAVAILABLE', Conflict)
+    rules.require_owner_still_authorised(owner_can_accept(tx,link['owner_account_id'],link['event_id']))
     data=participant_submission(body)
     keys.check_nonce(data.request_nonce,browser['id'],link['id'])
     revision=checked_revision(tx,link['owner_account_id'],link['revision_id'])

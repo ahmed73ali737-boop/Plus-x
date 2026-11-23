@@ -10,7 +10,7 @@ import re
 import uuid
 from datetime import datetime
 
-from app.domain.errors import Conflict, NotFound, fail
+from app.domain.errors import Conflict, Forbidden, NotFound, fail
 from app.domain.site_config import DEFAULT_RATING_CRITERIA
 from app.domain.surveys import answer_value
 from app.domain.values import boolean, number, text
@@ -20,6 +20,50 @@ SOURCES = ('web', 'qr', 'kiosk')
 FEEDBACK_TARGET_KINDS = ('participant', 'sponsor', 'session', 'place', 'service')
 POLL_SHAPE_FIELDS = ('qtype', 'options', 'min', 'max', 'rows')
 CONTACT_CHANNELS = ('any', 'phone', 'email', 'whatsapp')
+MAX_BATCH = 50  # items per offline collection batch
+
+
+def require_batch(entries) -> None:
+    """An offline batch is a non-empty list of at most MAX_BATCH items."""
+    if not isinstance(entries, list) or not entries or len(entries) > MAX_BATCH:
+        fail('BATCH_1_TO_50_ITEMS')
+
+
+def require_submission_object(body) -> None:
+    if not isinstance(body, dict):
+        fail('SUBMISSION_OBJECT_REQUIRED')
+
+
+def is_replay(previous: dict | None, fingerprint: str) -> bool:
+    """True for an exact retry of a stored submission; the same id with another body is a conflict."""
+    if not previous:
+        return False
+    if previous['fingerprint'] != fingerprint:
+        fail('IDEMPOTENCY_BODY_CONFLICT', Conflict)
+    return True
+
+
+def same_submission(previous: dict | None, fingerprint: str) -> bool:
+    """Non-raising variant used after a concurrent insert collided with this id."""
+    return bool(previous) and previous['fingerprint'] == fingerprint
+
+
+def feedback_targets_other_site(site: dict, scope: str) -> bool:
+    """Feedback aimed at neither the visited page nor its event needs the target site looked up."""
+    return scope not in (site['id'], site['event_id'])
+
+
+def require_feedback_scope(site: dict, target_site: dict) -> None:
+    """Visitors may rate only published agency pages of the same event."""
+    if (target_site['kind'] != 'agency' or target_site['event_id'] != site['event_id']
+            or not target_site['published_version']):
+        fail('FEEDBACK_SCOPE', Forbidden)
+
+
+def require_feedback_target(config: dict, code: str) -> None:
+    """A non-general target code must name a rateable record of the target page."""
+    if code != 'general' and not has_feedback_target(config, code):
+        fail('FEEDBACK_TARGET', NotFound)
 
 
 def require_identifiers(body) -> None:

@@ -109,3 +109,81 @@ def test_certificate_state_is_derived_from_row():
 def test_replacement_award_key_is_bound_to_the_original():
     from app.domain.certificates import Certificate
     assert Certificate.replacement_award_key({'id': 'c9'}) == 'replacement/c9'
+
+
+# Phase 3: orchestration guards ------------------------------------------------------------------
+
+def test_certificate_lookups_and_public_value_bound():
+    from app.domain import NotFound
+    from app.domain.certificates import public_lookup_value, require_certificate, require_template
+    assert require_certificate({'id': 'c'}) == {'id': 'c'}
+    with pytest.raises(NotFound) as missing:
+        require_certificate(None)
+    assert missing.value.code == 'CERTIFICATE_NOT_FOUND'
+    with pytest.raises(NotFound) as template:
+        require_template(None)
+    assert template.value.code == 'CERTIFICATE_TEMPLATE_NOT_FOUND'
+    assert public_lookup_value('x' * 120) == 'x' * 120
+    with pytest.raises(NotFound):
+        public_lookup_value('x' * 121)
+
+
+def test_a_lost_issue_race_returns_the_winner_only_for_the_identical_request():
+    from app.domain import Conflict
+    from app.domain.certificates import concurrent_issue_winner
+    winner = {'request_hash': 'h'}
+    assert concurrent_issue_winner(winner, 'h') is winner
+    for stored in (None, winner):
+        with pytest.raises(Conflict) as error:
+            concurrent_issue_winner(stored, 'different')
+        assert error.value.code == 'CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST'
+
+
+def test_a_certificate_is_replaced_at_most_once():
+    from app.domain import Conflict
+    from app.domain.certificates import require_replacement_recorded, require_same_replacement
+    require_same_replacement({'replacement_id': 'r1'}, 'r1')
+    with pytest.raises(Conflict) as other:
+        require_same_replacement({'replacement_id': 'r1'}, 'r2')
+    assert other.value.code == 'CERTIFICATE_ALREADY_REPLACED'
+    require_replacement_recorded(True)
+    with pytest.raises(Conflict):
+        require_replacement_recorded(False)
+
+
+def test_embedded_image_and_render_limits():
+    from app.domain import InvalidInput, Unavailable
+    from app.domain.certificates import (
+        require_font_version, require_image_reference, require_image_within_limits, require_normalized_image_size,
+        require_render_size, require_text_inside_canvas, unreadable_image)
+    png = 'data:image/png;base64,AAAA'
+    assert require_image_reference(png) == png
+    assert require_image_reference('data:image/jpeg;base64,AAAA')
+    for bad in (None, 5, 'https://example.test/x.png', 'data:image/gif;base64,AAAA', png + 'A' * 1_400_000):
+        with pytest.raises(InvalidInput) as error:
+            require_image_reference(bad)
+        assert error.value.code == 'CERTIFICATE_IMAGE_INVALID'
+    require_image_within_limits('PNG', 2000, 2000)
+    for fmt, w, h in (('GIF', 10, 10), (None, 10, 10), ('PNG', 2001, 2000)):
+        with pytest.raises(InvalidInput) as error:
+            require_image_within_limits(fmt, w, h)
+        assert error.value.code == 'CERTIFICATE_IMAGE_LIMIT'
+    require_normalized_image_size(1_000_000)
+    with pytest.raises(InvalidInput):
+        require_normalized_image_size(1_000_001)
+    with pytest.raises(InvalidInput) as unreadable:
+        unreadable_image()
+    assert unreadable.value.code == 'CERTIFICATE_IMAGE_INVALID'
+    require_text_inside_canvas((0, 0, 100, 50), 100, 50)
+    for bbox in ((-1, 0, 10, 10), (0, -1, 10, 10), (0, 0, 101, 10), (0, 0, 10, 51)):
+        with pytest.raises(InvalidInput) as overflow:
+            require_text_inside_canvas(bbox, 100, 50)
+        assert overflow.value.code == 'CERTIFICATE_TEXT_OVERFLOW'
+    require_font_version('h', 'h')
+    with pytest.raises(Unavailable) as font:
+        require_font_version('old', 'new')
+    assert font.value.code == 'CERTIFICATE_FONT_VERSION_UNAVAILABLE'
+    require_render_size(6000, 3000)
+    with pytest.raises(InvalidInput) as size:
+        require_render_size(6001, 3000)
+    assert size.value.code == 'CERTIFICATE_RENDER_SIZE_LIMIT'

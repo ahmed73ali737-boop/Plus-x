@@ -1,6 +1,8 @@
 """Account rules: sessions, password changes, administrative resets, preferences."""
 from __future__ import annotations
 
+import hmac
+
 from app.domain.errors import Conflict, Forbidden, NotFound, PreconditionRequired, Unauthenticated, fail
 
 SESSION_HOURS = 8
@@ -89,3 +91,36 @@ def check_request_path(user: dict, path: str, has_management_access) -> None:
         fail('FORBIDDEN_ROLE', Forbidden)
     if user.get('must_change_password') and path not in PASSWORD_CHANGE_ALLOWED_PATHS:
         fail('PASSWORD_CHANGE_REQUIRED', PreconditionRequired)
+
+
+def require_live_session(session: dict | None, at: str) -> dict:
+    """A stored, unexpired session."""
+    if not session or session['expires_at'] <= at:
+        fail('LOGIN_REQUIRED', Unauthenticated)
+    return session
+
+
+def require_active_account(user: dict | None) -> dict:
+    """The session's account must still exist and be active."""
+    if not user or not user['active']:
+        fail('LOGIN_REQUIRED', Unauthenticated)
+    return user
+
+
+def require_csrf(sent: str, stored: str) -> None:
+    """State-changing requests must echo the session's CSRF secret (constant-time compare)."""
+    if not hmac.compare_digest(sent, stored):
+        fail('CSRF_REQUIRED', Forbidden)
+
+
+def require_notification(marked: bool) -> None:
+    """Only the owner's own notification can be marked read."""
+    if not marked:
+        fail('NOT_FOUND', NotFound)
+
+
+def require_active_target_account(target: dict | None) -> dict:
+    """Messaging/administration targets must be existing, active accounts."""
+    if not target or not target['active']:
+        fail('ACCOUNT_NOT_FOUND', NotFound)
+    return target

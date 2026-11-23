@@ -5,7 +5,7 @@ import math
 from datetime import datetime
 
 from app.domain.authorization import active_window
-from app.domain.errors import Forbidden, Unauthenticated, fail
+from app.domain.errors import Forbidden, NotFound, Unauthenticated, fail
 from app.domain.values import CODE, stamp, text
 
 DEVICE_TYPES = ('kiosk', 'tablet', 'display', 'operator')
@@ -108,3 +108,22 @@ def heartbeat_values(device: dict, body: dict, at: str) -> dict:
             telemetry['kiosk'] = metadata['kiosk']
         values['metadata_json'] = {**device['metadata_json'], **telemetry}
     return values
+
+
+def require_device_of_site(device: dict | None, site_id: str) -> dict:
+    """A device of another site does not exist for this site's managers."""
+    if not device or device['site_id'] != site_id:
+        fail('DEVICE_NOT_FOUND', NotFound)
+    return device
+
+
+def require_device(device: dict | None) -> dict:
+    if not device:
+        fail('DEVICE_NOT_FOUND', NotFound)
+    return device
+
+
+def require_device_token(raw_token) -> str:
+    if not raw_token:
+        fail('DEVICE_TOKEN_REQUIRED', Unauthenticated)
+    return raw_token

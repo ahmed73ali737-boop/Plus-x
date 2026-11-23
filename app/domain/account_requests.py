@@ -8,10 +8,12 @@ links) the login identity and grants exactly the approved scope.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from app.domain.authorization import EVENT_ROLE_PERMISSIONS
 from app.domain.errors import Conflict, Forbidden, NotFound, Unavailable, fail
+from app.domain.guards import require_found
 from app.domain.site_config import default_config
 from app.domain.values import stamp, text
 
@@ -257,3 +259,55 @@ def require_platform_inviter(actor: dict) -> None:
 def require_invitation_usable(row: dict, at: str) -> None:
     if not row['request_id'] and row['expires_at'] <= at:
         fail('ACCOUNT_INVITATION_EXPIRED', Conflict)
+
+
+def require_supervisor(supervisor_id: str | None) -> str:
+    """A pending request needs a designated independent supervisor; none available is a conflict."""
+    if not supervisor_id:
+        fail('ACCOUNT_REQUEST_SUPERVISOR_UNAVAILABLE', Conflict)
+    return supervisor_id
+
+
+def submitter_in_scope(scope_type: str, is_organization_reviewer: Callable[[], bool],
+                       is_authorized: Callable[[], bool], organizer_for_platform: Callable[[], bool]) -> bool:
+    """Who may submit a request: organization reviewers for organization scope; otherwise people
+    already authorised for the scope, or an organizer asking for platform review in its own event."""
+    if scope_type == 'organization':
+        return is_organization_reviewer()
+    return is_authorized() or organizer_for_platform()
+
+
+def require_submitter_in_scope(allowed: bool) -> None:
+    if not allowed:
+        fail('FORBIDDEN_SCOPE', Forbidden)
+
+
+def is_replay(stored: dict | None, fingerprint: str) -> bool:
+    """A repeated request key with the same payload returns the stored request; another payload conflicts."""
+    if not stored:
+        return False
+    if stored['payload_hash'] != fingerprint:
+        fail('ACCOUNT_REQUEST_KEY_EXISTS', Conflict)
+    return True
+
+
+def require_request(row: dict | None) -> dict:
+    return require_found(row, 'ACCOUNT_REQUEST_NOT_FOUND')
+
+
+def require_supervision(supervises: bool) -> None:
+    """Requests outside the actor's supervision are concealed as not found."""
+    if not supervises:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+
+
+def require_setup_activated(activated: bool) -> None:
+    """Setting the first password activates a still-inactive approved account exactly once."""
+    if not activated:
+        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+
+
+def require_new_account(existing) -> None:
+    """A platform invitation is only for people without an account."""
+    if existing:
+        fail('ACCOUNT_ALREADY_EXISTS', Conflict)

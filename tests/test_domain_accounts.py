@@ -52,3 +52,47 @@ def test_failed_password_reentry_is_one_indistinguishable_error():
     with pytest.raises(Unauthenticated) as raised:
         require_credentials(False)
     assert raised.value.code == 'INVALID_CREDENTIALS'
+
+
+# Phase 3: session identification ---------------------------------------------------------------
+
+def test_a_session_must_exist_and_be_unexpired():
+    from app.domain.accounts import require_live_session
+    live = {'expires_at': '2026-10-19T13:00:00+00:00'}
+    assert require_live_session(live, '2026-10-19T12:00:00+00:00') is live
+    for session, at in ((None, '2026-10-19T12:00:00+00:00'), (live, '2026-10-19T13:00:00+00:00'),
+                        (live, '2026-10-20T00:00:00+00:00')):
+        with pytest.raises(Unauthenticated) as error:
+            require_live_session(session, at)
+        assert error.value.code == 'LOGIN_REQUIRED'
+
+
+def test_the_session_account_must_still_be_active():
+    from app.domain.accounts import require_active_account
+    user = {'id': 'u', 'active': 1}
+    assert require_active_account(user) is user
+    for gone in (None, {'id': 'u', 'active': 0}):
+        with pytest.raises(Unauthenticated):
+            require_active_account(gone)
+
+
+def test_writes_must_echo_the_session_csrf_secret():
+    from app.domain.accounts import require_csrf
+    require_csrf('secret', 'secret')
+    for sent in ('', 'other', 'secre'):
+        with pytest.raises(Forbidden) as error:
+            require_csrf(sent, 'secret')
+        assert error.value.code == 'CSRF_REQUIRED'
+
+
+def test_notification_and_message_targets():
+    from app.domain.accounts import require_active_target_account, require_notification
+    require_notification(True)
+    with pytest.raises(NotFound):
+        require_notification(False)
+    active = {'id': 'u', 'active': 1}
+    assert require_active_target_account(active) is active
+    for target in (None, {'id': 'u', 'active': 0}):
+        with pytest.raises(NotFound) as error:
+            require_active_target_account(target)
+        assert error.value.code == 'ACCOUNT_NOT_FOUND'

@@ -119,3 +119,26 @@ class IssuanceBatch:
     def request_key(import_id: str, index: int) -> str:
         """One idempotency key per row: a replayed job can never issue twice."""
         return f'{import_id}:{index}'
+
+
+def require_single_sheet(workbook: dict) -> None:
+    """Certificate workbooks must contain exactly one sheet."""
+    if len(workbook) != 1:
+        fail('IMPORT_ONE_SHEET_REQUIRED')
+
+
+def unreadable_table() -> None:
+    """The uploaded file could not be parsed as the declared table format."""
+    fail('CERTIFICATE_IMPORT_INVALID')
+
+
+def require_import_template(template: dict | None) -> dict:
+    if not template:
+        fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
+    return template
+
+
+def require_commit_recorded(recorded: bool) -> None:
+    """The guarded commit marker touched no row: another request committed this import."""
+    if not recorded:
+        fail('IMPORT_ALREADY_COMMITTED', Conflict)

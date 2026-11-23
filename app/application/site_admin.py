@@ -13,9 +13,9 @@ from app.application.event_visibility import event_id_for_site, require_public_e
 from app.application.phone_accounts import contact_identity
 from app.application.ports import persistence
 from app.application.publishing import publish_site_version
-from app.domain import Conflict, DomainError, Forbidden, NotFound, fail, normalize_config, now, text
+from app.domain import DomainError, normalize_config, now, text
 from app.domain.organizations import (
-    can_manage_people_by_role,
+    may_manage_people,
     membership_changes,
     new_organization,
     new_participation,
@@ -23,9 +23,18 @@ from app.domain.organizations import (
     person_changes,
     person_values,
     require_event_operator,
+    require_free_organization_slug,
+    require_manageable_person,
+    require_membership,
     require_membership_manager,
+    require_new_participation,
+    require_organization,
+    require_participation,
     require_participation_event,
+    require_people_manager,
+    require_person_of_visible_organization,
     require_unlinked_person,
+    require_visible_organization,
     requested_membership_role,
     signup_role,
     signup_values,
@@ -41,10 +50,17 @@ from app.domain.sites import (
     new_site_draft,
     public_path,
     require_draft_revision,
+    require_draft_saved,
     require_event_site,
+    require_free_slug,
     require_not_agency,
     require_platform_or_organizer,
     require_publish_revision,
+    require_request_in_scope,
+    require_requestable_target,
+    require_site,
+    require_workflow_request,
+    requested_role_for,
     site_slug,
 )
 
@@ -57,9 +73,8 @@ def request_access(tx, body: dict) -> dict:
     site_id = text(body.get('site_id'), 64, True)
     target = get_site(tx, site_id)
     require_public_event(tx, event_id_for_site(tx, target))
-    if target['kind'] == 'platform':
-        fail('EVENT_REQUIRED')
-    role = 'organizer' if target['kind'] == 'event' else 'agency'
+    require_requestable_target(target)
+    role = requested_role_for(target)
     request_id = new_id()
     email, _phone = contact_identity(body, preserve_email=True)
     persistence.site_admin.add_access_request(tx, {
@@ -104,19 +119,14 @@ def signup_requests_for(tx, user, site_id: str | None) -> list[dict]:
 
 
 def review_signup_request(tx, user, signup_id: str, status, reason):
-    linked = persistence.site_admin.workflow_request_id(tx, signup_id=signup_id)
-    if not linked:
-        fail('LEGACY_REQUEST_REQUIRES_RESUBMISSION', Conflict)
+    linked = require_workflow_request(persistence.site_admin.workflow_request_id(tx, signup_id=signup_id))
     return account_request_service.review(tx, user, linked, status, reason)
 
 
 def review_access_request(tx, user, site_id: str, access_id: str, status, reason):
     require_scope(tx, user, site_id)
-    linked = persistence.site_admin.workflow_request_id(tx, access_id=access_id)
-    if not linked:
-        fail('LEGACY_REQUEST_REQUIRES_RESUBMISSION', Conflict)
-    if account_request_service.request_scope_id(tx, linked) != site_id:
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    linked = require_workflow_request(persistence.site_admin.workflow_request_id(tx, access_id=access_id))
+    require_request_in_scope(account_request_service.request_scope_id(tx, linked), site_id)
     return account_request_service.review(tx, user, linked, status, reason)
 
 
@@ -136,8 +146,7 @@ def create_site(tx, user, body: dict) -> dict:
     parent = require_scope(tx, user, body.get('parent_id'))
     authorize_new_site(user['role'], parent, kind)
     slug = site_slug(body.get('slug'))
-    if persistence.sites.get_by_slug(tx, slug):
-        fail('SLUG_EXISTS', Conflict)
+    require_free_slug(persistence.sites.get_by_slug(tx, slug))
     site_id = new_id()
     persistence.sites.add(tx, new_site(site_id, parent, kind, slug, new_site_draft(body, kind)))
     write_audit(tx, user, site_id, 'site_created')
@@ -155,8 +164,7 @@ def save_draft(tx, user, site_id: str, revision, config: dict, authorize) -> dic
     site = require_scope(tx, user, site_id)
     authorize(user, site, 'event.configure')
     revision = require_draft_revision(site, revision)
-    if not persistence.sites.save_draft(tx, site_id, revision, config):
-        fail('DRAFT_CHANGED_REFRESH_REQUIRED', Conflict)
+    require_draft_saved(persistence.sites.save_draft(tx, site_id, revision, config))
     write_audit(tx, user, site_id, 'draft_saved', {'revision': revision + 1})
     return {'draft_rev': revision + 1}
 
@@ -169,10 +177,7 @@ def publish(tx, user, site_id: str, revision, authorize) -> dict:
 
 
 def site_by_slug(tx, slug: str) -> dict:
-    site = persistence.sites.get_by_slug(tx, slug)
-    if not site:
-        fail('SITE_NOT_FOUND', NotFound)
-    return site
+    return require_site(persistence.sites.get_by_slug(tx, slug))
 
 
 def site_users(tx, user, site_id: str) -> dict:
@@ -269,8 +274,7 @@ def _add_agency_participation(tx, event, organization, body, draft) -> tuple[str
 def create_organization(tx, user, body: dict) -> dict:
     require_platform_or_organizer(user)
     organization = new_organization(new_id(), body, now())
-    if persistence.site_admin.organization_by_slug(tx, organization['slug']):
-        fail('ORGANIZATION_SLUG_EXISTS', Conflict)
+    require_free_organization_slug(persistence.site_admin.organization_by_slug(tx, organization['slug']))
     persistence.site_admin.add_organization(tx, organization)
     write_audit(tx, user, user['scope_id'], 'organization_created',
                 {'organization_id': organization['id'], 'name': organization['name']})
@@ -290,11 +294,8 @@ def add_participation(tx, user, event_id: str, body: dict) -> dict:
     event = require_scope(tx, user, event_id)
     require_event_operator(user, event)
     organization_id = text(body.get('organization_id'), 64, True)
-    organization = persistence.site_admin.organization(tx, organization_id)
-    if not organization:
-        fail('ORGANIZATION_NOT_FOUND', NotFound)
-    if persistence.site_admin.participation_exists(tx, event_id, organization_id):
-        fail('PARTICIPATION_EXISTS', Conflict)
+    organization = require_organization(persistence.site_admin.organization(tx, organization_id))
+    require_new_participation(persistence.site_admin.participation_exists(tx, event_id, organization_id))
     participation_id, site_id = _add_agency_participation(tx, event, organization, body,
                                                           agency_draft(organization, normalized=True))
     write_audit(tx, user, event_id, 'participation_added', {'organization_id': organization_id, 'agency_site_id': site_id})
@@ -302,9 +303,7 @@ def add_participation(tx, user, event_id: str, body: dict) -> dict:
 
 
 def update_participation(tx, user, participation_id: str, body: dict) -> dict:
-    participation = persistence.site_admin.participation(tx, participation_id)
-    if not participation:
-        fail('PARTICIPATION_NOT_FOUND', NotFound)
+    participation = require_participation(persistence.site_admin.participation(tx, participation_id))
     event = require_scope(tx, user, participation['event_id'])
     require_event_operator(user, event)
     values = participation_changes(body)
@@ -314,16 +313,13 @@ def update_participation(tx, user, participation_id: str, body: dict) -> dict:
 
 
 def _visible_organization(tx, user, organization_id: str, error: str = 'ORGANIZATION_NOT_FOUND') -> dict:
-    organization = persistence.site_admin.organization(tx, organization_id)
-    if not organization or not organization_visible(tx, user, organization_id):
-        fail(error, NotFound)
-    return organization
+    return require_visible_organization(persistence.site_admin.organization(tx, organization_id),
+                                        lambda: organization_visible(tx, user, organization_id), error)
 
 
 def _can_manage_people(tx, user, organization_id: str) -> bool:
-    if can_manage_people_by_role(user) and organization_visible(tx, user, organization_id):
-        return True
-    return persistence.access.membership_role(tx, user['id'], organization_id) in ('owner', 'admin')
+    return may_manage_people(user, lambda: organization_visible(tx, user, organization_id),
+                             lambda: persistence.access.membership_role(tx, user['id'], organization_id))
 
 
 def organization_people(tx, user, organization_id: str) -> list[dict]:
@@ -333,8 +329,7 @@ def organization_people(tx, user, organization_id: str) -> list[dict]:
 
 def add_person(tx, user, organization_id: str, body: dict) -> dict:
     _visible_organization(tx, user, organization_id)
-    if not _can_manage_people(tx, user, organization_id):
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_people_manager(_can_manage_people(tx, user, organization_id))
     person = person_values(new_id(), organization_id, body, now())
     persistence.site_admin.add_person(tx, person)
     write_audit(tx, user, user['scope_id'], 'organization_person_added',
@@ -345,11 +340,9 @@ def add_person(tx, user, organization_id: str, body: dict) -> dict:
 def update_person(tx, user, organization_id: str, person_id: str, body: dict) -> dict:
     organization = persistence.site_admin.organization(tx, organization_id)
     person = persistence.site_admin.person(tx, person_id)
-    if (not organization or not person or person['organization_id'] != organization_id
-            or not organization_visible(tx, user, organization_id)):
-        fail('PERSON_NOT_FOUND', NotFound)
-    if not _can_manage_people(tx, user, organization_id):
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_person_of_visible_organization(organization, person, organization_id,
+                                           lambda: organization_visible(tx, user, organization_id))
+    require_people_manager(_can_manage_people(tx, user, organization_id))
     values = person_changes(body)
     persistence.site_admin.update_person(tx, person_id, values)
     write_audit(tx, user, user['scope_id'], 'organization_person_updated',
@@ -358,9 +351,8 @@ def update_person(tx, user, organization_id: str, person_id: str, body: dict) ->
 
 
 def request_person_account(tx, user, organization_id: str, person_id: str, body: dict) -> dict:
-    person = persistence.site_admin.person(tx, person_id)
-    if not person or person['organization_id'] != organization_id or not _can_manage_people(tx, user, organization_id):
-        fail('PERSON_NOT_FOUND', NotFound)
+    person = require_manageable_person(persistence.site_admin.person(tx, person_id), organization_id,
+                                       lambda: _can_manage_people(tx, user, organization_id))
     require_unlinked_person(person)
     contact = {**body, 'name': person['name'], 'email': body.get('email') or person['email'],
                'phone': body.get('phone') or person['phone']}
@@ -384,9 +376,7 @@ def update_member(tx, user, organization_id: str, member_id: str, body: dict) ->
     _visible_organization(tx, user, organization_id)
     is_owner = persistence.site_admin.is_active_owner(tx, user['id'], organization_id)
     require_membership_manager(user, is_owner)
-    membership = persistence.site_admin.membership(tx, member_id, organization_id)
-    if not membership:
-        fail('MEMBERSHIP_NOT_FOUND', NotFound)
+    membership = require_membership(persistence.site_admin.membership(tx, member_id, organization_id))
     if requested_membership_role(membership, body) is not None:
         # A role change is a new reviewed account request, never a silent update.
         target = persistence.identity.user(tx, member_id)

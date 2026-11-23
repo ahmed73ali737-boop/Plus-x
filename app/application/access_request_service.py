@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 from app.application.ports import persistence
-from app.domain import NotFound, fail
-
-REQUEST_STATUSES = ('pending', 'approved', 'rejected')
+from app.domain.sites import require_access_request, require_access_request_status
 
 
 def list_requests(tx, site_id: str):
@@ -12,10 +10,7 @@ def list_requests(tx, site_id: str):
 
 
 def set_request_status(tx, site_id: str, request_id: str, status: str):
-    if status not in REQUEST_STATUSES:
-        fail('REQUEST_STATUS_INVALID')
-    request = persistence.site_admin.access_request(tx, site_id, request_id)
-    if not request:
-        fail('ACCESS_REQUEST_NOT_FOUND', NotFound)
+    require_access_request_status(status)
+    request = require_access_request(persistence.site_admin.access_request(tx, site_id, request_id))
     persistence.site_admin.set_access_request_status(tx, request_id, status)
     return {**request, 'status': status}

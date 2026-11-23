@@ -15,7 +15,7 @@ from app.application.audit_service import new_id
 from app.application.guest_service import event_guest_by_number, list_event_guests
 from app.application.invitation_service import admission_use, consume_entitlement, entitlement_status, get_policy, lock_policy
 from app.application.ports import persistence
-from app.domain import DomainError, NotFound, fail, now, text
+from app.domain import DomainError, now, text
 from app.domain.access_control import AccessPolicy
 from app.domain.gate import (
     ACCEPTED,
@@ -30,12 +30,14 @@ from app.domain.gate import (
     checkpoint_key,
     offline_scan_time,
     require_invitation_when_managed,
+    require_registered_guest,
     require_scan_replay,
     require_unmanaged_quantity,
     require_valid_admission,
     scan_mode,
 )
 from app.domain.guests import registration_status, staff_guest_view
+from app.domain.sites import require_event_target
 
 __all__ = [
     'PRESENCE_STATES', 'SCAN_MODES', 'access_config', 'access_policy_version', 'attendance_report',
@@ -47,10 +49,7 @@ __all__ = [
 def _event(tx, event_or_id) -> dict:
     if isinstance(event_or_id, Mapping):
         return dict(event_or_id)
-    event = persistence.sites.get(tx, event_or_id)
-    if not event or event['kind'] != 'event':
-        fail('EVENT_REQUIRED', NotFound)
-    return event
+    return require_event_target(persistence.sites.get(tx, event_or_id))
 
 
 def access_config(event: dict) -> dict:
@@ -80,9 +79,7 @@ def validate_guest(tx, event_or_id, guest_number: str, checkpoint: str = 'main',
                    *, check_admission=True, body=None) -> dict:
     event = _event(tx, event_or_id)
     event_id = event['id']
-    guest = event_guest_by_number(tx, event_id, guest_number)
-    if not guest:
-        fail('GUEST_NOT_REGISTERED', NotFound)
+    guest = require_registered_guest(event_guest_by_number(tx, event_id, guest_number))
     presence = _presence(tx, event_id, guest['id']).state
     view = staff_guest_view(guest)
     policy = AccessPolicy.from_site_config(event.get('draft'))
@@ -108,9 +105,7 @@ def _duplicate_scan_result(tx, event_id: str, guest_number: str, scan_id: str, m
     use = admission_use(tx, scan_id)
     require_scan_replay(existing, use, event_id=event_id, guest_number=guest_number, mode=mode,
                         checkpoint=checkpoint, quantity=quantity)
-    replay_guest = event_guest_by_number(tx, event_id, guest_number)
-    if not replay_guest:
-        fail('GUEST_NOT_REGISTERED', NotFound)
+    replay_guest = require_registered_guest(event_guest_by_number(tx, event_id, guest_number))
     current = _presence(tx, event_id, replay_guest['id'])
     return {
         'scan_id': scan_id, 'status': 'duplicate', 'mode': existing['direction'], 'direction': existing['direction'],
@@ -148,9 +143,7 @@ def _record_checkin(tx, event_or_id, guest_number: str, body: dict, *, scanner_i
         if replay:
             return replay
 
-    raw_guest = event_guest_by_number(tx, event_id, guest_number)
-    if not raw_guest:
-        fail('GUEST_NOT_REGISTERED', NotFound)
+    raw_guest = require_registered_guest(event_guest_by_number(tx, event_id, guest_number))
     if get_policy(tx, event_id)['enabled'] or (raw_guest.get('metadata_json') or {}).get('invitation_id'):
         lock_policy(tx, event_id)
     if mode != VALIDATE:

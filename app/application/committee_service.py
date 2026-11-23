@@ -5,9 +5,14 @@ from app.application import account_requests as account_request_service
 from app.application.access import event_permissions, require_event_permission
 from app.application.audit_service import write_audit
 from app.application.ports import persistence
-from app.domain import NotFound, fail
 from app.domain.authorization import EVENT_ROLE_PERMISSIONS
-from app.domain.committee import assignment_changes, assignment_view
+from app.domain.committee import (
+    assignment_changes,
+    assignment_view,
+    require_assignee,
+    require_assignment,
+    require_committee_role,
+)
 
 
 def admission_events(tx, user) -> list[dict]:
@@ -32,11 +37,9 @@ def committee(tx, user, event_id: str) -> dict:
 def request_assignment(tx, actor, event_id: str, body: dict) -> dict:
     """Committee membership is always a reviewed account request, never a direct grant."""
     require_event_permission(tx, actor, event_id, 'committee.manage')
-    if body.get('role') not in EVENT_ROLE_PERMISSIONS:
-        fail('COMMITTEE_ROLE_INVALID')
+    require_committee_role(body.get('role'), EVENT_ROLE_PERMISSIONS)
     target = persistence.identity.user(tx, body.get('user_id')) if body.get('user_id') else None
-    if body.get('user_id') and not target:
-        fail('ACTIVE_USER_NOT_FOUND', NotFound)
+    require_assignee(body.get('user_id'), target)
     payload = dict(body)
     if target:
         payload.update(name=target['name'], email=target['email'] if not target['email'].startswith('tel:') else None,
@@ -47,9 +50,7 @@ def request_assignment(tx, actor, event_id: str, body: dict) -> dict:
 
 def update_assignment(tx, actor, event_id: str, assignment_id: str, body: dict) -> dict:
     require_event_permission(tx, actor, event_id, 'committee.manage')
-    current = persistence.committee.assignment(tx, assignment_id, event_id, tuple(EVENT_ROLE_PERMISSIONS))
-    if not current:
-        fail('ASSIGNMENT_NOT_FOUND', NotFound)
+    current = require_assignment(persistence.committee.assignment(tx, assignment_id, event_id, tuple(EVENT_ROLE_PERMISSIONS)))
     values = assignment_changes(current, body)
     persistence.committee.update_assignment(tx, assignment_id, values)
     write_audit(tx, actor, event_id, 'committee_updated', {'assignment_id': assignment_id, **values})

@@ -293,3 +293,40 @@ def test_account_request_reviewer_independence_and_granted_scope():
     assert granted_assignment_role({**record, 'requested_role': 'agency'}, {'purpose': 'organization'}, 'org') is None
     with pytest.raises(InvalidInput, match='ACCOUNT_REQUEST_KEY_INVALID'):
         request_key('short', 'unused')
+
+
+# Phase 3: committee and device guards -------------------------------------------------------------
+
+def test_committee_assignment_guards():
+    from app.domain.committee import require_assignee, require_assignment, require_committee_role
+    assert require_committee_role('scanner', ('scanner', 'analyst')) == 'scanner'
+    for role in ('owner', None, ''):
+        with pytest.raises(InvalidInput) as error:
+            require_committee_role(role, ('scanner', 'analyst'))
+        assert error.value.code == 'COMMITTEE_ROLE_INVALID'
+    require_assignee(None, None)               # no user named: the request carries contact details instead
+    require_assignee('u1', {'id': 'u1'})
+    with pytest.raises(NotFound) as error:
+        require_assignee('u1', None)
+    assert error.value.code == 'ACTIVE_USER_NOT_FOUND'
+    assert require_assignment({'id': 'a'}) == {'id': 'a'}
+    with pytest.raises(NotFound):
+        require_assignment(None)
+
+
+def test_device_lookup_is_scoped_to_its_site_and_needs_a_token():
+    from app.domain.devices import require_device, require_device_of_site, require_device_token
+    device = {'id': 'd', 'site_id': 's1'}
+    assert require_device_of_site(device, 's1') is device
+    for found in (None, device):
+        with pytest.raises(NotFound) as error:
+            require_device_of_site(found, 's2')
+        assert error.value.code == 'DEVICE_NOT_FOUND'
+    assert require_device(device) is device
+    with pytest.raises(NotFound):
+        require_device(None)
+    assert require_device_token('tok') == 'tok'
+    for token in ('', None):
+        with pytest.raises(Unauthenticated) as error:
+            require_device_token(token)
+        assert error.value.code == 'DEVICE_TOKEN_REQUIRED'

@@ -1,5 +1,5 @@
 """Streaming seven-column CSV/XLSX exports from one database snapshot."""
-import csv,os,tempfile,zipfile,re
+import csv,os,tempfile,zipfile
 from hashlib import sha256
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,7 +9,8 @@ from app.application.self_certificate_access import require_capability
 from app.application.audit_service import new_id
 from app.application.self_certificate_clock import utc_now,lease_now
 from app.application.self_certificate_worker import later
-from app.domain import Conflict, Gone, NotFound, fail
+from app.domain.self_certificates import (ExportRequest,require_downloadable_export,require_export_file_fresh,
+    require_export_lease,require_same_operation,require_snapshot_complete)
 from app.application.self_certificate_metrics import timed,record
 
 HEADERS=['ترتيب المشارك','الاسم','رقم الهاتف','النموذج','الفعالية','التاريخ','الحالة']
@@ -24,23 +25,20 @@ def export_projection(row):
 @timed('export_snapshot')
 def request_export(tx,user,body):
     owner=require_capability(tx,user,'requests.export')
-    if not isinstance(body,dict) or set(body)-{'format','idempotency_key'} or body.get('format') not in ('csv','xlsx'):
-        fail('EXPORT_FORMAT_INVALID')
-    key=body.get('idempotency_key')
-    if key is not None and (not isinstance(key,str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,80}',key)):
-        fail('EXPORT_INPUT_INVALID')
-    fingerprint=sha256(('snapshot-v2:'+body['format']).encode()).hexdigest()
+    request=ExportRequest.parse(body)
+    key=request.idempotency_key
+    fingerprint=sha256(request.fingerprint_source.encode()).hexdigest()
     store=persistence.self_certificates
     def previous():
         row=store.export_by_key(tx,owner['id'],key)
         if row:
-            if row['input_hash']!=fingerprint:fail('IDEMPOTENCY_CONFLICT', Conflict)
+            require_same_operation(row['input_hash'],fingerprint)
             return export_projection(row)
     if key is not None:
         existing=previous()
         if existing:return existing
     at=utc_now()
-    row=dict(id=new_id(),owner_account_id=owner['id'],format=body['format'],cutoff=at,status='pending',created_at=at,attempts=0,
+    row=dict(id=new_id(),owner_account_id=owner['id'],format=request.format,cutoff=at,status='pending',created_at=at,attempts=0,
         snapshot_version=2,snapshot_taken_at=at,expected_rows=None,idempotency_key=key,input_hash=fingerprint)
     if not store.add_export_if_absent(tx,row):
         if key is not None:
@@ -129,14 +127,14 @@ def process_export(engine,store):
     def heartbeat():
         if not rows_store.supports_lease_heartbeat(engine):return
         with transactions.write(engine) as tx:
-            if not live_export(tx,job):fail('EXPORT_LEASE_LOST', Conflict)
+            require_export_lease(live_export(tx,job))
             rows_store.update_export(tx,job['id'],dict(lease_until=later(600,lease_now(tx))))
     try:
         descriptor,temp=tempfile.mkstemp(prefix='export-',suffix='.tmp',dir=store.root);os.close(descriptor);path=Path(temp)
         with rows_store.snapshot_rows(engine,job) as source:
             if job['format']=='xlsx':count=write_xlsx(path,_snapshot_values(source),heartbeat)
             else:count=_write_csv(path,_snapshot_values(source),heartbeat)
-        if count!=job['expected_rows']:fail('EXPORT_SNAPSHOT_INVALID', Conflict)
+        require_snapshot_complete(count,job['expected_rows'])
         heartbeat()
         stored=store.put_file(path)
         mime='text/csv' if job['format']=='csv' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -192,10 +190,7 @@ def downloadable_export(tx,user,ident):
     """The export row and its file asset, when the owner may download it now."""
     from app.application import self_certificate_repository as repo
 
-    row=persistence.self_certificates.export(tx,user['id'],ident)
-    if not row:fail('NOT_FOUND', NotFound)
-    if row['error_code']=='EXPORT_EXPIRED':fail('EXPORT_EXPIRED', Gone)
-    if row['status']!='done':fail('EXPORT_NOT_READY', Conflict)
+    row=require_downloadable_export(persistence.self_certificates.export(tx,user['id'],ident))
     asset=repo.owned_asset(tx,user,row['asset_id'],'export')
-    if is_expired(asset['created_at']):fail('EXPORT_EXPIRED', Gone)
+    require_export_file_fresh(is_expired(asset['created_at']))
     return row,asset

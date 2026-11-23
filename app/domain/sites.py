@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.errors import Conflict, Forbidden, NotFound, fail
+from app.domain.guards import reject_existing, require_found
 from app.domain.site_config import default_config, normalize_config
 from app.domain.values import slug, text
 
@@ -153,3 +154,97 @@ class ContentImport:
     @staticmethod
     def stale_draft() -> None:
         fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)
+
+
+def require_requestable_target(site: dict) -> None:
+    """Account access is requested for an event or an agency page, never for the platform site."""
+    if site['kind'] == 'platform':
+        fail('EVENT_REQUIRED')
+
+
+def requested_role_for(site: dict) -> str:
+    """Access to an event is granted as organizer, to an agency page as agency staff."""
+    return 'organizer' if site['kind'] == 'event' else 'agency'
+
+
+def require_workflow_request(linked_request_id: str | None) -> str:
+    """Legacy requests that never entered the reviewed workflow must be resubmitted."""
+    if not linked_request_id:
+        fail('LEGACY_REQUEST_REQUIRES_RESUBMISSION', Conflict)
+    return linked_request_id
+
+
+def require_request_in_scope(request_scope_id: str | None, site_id: str) -> None:
+    """A site manager may review only requests aimed at that site; others are concealed."""
+    if request_scope_id != site_id:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+
+
+def require_free_slug(existing_site: dict | None) -> None:
+    reject_existing(existing_site, 'SLUG_EXISTS')
+
+
+def require_site(site: dict | None) -> dict:
+    return require_found(site, 'SITE_NOT_FOUND')
+
+
+def require_draft_saved(saved: bool) -> None:
+    """The guarded save touched no row: another editor moved the draft first."""
+    if not saved:
+        fail('DRAFT_CHANGED_REFRESH_REQUIRED', Conflict)
+
+
+ACCESS_REQUEST_STATUSES = ('pending', 'approved', 'rejected')
+
+
+def require_access_request_status(status) -> str:
+    if status not in ACCESS_REQUEST_STATUSES:
+        fail('REQUEST_STATUS_INVALID')
+    return status
+
+
+def require_access_request(request: dict | None) -> dict:
+    return require_found(request, 'ACCESS_REQUEST_NOT_FOUND')
+
+
+def require_event_target(site: dict | None) -> dict:
+    """Gate, guest-desk and registration routes address events only; anything else does not exist for them."""
+    if not site or site['kind'] != 'event':
+        fail('EVENT_REQUIRED', NotFound)
+    return site
+
+
+def require_event_record(event: dict | None) -> dict:
+    """Public/lookup variant of the same rule with the lookup error code."""
+    if not event or event['kind'] != 'event':
+        fail('EVENT_NOT_FOUND', NotFound)
+    return event
+
+
+def require_published_event(event: dict, version: dict | None) -> dict:
+    """The public sees an event only through a published version that really exists."""
+    if not event['published_version'] or version is None:
+        fail('EVENT_NOT_PUBLISHED', NotFound)
+    return version
+
+
+def require_published_config(config: dict | None) -> dict:
+    if config is None:
+        fail('NOT_PUBLISHED', NotFound)
+    return config
+
+
+def require_site_version(version: dict | None) -> dict:
+    return require_found(version, 'NOT_PUBLISHED')
+
+
+def require_publication_advanced(advanced: bool) -> None:
+    """The guarded publish touched no row: the draft revision or version moved meanwhile."""
+    if not advanced:
+        fail('VERSION_CONFLICT', Conflict)
+
+
+def require_discoverable(visibility: str) -> None:
+    """Private events are concealed as missing sites."""
+    if visibility == 'private':
+        fail('SITE_NOT_FOUND', NotFound)

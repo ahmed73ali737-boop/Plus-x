@@ -7,15 +7,12 @@ a guessed event ID, a phone number, or a login cookie as an invitation.
 from __future__ import annotations
 
 from app.application.ports import persistence
-from app.domain import NotFound, fail
-from app.domain.sites import visibility_from_policy
+from app.domain.sites import require_discoverable, require_site, visibility_from_policy
 
 
 def event_id_for_site(tx, site_or_id):
     if isinstance(site_or_id, str):
-        site = persistence.sites.get(tx, site_or_id)
-        if not site:
-            fail('SITE_NOT_FOUND', NotFound)
+        site = require_site(persistence.sites.get(tx, site_or_id))
     else:
         site = site_or_id
     if site['kind'] == 'event':
@@ -36,6 +33,5 @@ def is_public_event(tx, event_id: str | None) -> bool:
 
 def require_public_event(tx, event_id: str | None):
     """Allow public/unlisted direct access; conceal private event existence."""
-    if get_visibility(tx, event_id) == 'private':
-        fail('SITE_NOT_FOUND', NotFound)
+    require_discoverable(get_visibility(tx, event_id))
     return event_id

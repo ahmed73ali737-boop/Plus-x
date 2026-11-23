@@ -7,20 +7,14 @@ from app.application.audit_service import new_id
 from app.application.self_certificate_access import require_library
 from app.application.self_certificate_clock import utc_now
 from app.application.ports import persistence
-from app.domain import fail, Unavailable, InvalidInput
+from app.domain import fail, Unavailable
+from app.domain import self_certificates as rules
 from app.application.self_certificate_sandbox import clean_environment
 
-MAX_BACKGROUND_BYTES=3_000_000
-MAX_STAMP_BYTES=999_999
-MAX_NORMALIZED_BYTES=80_000_000
+MAX_NORMALIZED_BYTES=rules.MAX_NORMALIZED_BYTES
 
 def validate_upload(data,kind):
-    if kind not in ('background','stamp'):
-        fail('ASSET_KIND_INVALID')
-    if not isinstance(data,bytes) or not data:
-        fail('FILE_EMPTY')
-    if len(data)>(MAX_STAMP_BYTES if kind=='stamp' else MAX_BACKGROUND_BYTES):
-        fail('STAMP_TOO_LARGE' if kind=='stamp' else 'BACKGROUND_TOO_LARGE')
+    rules.require_upload(data,kind)
     try:
         with tempfile.TemporaryFile() as channel:
             result=subprocess.run([sys.executable,'-m','app.application.self_certificate_asset_worker',kind],
@@ -39,9 +33,8 @@ def validate_upload(data,kind):
     except (ValueError,UnicodeDecodeError):
         fail('ASSET_PROCESS_FAILED', Unavailable)
     if 'error' in info:
-        fail(info['error'],Unavailable if info['error']=='ASSET_PROCESS_ISOLATION_UNAVAILABLE' else InvalidInput)
-    if not normalized or len(normalized)>MAX_NORMALIZED_BYTES:
-        fail('ASSET_RESOURCE_LIMIT')
+        rules.asset_worker_error(info['error'])
+    rules.require_normalized_size(normalized)
     return normalized,info
 
 def ingest_asset(tx,user,store,data,kind):

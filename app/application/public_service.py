@@ -8,16 +8,14 @@ from app.application.access import get_site
 from app.application.event_visibility import event_id_for_site, is_public_event, require_public_event
 from app.application.ports import persistence
 from app.application.publishing import get_site_version
-from app.domain import NotFound, fail, now
+from app.domain import now
 from app.domain.site_config import public_config_without_answer_keys
-from app.domain.sites import event_status
+from app.domain.sites import event_status, require_published_config
 from app.domain.surveys import ballot_items
 
 
 def _child_card(child: dict, participation) -> dict:
-    config = child['published_config']
-    if config is None:
-        fail('NOT_PUBLISHED', NotFound)
+    config = require_published_config(child['published_config'])
     return {
         'id': child['id'], 'slug': child['slug'], 'title': config['title'], 'subtitle': config['subtitle'],
         'description': config['description'], 'logo': config['logo'], 'primary': config['primary'],

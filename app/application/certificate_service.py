@@ -12,10 +12,11 @@ import qrcode.image.svg
 from app.application.audit_service import new_id
 from app.application.certificate_rendering import font_bytes, font_hash, image_data, validate_layout
 from app.application.ports import persistence
-from app.domain import Conflict, NotFound, fail, now, text
+from app.domain import now, text
 from app.domain.certificates import (
     ALIASES, FIELDS, PLACEHOLDER, Certificate, CertificateDesign, IssueRequest, default_design, fingerprint,
-    issue_timezone, resolve_placeholders,
+    concurrent_issue_winner, issue_timezone, public_lookup_value, require_certificate, require_replacement_recorded,
+    require_same_replacement, require_template, resolve_placeholders,
 )
 
 __all__ = [
@@ -41,9 +42,7 @@ def create_template(tx, event_id, body):
 
 
 def get_certificate(tx, event_id, certificate_id):
-    row = persistence.certificates.certificate(tx, event_id, certificate_id)
-    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
-    return row
+    return require_certificate(persistence.certificates.certificate(tx, event_id, certificate_id))
 
 
 def issue(tx, event_id, body):
@@ -52,9 +51,7 @@ def issue(tx, event_id, body):
     if existing:
         return dict(request.require_replay_of(existing)), None, False
     request.require_future_expiry(datetime.now(timezone.utc))
-    template = persistence.certificates.template(tx, event_id, request.template_id)
-    if not template:
-        fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
+    template = require_template(persistence.certificates.template(tx, event_id, request.template_id))
     token = secrets.token_urlsafe(32)
     row = Certificate.issue(
         request, template, certificate_id=new_id(), event_id=event_id,
@@ -63,9 +60,7 @@ def issue(tx, event_id, body):
     if not persistence.certificates.add_if_absent(tx, row):
         # A concurrent retry returns the committed winner; different requests cannot duplicate an award.
         winner = persistence.certificates.by_request_key(tx, event_id, request.request_key)
-        if winner and winner['request_hash'] == request.request_hash:
-            return winner, None, False
-        fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', Conflict)
+        return concurrent_issue_winner(winner, request.request_hash), None, False
     return row, token, True
 
 
@@ -95,11 +90,10 @@ def replace(tx, event_id, certificate_id, body):
         'award_key': Certificate.replacement_award_key(original), 'template_id': body.get('template_id', original['template_id'])})
     link = persistence.certificates.replacement_of(tx, certificate_id)
     if link:
-        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+        require_same_replacement(link, row['id'])
         return row, token, created
-    if not persistence.certificates.add_replacement_if_absent(tx, {'previous_id': certificate_id, 'replacement_id': row['id'],
-                                                                      'reason': reason, 'created_at': now()}):
-        fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+    require_replacement_recorded(persistence.certificates.add_replacement_if_absent(
+        tx, {'previous_id': certificate_id, 'replacement_id': row['id'], 'reason': reason, 'created_at': now()}))
     revoke(tx, event_id, certificate_id, reason)
     return row, token, created
 
@@ -144,10 +138,7 @@ def list_certificates(tx, event_id, offset, limit):
 
 def find_certificate(tx, field, value):
     """Public lookup by serial or by access-token hash; unknown values are concealed."""
-    if len(value) > 120: fail('CERTIFICATE_NOT_FOUND', NotFound)
-    row = persistence.certificates.find_by(tx, field, value)
-    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
-    return row
+    return require_certificate(persistence.certificates.find_by(tx, field, public_lookup_value(value)))
 
 
 def is_superseded(tx, certificate_id):

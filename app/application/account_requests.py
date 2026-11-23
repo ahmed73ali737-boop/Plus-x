@@ -12,7 +12,7 @@ from app.application.audit_service import new_id, write_audit
 from app.application.phone_accounts import bind_phone, contact_identity, find_contact_user
 from app.application.ports import persistence
 from app.core.security import digest, hash_password
-from app.domain import Conflict, Forbidden, NotFound, fail, now, text
+from app.domain import now, text
 from app.domain.account_requests import (
     SETUP_DAYS,
     SOURCES,
@@ -25,6 +25,7 @@ from app.domain.account_requests import (
     delegated_grant_allowed,
     expires,
     granted_assignment_role,
+    is_replay,
     may_supervise,
     new_login,
     organizer_may_submit_for_platform,
@@ -34,15 +35,22 @@ from app.domain.account_requests import (
     require_active_actor,
     require_active_target,
     require_invitation_usable,
+    require_new_account,
     require_password_setup,
     require_platform_inviter,
+    require_request,
+    require_setup_activated,
     require_setup_renewable,
+    require_submitter_in_scope,
+    require_supervision,
+    require_supervisor,
     require_tracking_token,
     require_unclaimed_identity,
     requests_accepting,
     review_disposition,
     signup_entities as new_signup_entities,
     submitted_password,
+    submitter_in_scope,
     supervisor_preference,
 )
 
@@ -104,23 +112,22 @@ def _supervises(tx, actor, record):
 
 def choose_supervisor(tx, record, actor=None):
     actor_id = (actor or {}).get('id')
-    for candidate in sorted(_requests().active_users(tx), key=supervisor_preference(actor_id)):
-        if may_supervise(candidate, record, actor_id) and authorized(tx, candidate, record):
-            return candidate['id']
-    fail('ACCOUNT_REQUEST_SUPERVISOR_UNAVAILABLE', Conflict)
+    candidates = sorted(_requests().active_users(tx), key=supervisor_preference(actor_id))
+    chosen = next((candidate['id'] for candidate in candidates
+                   if may_supervise(candidate, record, actor_id) and authorized(tx, candidate, record)), None)
+    return require_supervisor(chosen)
 
 
 def check_submitter(tx, actor, record):
     if actor is None:
         return
     require_active_actor(actor)
-    if record['scope_type'] == 'organization':
-        if not org_reviewer(tx, actor, record['scope_id'], False):
-            fail('FORBIDDEN_SCOPE', Forbidden)
-    elif not authorized(tx, actor, record):
+    require_submitter_in_scope(submitter_in_scope(
+        record['scope_type'],
+        lambda: org_reviewer(tx, actor, record['scope_id'], False),
+        lambda: authorized(tx, actor, record),
         # An organizer may submit organizer requests for platform review in their event.
-        if not organizer_may_submit_for_platform(actor, record):
-            fail('FORBIDDEN_SCOPE', Forbidden)
+        lambda: organizer_may_submit_for_platform(actor, record)))
 
 
 def submit(tx, *, actor, body, purpose, scope_type, scope_id, role, membership_role=None,
@@ -143,9 +150,7 @@ def submit(tx, *, actor, body, purpose, scope_type, scope_id, role, membership_r
     fingerprint = digest(payload_fingerprint_source(email, phone, name, purpose, scope_type, scope_id, role,
                                                     membership_role, assignment_role, person_id, body))
     old = _requests().by_request_key(tx, key)
-    if old:
-        if old['payload_hash'] != fingerprint:
-            fail('ACCOUNT_REQUEST_KEY_EXISTS', Conflict)
+    if is_replay(old, fingerprint):
         return {**view(tx, old), 'tracking_token': token, 'already_pending': True, 'grants_access': False}
     start, end = assignment_window(body)
     supervisor = choose_supervisor(tx, {**record, 'existing_user_id': target['id'] if target else None}, actor)
@@ -164,10 +169,7 @@ def submit(tx, *, actor, body, purpose, scope_type, scope_id, role, membership_r
 
 
 def context(tx, request_id):
-    row = _requests().workflow(tx, request_id)
-    if not row:
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
-    return row
+    return require_request(_requests().workflow(tx, request_id))
 
 
 def request_scope_id(tx, request_id):
@@ -265,8 +267,7 @@ def _approve_identity(tx, record, workflow, request_id):
 def review(tx, actor, request_id, action, reason=None):
     actor = persistence.identity.user(tx, actor['id'], for_update=True)
     record = _requests().request(tx, request_id, for_update=True)
-    if not _supervises(tx, actor, record):
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    require_supervision(_supervises(tx, actor, record))
     workflow = context(tx, request_id)
     check_reviewer(actor, record, workflow, action)
     disposition = review_disposition(record, now())
@@ -293,10 +294,7 @@ def review(tx, actor, request_id, action, reason=None):
 
 def owned(tx, token, lock=False):
     require_tracking_token(token)
-    record = _requests().by_tracking_hash(tx, digest(token), for_update=lock)
-    if not record:
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
-    return record
+    return require_request(_requests().by_tracking_hash(tx, digest(token), for_update=lock))
 
 
 def status(tx, token):
@@ -318,8 +316,7 @@ def setup_password(tx, token, body):
     record = owned(tx, token, True)
     workflow = context(tx, record['id'])
     require_password_setup(record, workflow, now(), body)
-    if not _requests().activate_with_password(tx, workflow['user_id'], hash_password(body.get('password'))):
-        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+    require_setup_activated(_requests().activate_with_password(tx, workflow['user_id'], hash_password(body.get('password'))))
     _requests().update_workflow(tx, record['id'], {'setup_expires_at': None})
     write_audit(tx, None, None, 'account_password_set', {'request_id': record['id']})
     return {'ok': True, 'login_required': True}
@@ -327,8 +324,7 @@ def setup_password(tx, token, body):
 
 def renew_setup(tx, actor, request_id):
     record = _requests().request(tx, request_id, for_update=True)
-    if not _supervises(tx, actor, record):
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    require_supervision(_supervises(tx, actor, record))
     workflow = context(tx, request_id)
     require_setup_renewable(record, workflow, persistence.identity.user(tx, workflow['user_id']), actor)
     _requests().update_workflow(tx, request_id, {'setup_expires_at': expires(SETUP_DAYS)})
@@ -343,8 +339,7 @@ def list_submitted(tx, actor, status=None):
 def invite_platform_candidate(tx, actor, body):
     require_platform_inviter(actor)
     email, phone = contact_identity(body, preserve_email=True)
-    if find_contact_user(tx, email, phone):
-        fail('ACCOUNT_ALREADY_EXISTS', Conflict)
+    require_new_account(find_contact_user(tx, email, phone))
     token = secrets.token_urlsafe(32)
     invite_id = new_id()
     expires_at = expires(SETUP_DAYS)
@@ -360,9 +355,7 @@ def invite_platform_candidate(tx, actor, body):
 
 def platform_invite(tx, token, lock=False):
     require_tracking_token(token)
-    row = _requests().platform_invite(tx, digest(token), for_update=lock)
-    if not row:
-        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    row = require_request(_requests().platform_invite(tx, digest(token), for_update=lock))
     require_invitation_usable(row, now())
     return row
 
