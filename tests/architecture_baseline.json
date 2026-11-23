@@ -16,7 +16,6 @@
     "app/application/guest_desk.py": 2,
     "app/application/guest_gate_service.py": 4,
     "app/application/invitation_service.py": 14,
-    "app/application/phone_accounts.py": 9,
     "app/application/public_service.py": 1,
     "app/application/publishing.py": 2,
     "app/application/self_certificate_assets.py": 10,
