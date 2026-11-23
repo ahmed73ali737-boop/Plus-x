@@ -155,7 +155,7 @@ written (the system's durable domain events).
 `tests/architecture_baseline.json` records, per `app/application` module, how many `fail(...)`
 rule checks are still written outside the domain; `tests/test_architecture.py::test_rules_in_application_ratchet_only_shrinks`
 fails when a count grows, when a new module appears, **or** when a count dropped without the
-baseline being lowered. Phase-2 start: 344 checks in 36 modules; now: 250.
+baseline being lowered. Phase-2 start: 344 checks in 36 modules; after phase 2: 250; after phase 3: 60.
 
 | Context | Rules now owned by the domain | Domain class / module | Tests |
 |---|---|---|---|
@@ -168,12 +168,51 @@ baseline being lowered. Phase-2 start: 344 checks in 36 modules; now: 250.
 | Site administration | staff-only directory actions, signup role, membership manager, person link, content-import commit | `domain/sites.py`, `domain/organizations.py` | `tests/test_domain_site_admin.py` |
 | Self-declared certificates | phone normalisation, browser remember window, accepting switch, revision integrity, retry | `domain/self_certificates.py` | `tests/test_domain_self_certificates.py` |
 
-### Not yet migrated (what the ratchet still counts)
+## Phase 3 — authorization, accounts, collection, admission and self-certificates
 
-The 250 remaining checks are mostly lookups that raise not-found, feature/pilot gates and
-authorization orchestration that needs repository reads (`access.py`, `site_admin.py`,
-`self_certificate_*` workers, `phone_accounts.py`, `collection_service.py`). Request-level
-rules in those modules should keep moving into aggregates (next candidates by risk:
-`self_certificate_links`, `self_certificate_assets`, `phone_accounts`, `collection_service`).
-Use cases still pass rows as dicts rather than rich entities; the domain classes above
-operate on those records and are the seam for introducing entities later.
+Phase 3 started at 250 checks in 37 modules and ends at **60 in 12** (25 modules now have none).
+Domain rules take their facts as plain values or lazy callables, so use cases only *load* (ports) and
+*apply* (domain); behaviour, routes, status codes and bodies are unchanged (the OpenAPI document and
+route table are byte-identical before and after, and the pre-existing suite passes unchanged).
+
+New shared vocabulary: `domain/guards.py` (`require_found` -> `NotFound`, `reject_existing` -> `Conflict`)
+so "missing/duplicate" is a typed domain decision instead of a `fail(...)` next to a repository call.
+
+| Context | Rules now owned by the domain | Domain class / module | Tests |
+|---|---|---|---|
+| Site scope and event capabilities (authorization) | `can_manage_site` / `can_read_site` decision order over a `SiteAccessFacts` port (inactive user, role, own agency page lifecycle, shift assignment, organization membership + active participation; read never flows into manage), organization visibility, unknown permission fails closed, event-only capabilities | `domain/authorization.py` | `tests/test_domain_authorization.py`, `tests/test_use_cases_phase3.py` |
+| Certificate library authority | live principal (active, password change done), library capability set, who manages the library, event authority, eligible events, owner-only concealment | `domain/authorization.py` | `tests/test_domain_authorization.py` |
+| Phone/contact accounts | strict E.164 account phone (+967 mobiles only), login principal, `tel:` never exposed as email, one person per contact, phone binding (bind/keep/takeover/change), review-queue visibility | `domain/contacts.py` | `tests/test_domain_contacts.py` |
+| Sessions and identity | live session, active account, CSRF on writes, notification ownership, message targets | `domain/accounts.py` | `tests/test_domain_accounts.py`, `tests/test_use_cases_phase3.py` |
+| Account approvals (maker/checker) | supervisor availability, submitter scope (lazy), request-key replay vs changed payload, supervision concealment, setup activation, new-account-only invitations | `domain/account_requests.py` | `tests/test_domain_account_approval.py` |
+| Visitor collection and metrics | batch of 1..50, item must be an object, idempotent replay vs conflict, feedback scope/target, **metrics aggregation** | `domain/submissions.py`, `domain/metrics.py` | `tests/test_domain_submissions_collection.py`, `tests/test_use_cases_phase3.py` |
+| Site administration | access-request targets/roles, legacy-workflow and scope concealment, slug/organization/participation uniqueness, hidden-organization concealment, people-manager authority, draft-save race | `domain/sites.py`, `domain/organizations.py` | `tests/test_domain_site_admin.py`, `tests/test_use_cases_phase3.py` |
+| Managed admission | legacy-pass migration, guest-list scope, one invitation per phone, entitlement availability/consumption, per-file uniqueness, direct-registration closure, registered-guest rule | `domain/admission.py`, `domain/gate.py` | `tests/test_domain_guest_import.py`, `tests/test_domain_gate_rules.py` |
+| Public event visibility | event targeting, published-version requirement, private events concealed, guarded publish conflict | `domain/sites.py` | `tests/test_domain_site_admin.py`, `tests/test_use_cases_phase3.py` |
+| Certificates, devices, committee | lookups, bounded public lookup, concurrent-issue winner, single replacement, single-sheet import, commit-once, inline-image/render limits, committee role/assignee, device scope/token | `domain/certificates.py`, `domain/certificate_imports.py`, `domain/committee.py`, `domain/devices.py` | `tests/test_domain_certificates.py`, `tests/test_domain_certificate_imports.py`, `tests/test_domain.py` |
+| Self-certificate links, models, assets | `LinkRequest`/`LinkStateChange`, strict row versions, idempotent replay, pilot gate, expected revision, upgrade requirement, pagination/filter, upload gate, browser seed/token | `domain/self_certificates.py` | `tests/test_domain_self_certificates.py` |
+| Self-certificate layout and branding | typography/shape/pixel rules, name normalisation, shrink-then-drop-penultimate fitting (metrics injected), stamp placement, frozen branding profiles, card manifest, reserved-area clearance | `domain/certificate_layout.py`, `domain/certificate_branding.py` | `tests/test_domain_certificate_layout.py`, `tests/test_domain_certificate_branding.py` |
+| Participant exports and capability tokens | export request/lease/snapshot/download rules, token and nonce shape, +/-1 window freshness | `domain/self_certificates.py`, `domain/capability_tokens.py` | `tests/test_domain_self_certificates.py`, `tests/test_domain_capability_tokens.py` |
+
+Differential checks (old vs new implementation, identical results): metrics aggregation (200 random
+data sets), name fitting (3000), branding profiles (1500), reserved rectangles/manifests (3000).
+Ten domain rules were removed one at a time (can_manage inactive check, phone takeover, CSRF compare,
+replay conflict, people-manager rule, penultimate-word drop, card clearance, nonce window, strict row
+version, consumption guard) and each removal fails the domain/use-case suite.
+
+### Not yet migrated (what the ratchet still counts: 60 in 12 modules)
+
+What is left is adapter-shaped, not request-level business rules:
+
+* `self_certificate_fonts` (16), `self_certificate_storage` (10), `self_certificate_worker` (8),
+  `self_certificate_delivery`/`executor`/`limits`/`slots` (8): font-file and manifest verification,
+  file/lease storage, worker supervision and resource limits. These are infrastructure that still lives
+  under `app/application` and should move to `app/infrastructure` (not a domain extraction).
+* `self_certificate_assets` (5) and `self_certificate_branding` (2): isolated decoder process and resource
+  file hashing errors (`Unavailable`).
+* `invitation_service` (3): spreadsheet/CSV parse errors (`xlsx_reader` is an adapter).
+* `self_certificate_crypto` (3): key-file availability.
+* `shared_authorization` (5): **locked asset** (`ops/consolidated-source-lock.json`); untouched on purpose.
+
+Use cases still pass rows as dicts; the domain functions take those records (or lazy fact callables) as
+their input, which is the seam for introducing entities (`Principal`, `Site`, `Invitation`) later.
