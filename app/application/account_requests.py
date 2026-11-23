@@ -12,7 +12,7 @@ from app.application.audit_service import new_id, write_audit
 from app.application.phone_accounts import bind_phone, contact_identity, find_contact_user
 from app.application.ports import persistence
 from app.core.security import digest, hash_password
-from app.domain import Conflict, Forbidden, NotFound, Unavailable, fail, now, text
+from app.domain import Conflict, Forbidden, NotFound, fail, now, text
 from app.domain.account_requests import (
     SETUP_DAYS,
     SOURCES,
@@ -27,11 +27,20 @@ from app.domain.account_requests import (
     granted_assignment_role,
     may_supervise,
     new_login,
+    organizer_may_submit_for_platform,
     payload_fingerprint_source,
     public_account_request,
     request_key,
+    require_active_actor,
+    require_active_target,
+    require_invitation_usable,
+    require_password_setup,
+    require_platform_inviter,
+    require_setup_renewable,
     require_tracking_token,
-    setup_available,
+    require_unclaimed_identity,
+    requests_accepting,
+    review_disposition,
     signup_entities as new_signup_entities,
     submitted_password,
     supervisor_preference,
@@ -89,6 +98,10 @@ def authorized(tx, actor, record):
     return actor['role'] == 'organizer' and actor['scope_id'] == event_id
 
 
+def _supervises(tx, actor, record):
+    return bool(record) and record['supervisor_id'] == actor['id'] and authorized(tx, actor, record)
+
+
 def choose_supervisor(tx, record, actor=None):
     actor_id = (actor or {}).get('id')
     for candidate in sorted(_requests().active_users(tx), key=supervisor_preference(actor_id)):
@@ -100,22 +113,19 @@ def choose_supervisor(tx, record, actor=None):
 def check_submitter(tx, actor, record):
     if actor is None:
         return
-    if not actor['active']:
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_active_actor(actor)
     if record['scope_type'] == 'organization':
         if not org_reviewer(tx, actor, record['scope_id'], False):
             fail('FORBIDDEN_SCOPE', Forbidden)
     elif not authorized(tx, actor, record):
         # An organizer may submit organizer requests for platform review in their event.
-        if not (record['requested_role'] == 'organizer' and actor['role'] == 'organizer'
-                and actor['scope_id'] == record['scope_id']):
+        if not organizer_may_submit_for_platform(actor, record):
             fail('FORBIDDEN_SCOPE', Forbidden)
 
 
 def submit(tx, *, actor, body, purpose, scope_type, scope_id, role, membership_role=None,
            assignment_role=None, person_id=None, signup_id=None, access_id=None):
-    if os.environ.get('ACCOUNT_REQUESTS_ACCEPTING', 'true').lower() not in ('true', '1', 'yes'):
-        fail('ACCOUNT_REQUESTS_PAUSED', Unavailable)
+    requests_accepting(os.environ.get('ACCOUNT_REQUESTS_ACCEPTING', 'true'))
     expire_pending(tx)
     email, phone = contact_identity(body, preserve_email=True)
     initial_target = find_contact_user(tx, email, phone)
@@ -230,10 +240,7 @@ def approve_links(tx, record, workflow, target, site_id, organization_id):
 def _approve_identity(tx, record, workflow, request_id):
     _requests().lock_identities(tx, {record['email'], record['phone'] or record['email']})
     target = find_contact_user(tx, record['email'], record['phone'])
-    if workflow['purpose'] == 'personal' and target:
-        fail('CONTACT_IDENTITIES_CONFLICT', Conflict)
-    if workflow['existing_user_id'] and (not target or target['id'] != workflow['existing_user_id']):
-        fail('CONTACT_IDENTITIES_CONFLICT', Conflict)
+    require_unclaimed_identity(workflow, target)
     site_id = record['scope_id'] if record['scope_type'] == 'site' else None
     organization_id = record['organization_id']
     if workflow['purpose'] == 'signup':
@@ -241,8 +248,7 @@ def _approve_identity(tx, record, workflow, request_id):
     if organization_id and not site_id:
         site_id = _requests().latest_active_agency_site(tx, organization_id)
     is_new = not target
-    if target and not target['active']:
-        fail('ACCOUNT_SUSPENDED', Conflict)
+    require_active_target(target)
     if not target:
         hashed = record['password_hash'] or hash_password(secrets.token_urlsafe(32))
         target = new_login(new_id(), record, workflow, site_id, hashed)
@@ -259,13 +265,14 @@ def _approve_identity(tx, record, workflow, request_id):
 def review(tx, actor, request_id, action, reason=None):
     actor = persistence.identity.user(tx, actor['id'], for_update=True)
     record = _requests().request(tx, request_id, for_update=True)
-    if not record or record['supervisor_id'] != actor['id'] or not authorized(tx, actor, record):
+    if not _supervises(tx, actor, record):
         fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
     workflow = context(tx, request_id)
     check_reviewer(actor, record, workflow, action)
-    if record['status'] != 'pending':
+    disposition = review_disposition(record, now())
+    if disposition == 'already_reviewed':
         return {**view(tx, record), 'already_reviewed': True}
-    if record['expires_at'] <= now():
+    if disposition == 'expired':
         values = _close(tx, request_id, 'expired')
         return view(tx, dict(record, **values))
     reason = decision_reason(action, reason)
@@ -310,10 +317,7 @@ def cancel(tx, token):
 def setup_password(tx, token, body):
     record = owned(tx, token, True)
     workflow = context(tx, record['id'])
-    if not setup_available(record, workflow, now()):
-        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
-    if body.get('password') != body.get('confirmation'):
-        fail('PASSWORD_CONFIRMATION_MISMATCH')
+    require_password_setup(record, workflow, now(), body)
     if not _requests().activate_with_password(tx, workflow['user_id'], hash_password(body.get('password'))):
         fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
     _requests().update_workflow(tx, record['id'], {'setup_expires_at': None})
@@ -323,14 +327,10 @@ def setup_password(tx, token, body):
 
 def renew_setup(tx, actor, request_id):
     record = _requests().request(tx, request_id, for_update=True)
-    if not record or record['supervisor_id'] != actor['id'] or not authorized(tx, actor, record):
+    if not _supervises(tx, actor, record):
         fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
-    if record['requested_by'] == actor['id']:
-        fail('ACCOUNT_REQUEST_SELF_REVIEW', Forbidden)
     workflow = context(tx, request_id)
-    target = persistence.identity.user(tx, workflow['user_id'])
-    if record['status'] != 'approved' or not workflow['setup_expires_at'] or not target or target['active']:
-        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+    require_setup_renewable(record, workflow, persistence.identity.user(tx, workflow['user_id']), actor)
     _requests().update_workflow(tx, request_id, {'setup_expires_at': expires(SETUP_DAYS)})
     write_audit(tx, actor, None, 'account_setup_renewed', {'request_id': request_id})
     return view(tx, record)
@@ -341,8 +341,7 @@ def list_submitted(tx, actor, status=None):
 
 
 def invite_platform_candidate(tx, actor, body):
-    if actor['role'] != 'platform' or not actor['active']:
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_platform_inviter(actor)
     email, phone = contact_identity(body, preserve_email=True)
     if find_contact_user(tx, email, phone):
         fail('ACCOUNT_ALREADY_EXISTS', Conflict)
@@ -364,8 +363,7 @@ def platform_invite(tx, token, lock=False):
     row = _requests().platform_invite(tx, digest(token), for_update=lock)
     if not row:
         fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
-    if not row['request_id'] and row['expires_at'] <= now():
-        fail('ACCOUNT_INVITATION_EXPIRED', Conflict)
+    require_invitation_usable(row, now())
     return row
 
 

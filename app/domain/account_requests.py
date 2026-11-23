@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from app.domain.authorization import EVENT_ROLE_PERMISSIONS
-from app.domain.errors import Conflict, Forbidden, NotFound, fail
+from app.domain.errors import Conflict, Forbidden, NotFound, Unavailable, fail
 from app.domain.site_config import default_config
 from app.domain.values import stamp, text
 
@@ -187,3 +187,73 @@ def require_tracking_token(token) -> None:
 
 def setup_available(record: dict, workflow: dict, at: str) -> bool:
     return record['status'] == 'approved' and bool(workflow['setup_expires_at']) and workflow['setup_expires_at'] > at
+
+
+def requests_accepting(flag: str) -> None:
+    """Operators can pause new requests without redeploying."""
+    if str(flag).lower() not in ('true', '1', 'yes'):
+        fail('ACCOUNT_REQUESTS_PAUSED', Unavailable)
+
+
+def require_active_actor(actor: dict) -> None:
+    if not actor['active']:
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def organizer_may_submit_for_platform(actor: dict, record: dict) -> bool:
+    """An organizer may submit organizer requests for platform review in their own event."""
+    return (record['requested_role'] == 'organizer' and actor['role'] == 'organizer'
+            and actor['scope_id'] == record['scope_id'])
+
+
+def require_assigned_supervisor(actor: dict, record: dict | None) -> None:
+    """Only the designated supervisor sees a request; everyone else gets not-found."""
+    if not record or record['supervisor_id'] != actor['id']:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+
+
+def review_disposition(record: dict, at: str) -> str:
+    """What a review attempt does to a request: nothing more, expire it, or proceed."""
+    if record['status'] != 'pending':
+        return 'already_reviewed'
+    if record['expires_at'] <= at:
+        return 'expired'
+    return 'proceed'
+
+
+def require_unclaimed_identity(workflow: dict, target) -> None:
+    """Approval must not collide with, or silently adopt, an existing login."""
+    if workflow['purpose'] == 'personal' and target:
+        fail('CONTACT_IDENTITIES_CONFLICT', Conflict)
+    if workflow['existing_user_id'] and (not target or target['id'] != workflow['existing_user_id']):
+        fail('CONTACT_IDENTITIES_CONFLICT', Conflict)
+
+
+def require_active_target(target) -> None:
+    if target and not target['active']:
+        fail('ACCOUNT_SUSPENDED', Conflict)
+
+
+def require_password_setup(record: dict, workflow: dict, at: str, body: dict) -> None:
+    if not setup_available(record, workflow, at):
+        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+    if body.get('password') != body.get('confirmation'):
+        fail('PASSWORD_CONFIRMATION_MISMATCH')
+
+
+def require_setup_renewable(record: dict, workflow: dict, target, actor: dict) -> None:
+    """The requester cannot renew their own setup; only an approved, not-yet-used setup renews."""
+    if record['requested_by'] == actor['id']:
+        fail('ACCOUNT_REQUEST_SELF_REVIEW', Forbidden)
+    if record['status'] != 'approved' or not workflow['setup_expires_at'] or not target or target['active']:
+        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+
+
+def require_platform_inviter(actor: dict) -> None:
+    if actor['role'] != 'platform' or not actor['active']:
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def require_invitation_usable(row: dict, at: str) -> None:
+    if not row['request_id'] and row['expires_at'] <= at:
+        fail('ACCOUNT_INVITATION_EXPIRED', Conflict)
