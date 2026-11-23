@@ -127,6 +127,13 @@
   "/api/admin/events/{event_id}/permissions": [
     "get"
   ],
+  "/api/admin/integrations/messaging": [
+    "get",
+    "put"
+  ],
+  "/api/admin/integrations/messaging/test": [
+    "post"
+  ],
   "/api/admin/media": [
     "post"
   ],
