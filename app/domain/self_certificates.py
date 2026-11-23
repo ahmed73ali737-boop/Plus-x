@@ -6,7 +6,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.errors import Conflict, Forbidden, InvalidInput, NotFound, Unavailable, fail
+from app.domain.errors import Conflict, Forbidden, Gone, InvalidInput, NotFound, Unavailable, fail
 from app.domain.guards import require_found
 from app.domain.values import text
 
@@ -317,3 +317,59 @@ def require_issued_certificate(certificate: dict | None) -> dict:
     if not certificate:
         fail('CERTIFICATE_STATE_UNAVAILABLE', Unavailable)
     return certificate
+
+
+# Participant exports ------------------------------------------------------------------------------
+
+EXPORT_FORMATS = ('csv', 'xlsx')
+EXPORT_FIELDS = frozenset({'format', 'idempotency_key'})
+EXPORT_SNAPSHOT_VERSION = 'snapshot-v2'
+
+
+@dataclass(frozen=True)
+class ExportRequest:
+    """Request for a consistent-snapshot export of the owner's participant requests."""
+
+    format: str
+    idempotency_key: str | None
+
+    @classmethod
+    def parse(cls, body) -> 'ExportRequest':
+        if not isinstance(body, dict) or set(body) - EXPORT_FIELDS or body.get('format') not in EXPORT_FORMATS:
+            fail('EXPORT_FORMAT_INVALID')
+        key = body.get('idempotency_key')
+        if key is not None and (not isinstance(key, str) or not MODEL_OPERATION_KEY.fullmatch(key)):
+            fail('EXPORT_INPUT_INVALID')
+        return cls(body['format'], key)
+
+    @property
+    def fingerprint_source(self) -> str:
+        return f'{EXPORT_SNAPSHOT_VERSION}:{self.format}'
+
+
+def require_export_lease(live: bool) -> None:
+    """A worker may only write an export while it still holds the lease."""
+    if not live:
+        fail('EXPORT_LEASE_LOST', Conflict)
+
+
+def require_snapshot_complete(written_rows: int, expected_rows: int) -> None:
+    """The file must contain exactly the rows the snapshot counted."""
+    if written_rows != expected_rows:
+        fail('EXPORT_SNAPSHOT_INVALID', Conflict)
+
+
+def require_downloadable_export(row: dict | None) -> dict:
+    """Owner-only download: missing is concealed, expired is gone, unfinished is a conflict."""
+    if not row:
+        fail('NOT_FOUND', NotFound)
+    if row['error_code'] == 'EXPORT_EXPIRED':
+        fail('EXPORT_EXPIRED', Gone)
+    if row['status'] != 'done':
+        fail('EXPORT_NOT_READY', Conflict)
+    return row
+
+
+def require_export_file_fresh(expired: bool) -> None:
+    if expired:
+        fail('EXPORT_EXPIRED', Gone)

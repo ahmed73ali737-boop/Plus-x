@@ -1,10 +1,11 @@
 """Persistent, versioned HMAC capabilities. Never log or return signing keys."""
-import base64,hashlib,hmac,json,os,re,secrets,time
+import base64,hashlib,hmac,json,os,secrets,time
 from pathlib import Path
-from app.domain import fail, Forbidden, NotFound, Unavailable
+from app.domain import fail, Unavailable
+from app.domain import capability_tokens as tokens
 from app.application.self_certificate_keys import bounded_json,VersionedKeys
 
-PART=re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
+PART=tokens.PART
 REMEMBER_SECONDS=365*24*60*60
 
 class Keyring:
@@ -41,31 +42,25 @@ class Keyring:
 
     def token(self,purpose,ident,version=None):
         version=version or self.current
-        if not isinstance(ident,str) or not PART.fullmatch(ident):fail('TOKEN_INVALID', NotFound)
+        tokens.require_identifier(ident)
         return version+'.'+ident+'.'+self.sign(purpose,ident,version)
 
     def verify(self,purpose,token):
-        if not isinstance(token,str) or len(token)>220:fail('NOT_FOUND', NotFound)
-        parts=token.split('.')
-        if len(parts)!=3 or not all(PART.fullmatch(p) for p in parts):fail('NOT_FOUND', NotFound)
-        version,ident,signature=parts
-        if version not in self.keys:fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE', Unavailable)
-        if not hmac.compare_digest(signature,self.sign(purpose,ident,version)):fail('NOT_FOUND', NotFound)
+        version,ident,signature=tokens.parse_token(token)
+        tokens.require_known_key_version(version in self.keys)
+        tokens.require_valid_signature(hmac.compare_digest(signature,self.sign(purpose,ident,version)))
         return ident,version
 
     def nonce(self,browser_id,link_id):
-        epoch=str(int(time.time())//900)
+        epoch=str(tokens.current_epoch(time.time()))
         value=browser_id+':'+link_id+':'+epoch
         return self.current+'.'+epoch+'.'+self.sign('request-nonce',value)
 
     def check_nonce(self,nonce,browser_id,link_id):
-        if not isinstance(nonce,str) or len(nonce)>180:fail('REQUEST_NONCE_INVALID', Forbidden)
-        parts=nonce.split('.')
-        if len(parts)!=3:fail('REQUEST_NONCE_INVALID', Forbidden)
-        version,epoch,signature=parts
-        if not epoch.isdigit() or abs(int(time.time())//900-int(epoch))>1:fail('REQUEST_NONCE_EXPIRED', Forbidden)
-        if version not in self.keys or not hmac.compare_digest(signature,self.sign('request-nonce',browser_id+':'+link_id+':'+epoch,version)):
-            fail('REQUEST_NONCE_INVALID', Forbidden)
+        version,epoch,signature=tokens.parse_nonce(nonce)
+        tokens.require_fresh_epoch(epoch,time.time())
+        tokens.require_valid_nonce(version in self.keys,
+            version in self.keys and hmac.compare_digest(signature,self.sign('request-nonce',browser_id+':'+link_id+':'+epoch,version)))
 
 def token_hash(value):
     return hashlib.sha256(value.encode()).hexdigest()

@@ -231,3 +231,51 @@ def test_participant_browser_session_rules():
     assert require_issued_certificate({'id': 'c'}) == {'id': 'c'}
     with pytest.raises(Unavailable):
         require_issued_certificate(None)
+
+
+def test_export_request_is_strict_and_fingerprints_by_format():
+    from app.domain.self_certificates import ExportRequest
+    ok = ExportRequest.parse({'format': 'csv', 'idempotency_key': 'k' * 16})
+    assert ok.format == 'csv' and ok.idempotency_key == 'k' * 16
+    assert ExportRequest.parse({'format': 'xlsx'}).idempotency_key is None
+    assert ExportRequest.parse({'format': 'csv'}).fingerprint_source != ExportRequest.parse({'format': 'xlsx'}).fingerprint_source
+    for bad in (None, [], {}, {'format': 'pdf'}, {'format': 'csv', 'extra': 1}):
+        with pytest.raises(InvalidInput) as error:
+            ExportRequest.parse(bad)
+        assert error.value.code == 'EXPORT_FORMAT_INVALID'
+    for key in ('short', 5, 'bad key bad key bad', 'k' * 81):
+        with pytest.raises(InvalidInput) as error:
+            ExportRequest.parse({'format': 'csv', 'idempotency_key': key})
+        assert error.value.code == 'EXPORT_INPUT_INVALID'
+
+
+def test_exports_need_their_lease_and_a_complete_snapshot():
+    from app.domain.self_certificates import require_export_lease, require_snapshot_complete
+    require_export_lease(True)
+    with pytest.raises(Conflict) as lost:
+        require_export_lease(False)
+    assert lost.value.code == 'EXPORT_LEASE_LOST'
+    require_snapshot_complete(5, 5)
+    for written in (4, 6):
+        with pytest.raises(Conflict) as error:
+            require_snapshot_complete(written, 5)
+        assert error.value.code == 'EXPORT_SNAPSHOT_INVALID'
+
+
+def test_only_a_finished_unexpired_export_is_downloadable_by_its_owner():
+    from app.domain import Gone
+    from app.domain.self_certificates import require_downloadable_export, require_export_file_fresh
+    done = {'status': 'done', 'error_code': None}
+    assert require_downloadable_export(done) is done
+    with pytest.raises(NotFound):
+        require_downloadable_export(None)
+    with pytest.raises(Gone) as expired:
+        require_downloadable_export({'status': 'failed', 'error_code': 'EXPORT_EXPIRED'})
+    assert expired.value.code == 'EXPORT_EXPIRED'
+    for status in ('pending', 'running', 'failed'):
+        with pytest.raises(Conflict) as error:
+            require_downloadable_export({'status': status, 'error_code': None})
+        assert error.value.code == 'EXPORT_NOT_READY'
+    require_export_file_fresh(False)
+    with pytest.raises(Gone):
+        require_export_file_fresh(True)
