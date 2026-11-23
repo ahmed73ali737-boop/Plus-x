@@ -16,7 +16,7 @@ from app.application.audit_service import new_id
 from app.application.guest_service import register_guest
 from app.application.ports import persistence
 from app.core.security import digest, new_session_token
-from app.domain import Conflict, Forbidden, NotFound, fail, now, text
+from app.domain import fail, now, text
 from app.domain.admission import (
     DEFAULT_POLICY,
     AdmissionPolicy,
@@ -31,7 +31,16 @@ from app.domain.admission import (
     new_invitation,
     policy_from_record,
     require_active,
+    require_active_entitlement,
+    require_consumed,
+    require_guest_list_in_scope,
+    require_invitation,
+    require_invitation_of_event,
+    require_legacy_pass_linked,
+    require_new_guest_list,
+    require_new_invitation,
     require_token_shape,
+    require_unique_in_file,
     validate_current_days,
 )
 from app.domain.admission import assert_public_registration as _assert_public_registration
@@ -96,9 +105,8 @@ def _require_migrated_legacy_passes(tx, event_id) -> None:
     """Enabling managed admission requires every registered pass to belong to an invitation."""
     for registration in persistence.guests.registrations(tx, event_id, status='registered'):
         invitation_id = (registration['metadata_json'] or {}).get('invitation_id')
-        linked = invitation_id and _admission().invitation_links_guest(tx, invitation_id, event_id, registration['guest_id'])
-        if not linked:
-            fail('LEGACY_PASSES_REQUIRE_MIGRATION', Conflict)
+        require_legacy_pass_linked(bool(
+            invitation_id and _admission().invitation_links_guest(tx, invitation_id, event_id, registration['guest_id'])))
 
 
 def assert_public_registration(tx, event_id):
@@ -108,16 +116,15 @@ def assert_public_registration(tx, event_id):
 def clean_invitation(tx, event_id, body):
     policy = get_policy(tx, event_id)
     values = _clean_identity(policy, body)
-    if values['list_id'] and not _admission().guest_list_in_event(tx, values['list_id'], event_id):
-        fail('GUEST_LIST_SCOPE', Forbidden)
+    require_guest_list_in_scope(values['list_id'],
+                                lambda: _admission().guest_list_in_event(tx, values['list_id'], event_id))
     return {**values, **invitation_limits(policy, body)}
 
 
 def create_invitation(tx, event_id, body):
     lock_policy(tx, event_id)
     values = clean_invitation(tx, event_id, body)
-    if _admission().invitation_with_phone_exists(tx, event_id, values['phone']):
-        fail('INVITATION_ALREADY_EXISTS', Conflict)
+    require_new_invitation(_admission().invitation_with_phone_exists(tx, event_id, values['phone']))
     token = new_session_token()
     row = new_invitation(new_id(), event_id, values, digest(token))
     _admission().add_invitation(tx, row)
@@ -125,18 +132,12 @@ def create_invitation(tx, event_id, body):
 
 
 def get_invitation(tx, event_id, invitation_id):
-    row = _admission().invitation(tx, event_id, invitation_id)
-    if not row:
-        fail('INVITATION_NOT_FOUND', NotFound)
-    return row
+    return require_invitation(_admission().invitation(tx, event_id, invitation_id))
 
 
 def by_token(tx, token):
     require_token_shape(token)
-    row = _admission().invitation_by_token_hash(tx, digest(token))
-    if not row:
-        fail('INVITATION_NOT_FOUND', NotFound)
-    return row
+    return require_invitation(_admission().invitation_by_token_hash(tx, digest(token)))
 
 
 def _block_pass(tx, invitation, status):
@@ -170,9 +171,7 @@ def _approve(tx, event, invitation, policy, reviewer=None):
 
 
 def respond(tx, event, token, body):
-    invitation = by_token(tx, token)
-    if invitation['event_id'] != event['id']:
-        fail('INVITATION_NOT_FOUND', NotFound)
+    require_invitation_of_event(by_token(tx, token), event['id'])
     policy = lock_policy(tx, event['id'])
     invitation = by_token(tx, token)
     changes = Invitation.rsvp(invitation, policy, body)
@@ -265,9 +264,8 @@ def entitlement_status(tx, event, guest, body=None):
     policy = get_policy(tx, event['id'])
     # The server's event-local day is authoritative; client clocks cannot extend validity.
     day, slot = Entitlement.admission_day(invitation, policy, datetime.now(ZoneInfo(policy['timezone'])))
-    entitlement = _admission().active_entitlement(tx, invitation_id, event['id'], guest['id'], slot)
-    if not entitlement:
-        fail('ENTITLEMENT_NOT_FOUND', Conflict)
+    entitlement = require_active_entitlement(
+        _admission().active_entitlement(tx, invitation_id, event['id'], guest['id'], slot))
     quantity = Entitlement.requested_quantity(entitlement, body)
     return {'managed': True, 'entitlement_id': entitlement['id'], 'quantity': quantity,
             'remaining': entitlement['quantity'] - entitlement['consumed'], 'day': day}
@@ -291,8 +289,7 @@ def consume_entitlement(tx, event, guest, body):
     status = entitlement_status(tx, event, guest, body)
     if not status['managed']:
         return status
-    if not _admission().consume(tx, status['entitlement_id'], status['quantity']):
-        fail('ADMISSION_ALREADY_USED', Conflict)
+    require_consumed(_admission().consume(tx, status['entitlement_id'], status['quantity']))
     _admission().add_admission_use(tx, {'scan_id': scan_id, 'entitlement_id': status['entitlement_id'],
                                         'quantity': status['quantity'], 'used_at': now()})
     return {**status, 'remaining': status['remaining'] - status['quantity']}
@@ -306,8 +303,7 @@ def list_guest_lists(tx, event_id):
 
 def create_guest_list(tx, event_id, body):
     row = {'id': new_id(), 'event_id': event_id, 'name': text(body.get('name'), 160, True), 'created_at': now()}
-    if not _admission().add_guest_list_if_absent(tx, row):
-        fail('GUEST_LIST_ALREADY_EXISTS', Conflict)
+    require_new_guest_list(_admission().add_guest_list_if_absent(tx, row))
     return row
 
 
@@ -332,10 +328,8 @@ def preview_import(tx, event_id, user, body):
             item['list_id'] = body['list_id']
         try:
             clean = clean_invitation(tx, event_id, item)
-            if clean['phone'] in seen:
-                fail('DUPLICATE_PHONE_IN_FILE')
-            if _admission().invitation_with_phone_exists(tx, event_id, clean['phone']):
-                fail('INVITATION_ALREADY_EXISTS', Conflict)
+            require_unique_in_file(clean['phone'], seen)
+            require_new_invitation(_admission().invitation_with_phone_exists(tx, event_id, clean['phone']))
             seen.add(clean['phone'])
             rows.append({'name': clean['name'], 'phone': clean['phone'], 'list_id': clean['list_id'],
                          'max_companions': clean['max_companions'], 'days': clean['allowed_days']})

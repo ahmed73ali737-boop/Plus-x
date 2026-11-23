@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -386,3 +387,65 @@ class GuestImport:
             fail('IMPORT_ERRORS_MUST_BE_FIXED', Conflict)
         if datetime.fromisoformat(preview['created_at']) < at - GuestImport.PREVIEW_TTL:
             fail('IMPORT_PREVIEW_EXPIRED', Conflict)
+
+
+# Application-orchestration guards (the use case reads the fact, the domain decides) ----------------
+
+def require_legacy_pass_linked(linked: bool) -> None:
+    """Managed admission can only start when every registered pass belongs to an invitation."""
+    if not linked:
+        fail('LEGACY_PASSES_REQUIRE_MIGRATION', Conflict)
+
+
+def require_guest_list_in_scope(list_id, in_event: Callable[[], bool]) -> None:
+    """A guest list named on an invitation must belong to the same event."""
+    if list_id and not in_event():
+        fail('GUEST_LIST_SCOPE', Forbidden)
+
+
+def require_new_invitation(phone_already_invited: bool) -> None:
+    """One invitation per phone and event."""
+    if phone_already_invited:
+        fail('INVITATION_ALREADY_EXISTS', Conflict)
+
+
+def require_invitation(row: dict | None) -> dict:
+    if not row:
+        fail('INVITATION_NOT_FOUND', NotFound)
+    return row
+
+
+def require_invitation_of_event(invitation: dict, event_id: str) -> dict:
+    """An invitation token opened on another event's page does not exist there."""
+    if invitation['event_id'] != event_id:
+        fail('INVITATION_NOT_FOUND', NotFound)
+    return invitation
+
+
+def require_active_entitlement(entitlement: dict | None) -> dict:
+    if not entitlement:
+        fail('ENTITLEMENT_NOT_FOUND', Conflict)
+    return entitlement
+
+
+def require_consumed(consumed: bool) -> None:
+    """The guarded consume touched no row: the entitlement has no capacity left."""
+    if not consumed:
+        fail('ADMISSION_ALREADY_USED', Conflict)
+
+
+def require_new_guest_list(added: bool) -> None:
+    if not added:
+        fail('GUEST_LIST_ALREADY_EXISTS', Conflict)
+
+
+def require_unique_in_file(phone: str, seen: set) -> None:
+    """A phone may appear once per uploaded file."""
+    if phone in seen:
+        fail('DUPLICATE_PHONE_IN_FILE')
+
+
+def require_direct_registration_open(managed_admission_enabled: bool) -> None:
+    """Direct registration is closed while invitations manage admission."""
+    if managed_admission_enabled:
+        fail('ADMISSION_REGISTRATION_REQUIRED', Conflict)

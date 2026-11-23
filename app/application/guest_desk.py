@@ -6,7 +6,8 @@ from app.application.event_visibility import require_public_event
 from app.application.guest_gate_service import event_presence_map
 from app.application.guest_service import list_event_guests, register_guest
 from app.application.invitation_service import get_policy
-from app.domain import Conflict, NotFound, fail
+from app.domain.admission import require_direct_registration_open
+from app.domain.sites import require_event_target
 from app.domain.guests import guest_qr_payload
 
 SECRET_REGISTRATION_FIELDS = ('pass_token', 'internal_guest_number', 'phone_hash', 'pass_token_hash')
@@ -14,8 +15,7 @@ SECRET_REGISTRATION_FIELDS = ('pass_token', 'internal_guest_number', 'phone_hash
 
 def require_unmanaged_admission(tx, event_id: str) -> None:
     """Direct registration is closed while invitations manage admission."""
-    if get_policy(tx, event_id)['enabled']:
-        fail('ADMISSION_REGISTRATION_REQUIRED', Conflict)
+    require_direct_registration_open(get_policy(tx, event_id)['enabled'])
 
 
 def require_open_public_registration(tx, event: dict) -> None:
@@ -25,9 +25,7 @@ def require_open_public_registration(tx, event: dict) -> None:
 
 
 def require_event_kind(event: dict) -> dict:
-    if event['kind'] != 'event':
-        fail('EVENT_REQUIRED', NotFound)
-    return event
+    return require_event_target(event)
 
 
 def staff_guest_list(tx, user, event_id: str) -> list[dict]:

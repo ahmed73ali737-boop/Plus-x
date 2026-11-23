@@ -286,3 +286,35 @@ def test_identify_request_fails_closed_on_every_missing_piece(restore_ports):
     with pytest.raises(Forbidden, match='CSRF_REQUIRED'):
         identify_request(FakeRequest(csrf='wrong'), None, write=True)
     assert identify_request(FakeRequest(csrf='c'), None, write=True)[1] is live
+
+
+def test_event_lookup_and_visibility_conceal_what_the_public_may_not_see(restore_ports):
+    from app.application import event_lookup, event_visibility
+    sites = FakeSites(site(published_version=0), site('pub', published_version=3, event_id='pub'),
+                      site('agency', 'agency'))
+
+    class Policy:
+        config = None
+
+        def policy_config(self, tx, event_id):
+            return self.config
+
+    policy = Policy()
+    install(sites=sites, admission=policy)
+    assert event_lookup.event_by_id_or_slug(None, 'event')['id'] == 'event'
+    with pytest.raises(NotFound, match='EVENT_NOT_FOUND'):
+        event_lookup.event_by_id_or_slug(None, 'agency')
+    with pytest.raises(NotFound, match='EVENT_NOT_FOUND'):
+        event_lookup.event_by_id_or_slug(None, 'ghost')
+    with pytest.raises(NotFound, match='EVENT_NOT_PUBLISHED'):
+        event_lookup.published_event(None, sites.get(None, 'event'))
+    with pytest.raises(NotFound, match='EVENT_NOT_PUBLISHED'):          # version row missing
+        event_lookup.published_event(None, sites.get(None, 'pub'))
+    sites.add_version(None, 'pub', 3, {'title': 'Published'}, 't')
+    assert event_lookup.published_event(None, sites.get(None, 'pub'))['draft'] == {'title': 'Published'}
+    assert event_visibility.require_public_event(None, 'event') == 'event'
+    policy.config = {'visibility': 'private'}
+    with pytest.raises(NotFound, match='SITE_NOT_FOUND'):
+        event_visibility.require_public_event(None, 'event')
+    with pytest.raises(NotFound, match='SITE_NOT_FOUND'):
+        event_visibility.event_id_for_site(None, 'ghost')

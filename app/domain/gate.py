@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.domain.access_control import DEFAULT_GUEST_TYPE, AccessPolicy
-from app.domain.errors import Conflict, Forbidden, fail
+from app.domain.errors import Conflict, Forbidden, NotFound, fail
 from app.domain.values import text
 
 ENTRY = 'entry'
@@ -217,3 +217,10 @@ def require_unmanaged_quantity(quantity) -> None:
     """Without an entitlement a scan admits exactly one person."""
     if quantity != 1:
         fail('ADMISSION_QUANTITY_INVALID')
+
+
+def require_registered_guest(guest: dict | None) -> dict:
+    """A pass number must belong to a guest registered for this event."""
+    if not guest:
+        fail('GUEST_NOT_REGISTERED', NotFound)
+    return guest

@@ -205,3 +205,46 @@ def require_access_request_status(status) -> str:
 
 def require_access_request(request: dict | None) -> dict:
     return require_found(request, 'ACCESS_REQUEST_NOT_FOUND')
+
+
+def require_event_target(site: dict | None) -> dict:
+    """Gate, guest-desk and registration routes address events only; anything else does not exist for them."""
+    if not site or site['kind'] != 'event':
+        fail('EVENT_REQUIRED', NotFound)
+    return site
+
+
+def require_event_record(event: dict | None) -> dict:
+    """Public/lookup variant of the same rule with the lookup error code."""
+    if not event or event['kind'] != 'event':
+        fail('EVENT_NOT_FOUND', NotFound)
+    return event
+
+
+def require_published_event(event: dict, version: dict | None) -> dict:
+    """The public sees an event only through a published version that really exists."""
+    if not event['published_version'] or version is None:
+        fail('EVENT_NOT_PUBLISHED', NotFound)
+    return version
+
+
+def require_published_config(config: dict | None) -> dict:
+    if config is None:
+        fail('NOT_PUBLISHED', NotFound)
+    return config
+
+
+def require_site_version(version: dict | None) -> dict:
+    return require_found(version, 'NOT_PUBLISHED')
+
+
+def require_publication_advanced(advanced: bool) -> None:
+    """The guarded publish touched no row: the draft revision or version moved meanwhile."""
+    if not advanced:
+        fail('VERSION_CONFLICT', Conflict)
+
+
+def require_discoverable(visibility: str) -> None:
+    """Private events are concealed as missing sites."""
+    if visibility == 'private':
+        fail('SITE_NOT_FOUND', NotFound)

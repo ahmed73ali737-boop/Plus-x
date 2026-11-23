@@ -2,21 +2,15 @@
 from __future__ import annotations
 
 from app.application.ports import persistence
-from app.domain import NotFound, fail
+from app.domain.sites import require_event_record, require_published_event
 
 
 def event_by_id_or_slug(tx, event_id: str | None = None, slug: str | None = None) -> dict:
     event = persistence.sites.get(tx, event_id) if event_id else persistence.sites.event_by_slug(tx, slug)
-    if not event or event['kind'] != 'event':
-        fail('EVENT_NOT_FOUND', NotFound)
-    return event
+    return require_event_record(event)
 
 
 def published_event(tx, event: dict) -> dict:
     """The event as the public sees it: its draft replaced by the published config."""
-    if not event['published_version']:
-        fail('EVENT_NOT_PUBLISHED', NotFound)
-    version = persistence.sites.get_version(tx, event['id'], event['published_version'])
-    if version is None:
-        fail('EVENT_NOT_PUBLISHED', NotFound)
-    return {**event, 'draft': version['config']}
+    version = persistence.sites.get_version(tx, event['id'], event['published_version']) if event['published_version'] else None
+    return {**event, 'draft': require_published_event(event, version)['config']}

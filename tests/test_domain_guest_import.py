@@ -47,3 +47,60 @@ def test_guest_import_preview_commit_lifecycle():
     for preview, error in cases:
         with pytest.raises(error):
             GuestImport.require_committable(preview, NOW)
+
+
+# Phase 3: admission orchestration guards -------------------------------------------------------
+
+def test_managed_admission_orchestration_guards():
+    import pytest as _pytest
+    from app.domain import Conflict, Forbidden, InvalidInput, NotFound
+    from app.domain import admission
+
+    admission.require_legacy_pass_linked(True)
+    with _pytest.raises(Conflict) as legacy:
+        admission.require_legacy_pass_linked(False)
+    assert legacy.value.code == 'LEGACY_PASSES_REQUIRE_MIGRATION'
+
+    asked = []
+    admission.require_guest_list_in_scope(None, lambda: asked.append(1) or False)   # no list: nothing to check
+    assert asked == []
+    admission.require_guest_list_in_scope('l1', lambda: True)
+    with _pytest.raises(Forbidden) as scope:
+        admission.require_guest_list_in_scope('l1', lambda: False)
+    assert scope.value.code == 'GUEST_LIST_SCOPE'
+
+    admission.require_new_invitation(False)
+    with _pytest.raises(Conflict) as duplicate:
+        admission.require_new_invitation(True)
+    assert duplicate.value.code == 'INVITATION_ALREADY_EXISTS'
+
+    assert admission.require_invitation({'id': 'i'}) == {'id': 'i'}
+    with _pytest.raises(NotFound):
+        admission.require_invitation(None)
+    admission.require_invitation_of_event({'event_id': 'e'}, 'e')
+    with _pytest.raises(NotFound) as elsewhere:
+        admission.require_invitation_of_event({'event_id': 'e'}, 'other')
+    assert elsewhere.value.code == 'INVITATION_NOT_FOUND'
+
+    assert admission.require_active_entitlement({'id': 1}) == {'id': 1}
+    with _pytest.raises(Conflict) as none_left:
+        admission.require_active_entitlement(None)
+    assert none_left.value.code == 'ENTITLEMENT_NOT_FOUND'
+    admission.require_consumed(True)
+    with _pytest.raises(Conflict) as used:
+        admission.require_consumed(False)
+    assert used.value.code == 'ADMISSION_ALREADY_USED'
+    admission.require_new_guest_list(True)
+    with _pytest.raises(Conflict):
+        admission.require_new_guest_list(False)
+
+    seen = {'+967771111111'}
+    admission.require_unique_in_file('+967772222222', seen)
+    with _pytest.raises(InvalidInput) as repeated:
+        admission.require_unique_in_file('+967771111111', seen)
+    assert repeated.value.code == 'DUPLICATE_PHONE_IN_FILE'
+
+    admission.require_direct_registration_open(False)
+    with _pytest.raises(Conflict) as closed:
+        admission.require_direct_registration_open(True)
+    assert closed.value.code == 'ADMISSION_REGISTRATION_REQUIRED'

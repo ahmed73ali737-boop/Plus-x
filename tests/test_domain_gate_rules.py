@@ -53,3 +53,13 @@ def test_unmanaged_scan_admits_one_person():
     require_unmanaged_quantity(1)
     with pytest.raises(InvalidInput):
         require_unmanaged_quantity(2)
+
+
+def test_a_pass_number_must_belong_to_a_registered_guest():
+    from app.domain import NotFound
+    from app.domain.gate import require_registered_guest
+    guest = {'id': 'g'}
+    assert require_registered_guest(guest) is guest
+    with pytest.raises(NotFound) as error:
+        require_registered_guest(None)
+    assert error.value.code == 'GUEST_NOT_REGISTERED'

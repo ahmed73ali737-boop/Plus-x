@@ -175,3 +175,37 @@ def test_legacy_access_request_status_and_lookup():
     with pytest.raises(NotFound) as missing:
         require_access_request(None)
     assert missing.value.code == 'ACCESS_REQUEST_NOT_FOUND'
+
+
+def test_public_event_publication_and_visibility_guards():
+    from app.domain.sites import (
+        require_discoverable, require_event_record, require_event_target, require_publication_advanced,
+        require_published_config, require_published_event, require_site_version)
+    event = {'kind': 'event', 'published_version': 2}
+    assert require_event_target(event) is event and require_event_record(event) is event
+    for site in (None, {'kind': 'agency'}):
+        with pytest.raises(NotFound) as target:
+            require_event_target(site)
+        assert target.value.code == 'EVENT_REQUIRED'
+        with pytest.raises(NotFound) as record:
+            require_event_record(site)
+        assert record.value.code == 'EVENT_NOT_FOUND'
+    assert require_published_event(event, {'config': {}}) == {'config': {}}
+    for unpublished, version in (({'published_version': 0}, {'config': {}}), (event, None)):
+        with pytest.raises(NotFound) as hidden:
+            require_published_event(unpublished, version)
+        assert hidden.value.code == 'EVENT_NOT_PUBLISHED'
+    assert require_published_config({'title': 'x'}) == {'title': 'x'}
+    for check in (require_published_config, require_site_version):
+        with pytest.raises(NotFound) as error:
+            check(None)
+        assert error.value.code == 'NOT_PUBLISHED'
+    require_publication_advanced(True)
+    with pytest.raises(Conflict) as stale:
+        require_publication_advanced(False)
+    assert stale.value.code == 'VERSION_CONFLICT'
+    require_discoverable('public')
+    require_discoverable('unlisted')
+    with pytest.raises(NotFound) as private:
+        require_discoverable('private')
+    assert private.value.code == 'SITE_NOT_FOUND'
