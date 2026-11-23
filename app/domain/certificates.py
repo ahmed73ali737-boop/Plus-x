@@ -18,7 +18,7 @@ from hashlib import sha256
 from typing import Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app.domain.errors import Conflict, Gone, fail
+from app.domain.errors import Conflict, Gone, NotFound, fail
 from app.domain.values import number, stamp, text
 
 FIELDS = ('participant_name', 'course_title', 'issuer_name', 'grade', 'training_hours', 'issue_date', 'serial')
@@ -244,3 +244,46 @@ class Certificate:
     def replacement_award_key(original: dict) -> str:
         """A correction of this exact issue, not another independent award."""
         return 'replacement/' + original['id']
+
+
+# Orchestration guards -----------------------------------------------------------------------
+
+MAX_PUBLIC_LOOKUP_LENGTH = 120
+
+
+def require_certificate(row: dict | None) -> dict:
+    if not row:
+        fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return row
+
+
+def require_template(template: dict | None) -> dict:
+    if not template:
+        fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
+    return template
+
+
+def public_lookup_value(value: str) -> str:
+    """Serial/token lookups are bounded; an over-long value cannot exist and is concealed."""
+    if len(value) > MAX_PUBLIC_LOOKUP_LENGTH:
+        fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return value
+
+
+def concurrent_issue_winner(winner: dict | None, request_hash: str) -> dict:
+    """An insert that lost a race returns the committed winner only for the identical request;
+    any other request for the same award is a conflict, never a duplicate certificate."""
+    if winner and winner['request_hash'] == request_hash:
+        return winner
+    fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', Conflict)
+
+
+def require_same_replacement(existing_link: dict, replacement_id: str) -> None:
+    """A certificate can be replaced once; a second, different replacement is refused."""
+    if existing_link['replacement_id'] != replacement_id:
+        fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+
+
+def require_replacement_recorded(recorded: bool) -> None:
+    if not recorded:
+        fail('CERTIFICATE_ALREADY_REPLACED', Conflict)

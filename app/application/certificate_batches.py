@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from app.application import certificate_service as svc
 from app.application.audit_service import new_id, write_audit
 from app.application.ports import persistence
-from app.domain import Conflict, DomainError, NotFound, fail, now, text
+from app.domain import DomainError, now, text
 from app.domain import certificate_imports as imports
 from app.domain.certificate_imports import IssuanceBatch
 from app.xlsx_reader import Rejected, parse_xlsx
@@ -24,11 +24,11 @@ def _table(body):
         if imports.table_kind(filename) == 'xlsx':
             workbook = parse_xlsx(raw)['workbook']
             if len(workbook) != 1:
-                fail('IMPORT_ONE_SHEET_REQUIRED')
+                imports.require_single_sheet(workbook)
             return next(iter(workbook.values()))
         return list(csv.reader(io.StringIO(raw.decode('utf-8-sig'))))
     except (Rejected, ValueError, KeyError, UnicodeDecodeError, csv.Error):
-        fail('CERTIFICATE_IMPORT_INVALID')
+        imports.unreadable_table()
 
 
 def preview(tx, event_id, user_id, body):
@@ -40,8 +40,7 @@ def preview(tx, event_id, user_id, body):
     imports.check_mapping(mapping, headers)
     zone = svc.issue_timezone(body.get('timezone'))
     template_id = text(body.get('template_id'), 64, True)
-    if not persistence.certificates.template(tx, event_id, template_id):
-        fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
+    imports.require_import_template(persistence.certificates.template(tx, event_id, template_id))
     rows, errors = imports.preview_rows(
         values, headers, mapping, template_id=template_id, timezone_name=zone,
         award_exists=lambda recipient, award: persistence.certificates.award_exists(tx, event_id, recipient, award))
@@ -57,8 +56,7 @@ def commit(tx, event_id, user_id, body):
         return {'import_id': row['id'], 'queued_count': len(row['rows']), 'replayed': True}
     IssuanceBatch.require_committable(row, datetime.now(timezone.utc))
     available = IssuanceBatch.available_at(body.get('available_at'), now())
-    if not persistence.certificates.mark_import_committed(tx, row['id'], now()):
-        fail('IMPORT_ALREADY_COMMITTED', Conflict)
+    imports.require_commit_recorded(persistence.certificates.mark_import_committed(tx, row['id'], now()))
     for index, payload in enumerate(row['rows']):
         persistence.certificates.add_job(tx, {
             'id': new_id(), 'import_id': row['id'], 'event_id': event_id, 'user_id': user_id,

@@ -93,3 +93,25 @@ def test_availability_is_canonical_utc_and_request_keys_are_per_row():
     with pytest.raises(InvalidInput):
         IssuanceBatch.available_at('2026-10-19T15:00:00', 'x')
     assert IssuanceBatch.request_key('imp', 3) == 'imp:3'
+
+
+def test_workbook_shape_template_and_commit_guards():
+    import pytest as _pytest
+    from app.domain import Conflict, InvalidInput, NotFound
+    from app.domain.certificate_imports import (
+        require_commit_recorded, require_import_template, require_single_sheet, unreadable_table)
+    require_single_sheet({'a': []})
+    for workbook in ({}, {'a': [], 'b': []}):
+        with _pytest.raises(InvalidInput) as sheets:
+            require_single_sheet(workbook)
+        assert sheets.value.code == 'IMPORT_ONE_SHEET_REQUIRED'
+    with _pytest.raises(InvalidInput) as unreadable:
+        unreadable_table()
+    assert unreadable.value.code == 'CERTIFICATE_IMPORT_INVALID'
+    assert require_import_template({'id': 't'}) == {'id': 't'}
+    with _pytest.raises(NotFound):
+        require_import_template(None)
+    require_commit_recorded(True)
+    with _pytest.raises(Conflict) as committed:
+        require_commit_recorded(False)
+    assert committed.value.code == 'IMPORT_ALREADY_COMMITTED'

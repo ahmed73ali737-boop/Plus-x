@@ -5,13 +5,16 @@ from app.application import access
 from app.application.audit_service import new_id
 from app.application.ports import persistence
 from app.core.security import digest
-from app.domain import NotFound, Unauthenticated, fail, now, text
+from app.domain import now, text
 from app.domain.devices import (
     DEVICE_STATUSES,
     DEVICE_TYPES,
     device_changes,
     device_type,
     heartbeat_values,
+    require_device,
+    require_device_of_site,
+    require_device_token,
     require_gate_device,
     require_usable,
     validate_device_metadata,
@@ -50,25 +53,18 @@ def list_devices(tx, site_id: str):
 
 
 def site_device(tx, site_id: str, device_id: str) -> dict:
-    device = persistence.devices.get(tx, device_id)
-    if not device or device['site_id'] != site_id:
-        fail('DEVICE_NOT_FOUND', NotFound)
-    return device
+    return require_device_of_site(persistence.devices.get(tx, device_id), site_id)
 
 
 def update_device(tx, device_id: str, *, status=None, name=None, app_version=None, metadata_json=None):
-    device = persistence.devices.get(tx, device_id, for_update=True)
-    if not device:
-        fail('DEVICE_NOT_FOUND', NotFound)
+    device = require_device(persistence.devices.get(tx, device_id, for_update=True))
     values = device_changes(status=status, name=name, app_version=app_version, metadata_json=metadata_json)
     persistence.devices.update(tx, device_id, values)
     return {**device, **values}
 
 
 def authenticate_device(tx, raw_token: str, *, for_update: bool = False):
-    if not raw_token:
-        fail('DEVICE_TOKEN_REQUIRED', Unauthenticated)
-    device = persistence.devices.by_token_hash(tx, digest(raw_token), for_update=for_update)
+    device = persistence.devices.by_token_hash(tx, digest(require_device_token(raw_token)), for_update=for_update)
     # Shift windows use the same authorization clock as staff assignments.
     return require_usable(device, access.now())
 
