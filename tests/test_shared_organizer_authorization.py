@@ -1,7 +1,7 @@
 """Real unit tests for the optional canonical AND gate (no provider fixtures disguised as SIT)."""
 import pytest
-from fastapi import HTTPException
-
+from app.domain import DomainError
+from app.api.errors import http_status
 from app.application.shared_authorization import (
     SharedOrganizerDecision, authorize_organizer_action,
 )
@@ -25,9 +25,9 @@ class DecisionPort:
 
 
 def expect_deny(code, status, action):
-    with pytest.raises(HTTPException) as caught:
+    with pytest.raises(DomainError) as caught:
         action()
-    assert caught.value.status_code == status
+    assert http_status(caught.value) == status
     assert caught.value.detail == code
 
 

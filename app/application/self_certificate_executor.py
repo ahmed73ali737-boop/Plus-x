@@ -3,7 +3,7 @@ import json, os, socket, struct, subprocess, sys, time
 from app.application.self_certificate_slots import try_lock
 from app.application.self_certificate_sandbox import clean_environment
 from app.application.self_certificate_supervisor import socket_path,receive,MAX_OUTPUT
-from app.domain import fail
+from app.domain import fail, Unavailable
 
 def connect_supervisor(root):
     path=socket_path(root)
@@ -27,7 +27,7 @@ def connect_supervisor(root):
                     stderr=subprocess.DEVNULL,start_new_session=True)
             finally:os.close(fd)
         time.sleep(.05)
-    fail('CERTIFICATE_RENDER_UNAVAILABLE',503)
+    fail('CERTIFICATE_RENDER_UNAVAILABLE', Unavailable)
 
 def shutdown(root):
     """Explicit isolated maintenance only; never starts a missing supervisor."""
@@ -46,12 +46,12 @@ def shutdown(root):
 
 def execute(payload):
     encoded=json.dumps(payload,ensure_ascii=False,separators=(',',':')).encode()
-    if len(encoded)>200_000:fail('CERTIFICATE_RENDER_UNAVAILABLE',503)
+    if len(encoded)>200_000:fail('CERTIFICATE_RENDER_UNAVAILABLE', Unavailable)
     from pathlib import Path
     connection=connect_supervisor(Path(payload['root']))
     try:
         connection.sendall(struct.pack('!Q',len(encoded))+encoded)
         return receive(connection,MAX_OUTPUT)
     except (OSError,ValueError):
-        fail('CERTIFICATE_RENDER_UNAVAILABLE',503)
+        fail('CERTIFICATE_RENDER_UNAVAILABLE', Unavailable)
     finally:connection.close()

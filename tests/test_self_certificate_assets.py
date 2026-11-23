@@ -5,7 +5,7 @@ import struct
 import zlib
 import pytest
 from PIL import Image,ImageCms,PngImagePlugin
-from fastapi import HTTPException
+from app.domain import DomainError
 from app.application.self_certificate_assets import validate_upload,ingest_asset
 from app.application.self_certificate_storage import CertificateStore
 from tests.test_self_certificate_data import db
@@ -79,25 +79,25 @@ def test_exact_byte_boundaries_are_enforced_before_decode(kind,maximum):
     data=image_bytes()
     normalized,_=validate_upload(data+b' '*(maximum-len(data)),kind)
     assert normalized.startswith(b'\x89PNG')
-    with pytest.raises(HTTPException) as exc:validate_upload(data+b' '*(maximum+1-len(data)),kind)
+    with pytest.raises(DomainError) as exc:validate_upload(data+b' '*(maximum+1-len(data)),kind)
     assert exc.value.detail==('STAMP_TOO_LARGE' if kind=='stamp' else 'BACKGROUND_TOO_LARGE')
 
 @pytest.mark.parametrize('data,kind,code',[(b'<svg></svg>','background','IMAGE_DECODE_FAILED'),
     (b'not an image','stamp','IMAGE_DECODE_FAILED'),(image_bytes('JPEG'),'stamp','STAMP_PNG_REQUIRED'),
     (image_bytes()[:70],'background','IMAGE_DECODE_FAILED')])
 def test_forged_truncated_and_disallowed_files_are_rejected(data,kind,code):
-    with pytest.raises(HTTPException) as exc:validate_upload(data,kind)
+    with pytest.raises(DomainError) as exc:validate_upload(data,kind)
     assert exc.value.detail==code
 
 def test_animated_png_and_bomb_header_are_rejected():
     stream=BytesIO();im=Image.new('RGBA',(50,50),'red')
     im.save(stream,format='PNG',save_all=True,append_images=[Image.new('RGBA',(50,50),'blue')])
-    with pytest.raises(HTTPException) as exc:validate_upload(stream.getvalue(),'background')
+    with pytest.raises(DomainError) as exc:validate_upload(stream.getvalue(),'background')
     assert exc.value.detail=='ANIMATED_IMAGE_UNSUPPORTED'
     ihdr=struct.pack('>IIBBBBB',6000,3001,8,2,0,0,0)
     chunk=b'IHDR'+ihdr
     bomb=b'\x89PNG\r\n\x1a\n'+struct.pack('>I',len(ihdr))+chunk+struct.pack('>I',zlib.crc32(chunk))+b'\x00\x00\x00\x00IDAT'+struct.pack('>I',zlib.crc32(b'IDAT'))
-    with pytest.raises(HTTPException) as exc:validate_upload(bomb,'background')
+    with pytest.raises(DomainError) as exc:validate_upload(bomb,'background')
     assert exc.value.detail=='IMAGE_PIXEL_LIMIT'
 
 def test_single_pdf_renders_once_at_bounded_dpi_and_obeys_background_only_ratio():
@@ -106,18 +106,18 @@ def test_single_pdf_renders_once_at_bounded_dpi_and_obeys_background_only_ratio(
     assert len(output)<=2*len(data) and info['source_metadata']['dpi']==300
     assert info['source_metadata']['minimum_dpi']==150
     assert abs(info['width']/info['height']-595/842)<.001
-    with pytest.raises(HTTPException) as exc:validate_upload(pdf_bytes(),'background')
+    with pytest.raises(DomainError) as exc:validate_upload(pdf_bytes(),'background')
     assert exc.value.detail=='PDF_SIZE_QUALITY_CONFLICT'
 
 @pytest.mark.parametrize('password',['','synthetic-password'])
 def test_all_encrypted_pdf_including_blank_password_are_rejected(password):
-    with pytest.raises(HTTPException) as exc:validate_upload(pdf_bytes(password=password),'background')
+    with pytest.raises(DomainError) as exc:validate_upload(pdf_bytes(password=password),'background')
     assert exc.value.detail=='PDF_ENCRYPTED'
 
 def test_multiple_page_invalid_pdf_and_pdf_stamp_rejected():
     for data,kind,code in [(pdf_bytes(2),'background','PDF_ONE_PAGE_REQUIRED'),
         (b'%PDF-broken','background','PDF_INVALID'),(pdf_bytes(),'stamp','STAMP_PNG_REQUIRED')]:
-        with pytest.raises(HTTPException) as exc:validate_upload(data,kind)
+        with pytest.raises(DomainError) as exc:validate_upload(data,kind)
         assert exc.value.detail==code
 
 def test_ingestion_uses_active_account_ownership_and_private_integrity_store(db,tmp_path):
@@ -155,5 +155,5 @@ def test_pdf_photographic_background_uses_bounded_jpeg_candidate():
     assert info['source_metadata']['quality'] in (95,90,85)
 
 def test_invalid_icc_profile_is_rejected_instead_of_silently_miscolored():
-    with pytest.raises(HTTPException) as exc:validate_upload(image_bytes(icc_profile=b'invalid-icc'),'background')
+    with pytest.raises(DomainError) as exc:validate_upload(image_bytes(icc_profile=b'invalid-icc'),'background')
     assert exc.value.detail=='IMAGE_COLOR_PROFILE_INVALID'

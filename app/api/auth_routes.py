@@ -1,31 +1,85 @@
-"""Direct phone/password signup. No OTP or unauthenticated password resets."""
-from datetime import datetime, timedelta, timezone
+"""HTTP adapter: login sessions, passwords and account administration.
 
+Direct phone/password signup. No OTP or unauthenticated password resets.
+"""
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import delete, insert, select, update
-from sqlalchemy.exc import IntegrityError
 
-from app.application.access import require_scope
-from app.application.audit_service import new_id, write_audit
-from app.application.phone_accounts import account_phone, bind_phone, find_by_phone, principal, public_user
-from app.core.security import digest, hash_password, new_csrf_token, new_session_token, new_temporary_password, verify_password
-from app.db import sessions, users
-from app.domain import fail, text
+from app.api.errors import install_error_handlers
+from app.application import account_requests as account_request_service
+from app.application import account_service as accounts
+from app.application.phone_accounts import account_phone
+from app.core.security import hash_password
+from app.domain import Conflict, Forbidden, fail
+from app.domain.accounts import check_registration_passwords
+
+SESSION_COOKIE = 'px_session'
+SESSION_MAX_AGE = 28800
 
 
-def session_response(app, conn, user):
-    token, csrf = new_session_token(), new_csrf_token()
-    conn.execute(insert(sessions).values(token_hash=digest(token), user_id=user['id'], csrf=csrf,
-        expires_at=(datetime.now(timezone.utc) + timedelta(hours=8)).isoformat()))
-    write_audit(conn, user, user['scope_id'], 'login')
-    response = JSONResponse({'user': public_user(conn, user), 'csrf': csrf})
-    response.set_cookie('px_session', token, httponly=True, secure=app.state.cookie_secure,
-                        samesite='strict', max_age=28800, path='/')
+def session_response(app, tx, user):
+    token, body = accounts.open_session(tx, user)
+    response = JSONResponse(body)
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=app.state.cookie_secure,
+                        samesite='strict', max_age=SESSION_MAX_AGE, path='/')
     return response
 
 
+def _signed_out(body: dict) -> JSONResponse:
+    response = JSONResponse(body)
+    response.delete_cookie(SESSION_COOKIE, path='/')
+    return response
+
+
+def install_session_routes(app, engine, identify, dummy_hash: str):
+    """Login, current account, logout, session summary and password change."""
+    install_error_handlers(app)
+
+    @app.post('/api/auth/login')
+    def login(body: dict, request: Request):
+        with engine.begin() as tx:
+            user = accounts.authenticate(tx, body, dummy_hash)
+            return session_response(app, tx, user)
+
+    @app.get('/api/auth/me')
+    def me(request: Request):
+        with engine.connect() as tx:
+            user, session = identify(request, tx)
+            return accounts.current_account(tx, user, session)
+
+    @app.post('/api/auth/logout')
+    def logout(request: Request):
+        with engine.begin() as tx:
+            _, session = identify(request, tx, True)
+            accounts.logout(tx, session)
+        return _signed_out({'ok': True})
+
+    @app.get('/api/auth/sessions')
+    def my_sessions(request: Request):
+        """Return an owner-only session summary, never session hashes or CSRF secrets."""
+        with engine.connect() as tx:
+            user, session = identify(request, tx)
+            return accounts.session_summary(tx, user, session)
+
+    @app.post('/api/auth/sessions/revoke-all')
+    def revoke_all_my_sessions(request: Request):
+        """Explicit account-wide revoke; CSRF and identity checks precede mutation."""
+        with engine.begin() as tx:
+            user, _ = identify(request, tx, True)
+            revoked = accounts.revoke_all_sessions(tx, user)
+        return _signed_out({'ok': True, 'revoked_sessions': revoked})
+
+    @app.post('/api/auth/password')
+    def change_password(body: dict, request: Request):
+        with engine.begin() as tx:
+            user, _ = identify(request, tx, True)
+            accounts.change_password(tx, user, body)
+        return _signed_out({'ok': True})
+
+
 def install_auth_routes(app, engine, identify):
+    install_error_handlers(app)
+
     @app.get('/api/auth/options')
     def options():
         return {'authentication': 'phone_password', 'verification_required': False, 'approval_required': True,
@@ -34,88 +88,50 @@ def install_auth_routes(app, engine, identify):
 
     @app.post('/api/auth/register')
     def register(body: dict):
-        from app.application import account_requests as service
-        phone=account_phone(body.get('phone'))
-        if body.get('password')!=body.get('confirmation'):fail('PASSWORD_CONFIRMATION_MISMATCH')
+        phone = account_phone(body.get('phone'))
+        check_registration_passwords(body)
         # Validate policy before persisting the pending identity; never issue a session.
         hash_password(body.get('password'))
-        with engine.begin() as conn:
-            return service.submit(conn,actor=None,body={**body,'phone':phone,'email':None},purpose='personal',scope_type='site',scope_id='platform',role='member')
+        with engine.begin() as tx:
+            return account_request_service.submit(tx, actor=None, body={**body, 'phone': phone, 'email': None},
+                                                  purpose='personal', scope_type='site', scope_id='platform',
+                                                  role='member')
 
     @app.post('/api/auth/phone')
     def add_my_phone(body: dict, request: Request):
         phone = account_phone(body.get('phone'))
         try:
-            with engine.begin() as conn:
-                user, _ = identify(request, conn, True)
-                if not verify_password(body.get('current'), user['password_hash']):
-                    fail('INVALID_CREDENTIALS', 401)
-                bind_phone(conn, user['id'], phone)
-                # A new login identifier ends other sessions, including this one.
-                conn.execute(delete(sessions).where(sessions.c.user_id == user['id']))
-                write_audit(conn, user, user['scope_id'], 'phone_login_added')
-        except IntegrityError:
-            fail('PHONE_ALREADY_REGISTERED', 409)
-        response = JSONResponse({'ok': True, 'phone': phone, 'login_required': True})
-        response.delete_cookie('px_session', path='/')
-        return response
+            with engine.begin() as tx:
+                user, _ = identify(request, tx, True)
+                accounts.add_phone_login(tx, user, phone, body.get('current'))
+        except Exception as error:
+            if not accounts.is_conflict(error):
+                raise
+            fail('PHONE_ALREADY_REGISTERED', Conflict)
+        return _signed_out({'ok': True, 'phone': phone, 'login_required': True})
 
     @app.post('/api/auth/password/reset')
     def unauthenticated_reset_unavailable():
         # Knowing a phone number must never be enough to replace a password.
-        fail('RECOVERY_REQUIRES_ADMIN', 403)
+        fail('RECOVERY_REQUIRES_ADMIN', Forbidden)
 
     @app.post('/api/admin/users/{user_id}/password/reset')
     def admin_reset(user_id: str, request: Request):
-        with engine.begin() as conn:
-            actor, _ = identify(request, conn, True)
-            if actor['role'] not in ('platform', 'organizer'):
-                fail('FORBIDDEN_ROLE', 403)
-            target = conn.execute(select(users).where(users.c.id == user_id).with_for_update()).mappings().first()
-            if not target:
-                fail('USER_NOT_FOUND', 404)
-            if actor['role'] != 'platform':
-                if target['role'] not in ('agency', 'member') or not target['scope_id']:
-                    fail('FORBIDDEN_ROLE', 403)
-                require_scope(conn, actor, target['scope_id'])
-            if not target['active']:
-                fail('ACCOUNT_SUSPENDED', 409)
-            if target['id'] == actor['id']:
-                fail('USE_CURRENT_PASSWORD_CHANGE', 409)
-            temporary = new_temporary_password()
-            conn.execute(update(users).where(users.c.id == user_id).values(
-                password_hash=hash_password(temporary), must_change_password=1))
-            conn.execute(delete(sessions).where(sessions.c.user_id == user_id))
-            write_audit(conn, actor, target['scope_id'], 'admin_password_reset', {'target_user_id': user_id})
+        with engine.begin() as tx:
+            actor, _ = identify(request, tx, True)
+            temporary = accounts.admin_reset_password(tx, actor, user_id)
         return {'temporary_password': temporary, 'must_change_password': True, 'shown_once': True}
 
     @app.get('/api/admin/users')
     def lookup_user(phone: str, request: Request):
-        with engine.connect() as conn:
-            actor, _ = identify(request, conn)
-            if actor['role'] != 'platform':
-                fail('FORBIDDEN_ROLE', 403)
-            target = find_by_phone(conn, phone)
-            return {'users': [{**public_user(conn, target), 'active': bool(target['active'])}] if target else []}
+        with engine.connect() as tx:
+            actor, _ = identify(request, tx)
+            return {'users': accounts.lookup_by_phone(tx, actor, phone)}
 
     @app.patch('/api/admin/users/{user_id}')
     def set_account_status(user_id: str, body: dict, request: Request):
-        with engine.begin() as conn:
-            actor, _ = identify(request, conn, True)
-            if actor['role'] != 'platform':
-                fail('FORBIDDEN_ROLE', 403)
-            active = body.get('active')
-            if not isinstance(active, bool):
-                fail('USER_STATUS_INVALID')
-            if user_id == actor['id']:
-                fail('CANNOT_SUSPEND_SELF', 409)
-            target = conn.execute(select(users).where(users.c.id == user_id).with_for_update()).mappings().first()
-            if not target:
-                fail('USER_NOT_FOUND', 404)
-            conn.execute(update(users).where(users.c.id == user_id).values(active=int(active)))
-            if not active:
-                from app.account_requests_db import request_workflows
-                conn.execute(update(request_workflows).where(request_workflows.c.user_id==user_id).values(setup_expires_at=None))
-                conn.execute(delete(sessions).where(sessions.c.user_id == user_id))
-            write_audit(conn, actor, target['scope_id'], 'user_status_changed', {'user_id': user_id, 'active': active})
+        active = body.get('active')
+        with engine.begin() as tx:
+            actor, _ = identify(request, tx, True)
+            accounts.set_account_status(tx, actor, user_id, active)
         return {'id': user_id, 'active': active, 'sessions_revoked': not active}

@@ -1,7 +1,5 @@
 from app.domain import normalize_record, normalize_config, answer_value, default_config
-from fastapi import HTTPException
-
-
+from app.domain import DomainError
 def test_time_question_is_native_type_and_validated():
     q=normalize_record({'kind':'question','code':'visit-time','title':'وقت الزيارة','qtype':'time','form_id':'main','required':True})
     assert q['qtype']=='time'
@@ -9,7 +7,7 @@ def test_time_question_is_native_type_and_validated():
     try:
         answer_value(q,'29:99')
         assert False
-    except HTTPException as e:
+    except DomainError as e:
         assert e.detail=='TIME_INVALID'
 
 

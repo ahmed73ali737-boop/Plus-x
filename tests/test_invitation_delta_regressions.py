@@ -187,11 +187,12 @@ def test_analytics_assignment_can_read_metrics_without_site_editing(api, role):
     ('bad.csv', b'name,phone\n' + b'One,777881001\n' * 1001, 'IMPORT_ROWS_1_TO_1000'),
 ])
 def test_invitation_parser_rejects_unsafe_or_out_of_contract_files(filename, content, expected):
-    from fastapi import HTTPException
+    from app.domain import DomainError
+    from app.api.errors import http_status
     from app.application.invitation_service import parse_guest_file
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(DomainError) as exc:
         parse_guest_file(filename, base64.b64encode(content).decode())
-    assert exc.value.status_code == 422 and exc.value.detail == expected
+    assert http_status(exc.value) == 422 and exc.value.detail == expected
 
 
 
@@ -248,8 +249,9 @@ def test_valid_xlsx_invitation_preview_and_commit(api):
     ({'multiple': True}, 'IMPORT_ONE_SHEET_REQUIRED'),
 ])
 def test_invitation_workbook_active_content_and_multiple_sheets_are_rejected(options, expected):
-    from fastapi import HTTPException
+    from app.domain import DomainError
+    from app.api.errors import http_status
     from app.application.invitation_service import parse_guest_file
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(DomainError) as exc:
         parse_guest_file('synthetic.xlsx', invitation_workbook(**options))
-    assert exc.value.status_code == 422 and exc.value.detail == expected
+    assert http_status(exc.value) == 422 and exc.value.detail == expected

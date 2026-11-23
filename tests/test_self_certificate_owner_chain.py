@@ -5,7 +5,7 @@ from sqlalchemy import insert, update, select, func
 from sqlalchemy.exc import DBAPIError
 from tests.test_self_certificate_data import db, model, link
 from app.self_certificates_db import models,revisions,links,requests,browser_sessions,assets,certificates,exports,export_snapshot_rows
-from app.application.self_certificate_integrity import preflight, require_clean
+from app.infrastructure.persistence.self_certificate_integrity import preflight, require_clean
 
 
 def owner_fixture(conn):
@@ -77,7 +77,7 @@ def test_read_only_preflight_reports_existing_violation_without_reassigning(db):
     if db.dialect.name!='sqlite':
         pytest.skip('The PostgreSQL legacy upgrade witness is tested separately')
     from app.db import make_engine
-    from app.application.self_certificate_integrity import CHECKS
+    from app.infrastructure.persistence.self_certificate_integrity import CHECKS
     import app.self_certificates_db as schema
     a,_,_,_,_=owner_fixture(db)
     engine=make_engine('sqlite:///:memory:')

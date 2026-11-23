@@ -6,6 +6,7 @@ from app.server import create_app
 from app.db import audit, sites
 from app.domain import default_config
 from app.application.audit_service import AuditedDenial, DenialAuditWriter
+from app.domain import Forbidden
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def test_rollback_then_independent_audit_commit(system):
     def denied():
         with app.state.engine.begin() as conn:
             conn.execute(insert(sites).values(id='rolled-back',slug='rolled-back',kind='event',draft=default_config('Rollback','event'),draft_rev=1,published_version=0))
-            raise AuditedDenial('FORBIDDEN_SCOPE',403,action='scope_denied',user={'id':'trusted-actor'},site_id='event-demo')
+            raise AuditedDenial('FORBIDDEN_SCOPE',Forbidden,action='scope_denied',user={'id':'trusted-actor'},site_id='event-demo')
     route = app.router.routes.pop()
     app.router.routes.insert(0, route)
     assert client.get('/api/test-denial').status_code == 403
@@ -67,17 +68,17 @@ def test_deduplication_expires_and_global_budget_is_bounded(system):
     clock = [0]
     writer = DenialAuditWriter(app.state.engine,clock=lambda:clock[0])
     for i in range(650):
-        writer.record(AuditedDenial('FORBIDDEN_SCOPE',403,action='scope_denied',user={'id':str(i)},site_id='event-demo'))
+        writer.record(AuditedDenial('FORBIDDEN_SCOPE',Forbidden,action='scope_denied',user={'id':str(i)},site_id='event-demo'))
     assert len(rows(app)) == 600 and len(writer.recent) == 600
     assert writer.suppressed == 50
     clock[0] = 61
-    writer.record(AuditedDenial('FORBIDDEN_SCOPE',403,action='scope_denied',user={'id':'0'},site_id='event-demo'))
+    writer.record(AuditedDenial('FORBIDDEN_SCOPE',Forbidden,action='scope_denied',user={'id':'0'},site_id='event-demo'))
     assert len(rows(app)) == 601
 
 
 def test_same_denial_is_written_once(system):
     app, _ = system
-    denial = AuditedDenial('FORBIDDEN_SCOPE',403,action='scope_denied')
+    denial = AuditedDenial('FORBIDDEN_SCOPE',Forbidden,action='scope_denied')
     app.state.denial_audit.record(denial)
     app.state.denial_audit.record(denial)
     assert len(rows(app)) == 1

@@ -7,7 +7,7 @@ import json,os,time,threading
 import pytest
 from sqlalchemy import select,update,func
 from sqlalchemy.exc import DBAPIError
-from fastapi import HTTPException
+from app.domain import DomainError
 from PIL import Image
 from app.application import self_certificate_worker as worker,self_certificate_exports as exporter
 from app.application import self_certificate_rendering as renderer,self_certificate_branding as brand,self_certificate_fonts as fonts

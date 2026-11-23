@@ -1,7 +1,8 @@
 """Certificate policy is narrower than general organization/page editing."""
 import pytest
 from sqlalchemy import insert, update
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from app.db import make_engine, metadata, users, sites, organizations, memberships, event_participations, assignments
 from app.application.self_certificate_access import eligible_events, require_event, require_owner, require_capability, owner_can_accept
 
@@ -28,8 +29,8 @@ def test_event_scope_and_organization_owners_are_separate_from_event_management(
     assert ids(policy,'organizer')=={'ev-a'}
     assert ids(policy,'manager')=={'ev-a'}  # Ended event remains eligible.
     assert ids(policy,'other')==set()
-    with pytest.raises(HTTPException) as exc: require_event(policy,{'id':'manager'},'ev-b')
-    assert exc.value.status_code==403
+    with pytest.raises(DomainError) as exc: require_event(policy,{'id':'manager'},'ev-b')
+    assert http_status(exc.value)==403
     from app.application.access import event_permissions
     manager=dict(policy.execute(users.select().where(users.c.id=='manager')).mappings().one())
     assert 'certificates.issue' not in event_permissions(policy,manager,'ev-a')
@@ -54,23 +55,23 @@ def test_withdrawal_blocks_new_requests_but_owner_history_remains(policy,table):
     assert require_capability(policy,{'id':'manager'},'requests.export')['id']=='manager'
     if table is event_participations:
         assert require_capability(policy,{'id':'manager'},'models.manage')['id']=='manager'
-        with pytest.raises(HTTPException):require_event(policy,{'id':'manager'},'ev-a')
+        with pytest.raises(DomainError):require_event(policy,{'id':'manager'},'ev-a')
     else:
-        with pytest.raises(HTTPException): require_capability(policy,{'id':'manager'},'links.manage')
+        with pytest.raises(DomainError): require_capability(policy,{'id':'manager'},'links.manage')
 
 def test_suspension_and_password_change_are_rechecked_in_database(policy):
     assert owner_can_accept(policy,'manager','ev-a')
     policy.execute(update(users).where(users.c.id=='manager').values(active=0))
     assert not owner_can_accept(policy,'manager','ev-a')
-    with pytest.raises(HTTPException): require_owner(policy,{'id':'manager','active':1},'manager')
+    with pytest.raises(DomainError): require_owner(policy,{'id':'manager','active':1},'manager')
     policy.execute(update(users).where(users.c.id=='manager').values(active=1,must_change_password=1))
     assert not owner_can_accept(policy,'manager','ev-a')
 
 def test_owner_isolation_also_applies_to_platform_and_unknown_capabilities(policy):
     for user in ('other','platform'):
-        with pytest.raises(HTTPException) as exc: require_owner(policy,{'id':user},'manager')
-        assert exc.value.status_code==404
-    with pytest.raises(HTTPException): require_capability(policy,{'id':'platform'},'anything')
+        with pytest.raises(DomainError) as exc: require_owner(policy,{'id':user},'manager')
+        assert http_status(exc.value)==404
+    with pytest.raises(DomainError): require_capability(policy,{'id':'platform'},'anything')
 
 def test_v2_library_does_not_depend_on_events_or_participation(policy,monkeypatch):
     from sqlalchemy import delete
@@ -96,14 +97,14 @@ def test_v2_library_does_not_depend_on_events_or_participation(policy,monkeypatc
     assert repo.get_revision(policy,{'id':'manager'},v1['revision']['id'])['config']==default_config(1200,800)
     for other in ('platform','organizer'):
         assert repo.list_models(policy,{'id':other})['total']==0
-        with pytest.raises(HTTPException):repo.get_model(policy,{'id':other},v1['id'])
-        with pytest.raises(HTTPException):repo.owned_asset(policy,{'id':other},'v2-background')
-        with pytest.raises(HTTPException):repo.get_revision(policy,{'id':other},v1['revision']['id'])
+        with pytest.raises(DomainError):repo.get_model(policy,{'id':other},v1['id'])
+        with pytest.raises(DomainError):repo.owned_asset(policy,{'id':other},'v2-background')
+        with pytest.raises(DomainError):repo.get_revision(policy,{'id':other},v1['revision']['id'])
     v2=repo.save_model(policy,{'id':'manager'},name='تعديل',background_asset_id='v2-background',
         stamp_asset_id=None,config={**default_config(1200,800),'color':'#000000'},model_id=v1['id'],row_version=1)
     repo.delete_model(policy,{'id':'manager'},v2['id'],2)
     assert repo.list_models(policy,{'id':'manager'})['total']==0
-    with pytest.raises(HTTPException):access.require_event(policy,{'id':'manager'},'ev-a')
+    with pytest.raises(DomainError):access.require_event(policy,{'id':'manager'},'ev-a')
 
 def test_v2_direct_acceptance_does_not_scan_all_events(policy,monkeypatch):
     from app.application import self_certificate_access as access
@@ -120,20 +121,20 @@ def test_v2_library_without_participation_still_rejects_non_manager_roles(policy
     from app.application.self_certificate_access import require_library
     policy.execute(delete(event_participations))
     policy.execute(update(memberships).values(role=role))
-    with pytest.raises(HTTPException) as exc:require_library(policy,{'id':'manager'})
-    assert exc.value.status_code==403
+    with pytest.raises(DomainError) as exc:require_library(policy,{'id':'manager'})
+    assert http_status(exc.value)==403
 
 def test_v2_invalid_participant_input_rejected_before_any_request_or_job(policy):
     from sqlalchemy import select,func
     from app.self_certificates_db import requests,jobs
-    from app.application.self_certificate_contracts import parse_participant_input
+    from app.api.self_certificate_contracts import parse_participant_input
     payload=dict(name='محمد أحمد',phone='0770000000',consent=True,request_nonce='n'*32)
     for replacement in (False,None,'true',1):
-        with pytest.raises(HTTPException) as exc:parse_participant_input({**payload,'consent':replacement})
+        with pytest.raises(DomainError) as exc:parse_participant_input({**payload,'consent':replacement})
         assert exc.value.detail=='CONSENT_REQUIRED'
-    with pytest.raises(HTTPException) as exc:parse_participant_input({k:v for k,v in payload.items() if k!='consent'})
+    with pytest.raises(DomainError) as exc:parse_participant_input({k:v for k,v in payload.items() if k!='consent'})
     assert exc.value.detail=='CONSENT_REQUIRED'
     for replacement in ({'name':'   '},{'phone':'  '},{'owner_account_id':'spoof'}):
-        with pytest.raises(HTTPException):parse_participant_input({**payload,**replacement})
+        with pytest.raises(DomainError):parse_participant_input({**payload,**replacement})
     assert policy.execute(select(func.count()).select_from(requests)).scalar_one()==0
     assert policy.execute(select(func.count()).select_from(jobs)).scalar_one()==0

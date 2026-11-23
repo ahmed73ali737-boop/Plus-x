@@ -1,364 +1,289 @@
+"""Gate use cases: validate a pass, record entry/exit scans, build offline manifests.
+
+The rules (anti-passback, re-entry, checkpoint windows and guest types, offline
+clock/policy checks) live in app.domain.gate and app.domain.access_control;
+this module loads the aggregates, applies them and persists the outcome.
+"""
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
 import json
-from datetime import datetime, timezone
-
-from sqlalchemy import insert, select, update
-from fastapi import HTTPException
-from app.application.invitation_service import get_policy, lock_policy, entitlement_status, consume_entitlement
-from app.invitations_db import admission_uses
-from sqlalchemy.exc import IntegrityError
+from collections.abc import Mapping
+from datetime import datetime
 
 from app.application.audit_service import new_id
-from app.application.guest_service import event_guest_by_number, list_event_guests, staff_guest_view
-from app.db import guest_checkins, guest_presence, sites
-from app.domain import fail, now, text
+from app.application.guest_service import event_guest_by_number, list_event_guests
+from app.application.invitation_service import admission_use, consume_entitlement, entitlement_status, get_policy, lock_policy
+from app.application.ports import persistence
+from app.domain import DomainError, NotFound, fail, now, text
+from app.domain.access_control import AccessPolicy
+from app.domain.gate import (
+    ACCEPTED,
+    ENTRY,
+    EXIT,
+    PRESENCE_STATES,
+    SCAN_MODES,
+    VALIDATE,
+    GuestPresence,
+    admission_denial,
+    blocked_status,
+    checkpoint_key,
+    offline_scan_time,
+    require_invitation_when_managed,
+    require_scan_replay,
+    require_unmanaged_quantity,
+    require_valid_admission,
+    scan_mode,
+)
+from app.domain.guests import registration_status, staff_guest_view
 
-SCAN_MODES=("entry","exit","validate")
-PRESENCE_STATES=("outside","inside")
-TERMINAL_SCAN_STATUSES={"accepted","duplicate","already_inside","already_outside","valid","invalid"}
+__all__ = [
+    'PRESENCE_STATES', 'SCAN_MODES', 'access_config', 'access_policy_version', 'attendance_report',
+    'build_guest_manifest', 'checkin_overview', 'event_presence_map', 'guest_presence_state', 'record_checkin',
+    'validate_guest',
+]
 
 
-def _event(conn,event_or_id) -> dict:
-    if isinstance(event_or_id,Mapping):
+def _event(tx, event_or_id) -> dict:
+    if isinstance(event_or_id, Mapping):
         return dict(event_or_id)
-    event=conn.execute(select(sites).where(sites.c.id==event_or_id)).mappings().first()
-    if not event or event["kind"]!="event":
-        fail("EVENT_REQUIRED",404)
-    return dict(event)
+    event = persistence.sites.get(tx, event_or_id)
+    if not event or event['kind'] != 'event':
+        fail('EVENT_REQUIRED', NotFound)
+    return event
 
 
 def access_config(event: dict) -> dict:
-    draft=event.get("draft") if isinstance(event.get("draft"),dict) else {}
-    raw=draft.get("access_control") if isinstance(draft.get("access_control"),dict) else {}
-    return {
-        "anti_passback":raw.get("anti_passback",True) is not False,
-        "allow_reentry":raw.get("allow_reentry",True) is not False,
-        "manifest_max_age_minutes":int(raw.get("manifest_max_age_minutes") or 7200),
-        "guest_types":raw.get("guest_types") if isinstance(raw.get("guest_types"),list) else [
-            {"key":"visitor","label":"زائر"},{"key":"vip","label":"VIP"},{"key":"staff","label":"طاقم"},
-            {"key":"speaker","label":"متحدث"},{"key":"media","label":"إعلام"},{"key":"exhibitor","label":"عارض"},
-        ],
-        "checkpoints":raw.get("checkpoints") if isinstance(raw.get("checkpoints"),list) else [
-            {"key":"main","label":"البوابة الرئيسية","enabled":True,"allowed_guest_types":[],"start":"","end":""}
-        ],
-    }
+    return AccessPolicy.from_site_config(event.get('draft')).to_dict()
 
 
 def access_policy_version(access: dict) -> str:
-    source=json.dumps(access,ensure_ascii=False,sort_keys=True,separators=(",",":"))
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:20]
+    return AccessPolicy.from_site_config({'access_control': access}).version()
 
 
-def _scan_time(raw) -> datetime:
-    try:
-        value=datetime.fromisoformat(str(raw or ""))
-        if value.tzinfo is None:
-            value=value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
-    except (TypeError,ValueError):
-        fail("OFFLINE_SCAN_TIME_INVALID")
+def _presence(tx, event_id: str, guest_id: str) -> GuestPresence:
+    current = persistence.presence.get(tx, event_id, guest_id)
+    if current is not None:
+        return current
+    return persistence.presence.add_if_absent(tx, GuestPresence.new(event_id, guest_id, now()))
 
 
-def _checkpoint_rule(access: dict,key: str):
-    for item in access["checkpoints"]:
-        if item.get("key")==key:
-            return item
+def guest_presence_state(tx, event_id: str, guest_id: str) -> dict:
+    return _presence(tx, event_id, guest_id).to_record()
+
+
+def event_presence_map(tx, event_id: str) -> dict[str, dict]:
+    return persistence.presence.for_event(tx, event_id)
+
+
+def validate_guest(tx, event_or_id, guest_number: str, checkpoint: str = 'main', at_time: datetime | None = None,
+                   *, check_admission=True, body=None) -> dict:
+    event = _event(tx, event_or_id)
+    event_id = event['id']
+    guest = event_guest_by_number(tx, event_id, guest_number)
+    if not guest:
+        fail('GUEST_NOT_REGISTERED', NotFound)
+    presence = _presence(tx, event_id, guest['id']).state
+    view = staff_guest_view(guest)
+    policy = AccessPolicy.from_site_config(event.get('draft'))
+    reason = admission_denial(registration_status(guest), policy, checkpoint, guest.get('guest_type'), at_time)
+    if reason:
+        return {'status': 'invalid', 'reason': reason, 'guest': view, 'presence': presence}
+    admission = {'managed': False}
+    if check_admission:
+        try:
+            admission = entitlement_status(tx, event, guest, body)
+            require_invitation_when_managed(get_policy(tx, event_id)['enabled'], admission)
+        except DomainError as error:
+            return {'status': 'invalid', 'reason': error.code, 'guest': view, 'presence': presence}
+    return {
+        'status': 'valid', 'guest': view, 'presence': presence,
+        'checkpoint': policy.checkpoint_dict(checkpoint), 'access_control': policy.to_dict(), 'admission': admission,
+    }
+
+
+def _duplicate_scan_result(tx, event_id: str, guest_number: str, scan_id: str, mode: str, checkpoint: str,
+                           existing: dict, quantity=1) -> dict:
+    """An exact replay of an already recorded scan is idempotent; anything else conflicts."""
+    use = admission_use(tx, scan_id)
+    require_scan_replay(existing, use, event_id=event_id, guest_number=guest_number, mode=mode,
+                        checkpoint=checkpoint, quantity=quantity)
+    replay_guest = event_guest_by_number(tx, event_id, guest_number)
+    if not replay_guest:
+        fail('GUEST_NOT_REGISTERED', NotFound)
+    current = _presence(tx, event_id, replay_guest['id'])
+    return {
+        'scan_id': scan_id, 'status': 'duplicate', 'mode': existing['direction'], 'direction': existing['direction'],
+        'checkpoint': existing['checkpoint'], 'presence': current.state, 'guest': staff_guest_view(replay_guest),
+        'admission': {'managed': bool(use), 'quantity': use['quantity'] if use else 1},
+    }
+
+
+def record_checkin(tx, event_or_id, guest_number: str, body: dict, *, scanner_id: str | None, source: str) -> dict:
+    # Each scan is atomic even when the batch caller catches a rejected sibling.
+    with persistence.transactions.savepoint(tx):
+        return _record_checkin(tx, event_or_id, guest_number, body, scanner_id=scanner_id, source=source)
+
+
+def _replay(tx, event_id, guest_number, scan_id, mode, checkpoint, body):
+    existing = persistence.checkins.get(tx, scan_id)
+    if existing:
+        return _duplicate_scan_result(tx, event_id, guest_number, scan_id, mode, checkpoint, existing,
+                                      body.get('quantity', 1))
     return None
 
 
-def _in_window(rule: dict,current: datetime|None=None) -> bool:
-    current=current or datetime.now(timezone.utc)
-    for field,is_start in (("start",True),("end",False)):
-        raw=rule.get(field)
-        if not raw:
-            continue
-        try:
-            value=datetime.fromisoformat(raw)
-            if value.tzinfo is None:
-                value=value.replace(tzinfo=timezone.utc)
-        except (TypeError,ValueError):
-            return False
-        if is_start and current<value:
-            return False
-        if not is_start and current>=value:
-            return False
-    return True
+def _record_checkin(tx, event_or_id, guest_number: str, body: dict, *, scanner_id: str | None, source: str) -> dict:
+    event = _event(tx, event_or_id)
+    event_id = event['id']
+    mode = scan_mode(body.get('mode') or body.get('direction'))
+    checkpoint = checkpoint_key(body.get('checkpoint'))
 
+    # Resolve an exact replay before evaluating mutable access rules. If an ACK
+    # was lost, the same scan stays idempotent even after a gate closes or changes.
+    scan_id = None
+    if mode != VALIDATE:
+        scan_id = text(body.get('scan_id') or new_id(), 64, True)
+        replay = _replay(tx, event_id, guest_number, scan_id, mode, checkpoint, body)
+        if replay:
+            return replay
 
-def _ensure_presence(conn,event_id: str,guest_id: str) -> dict:
-    row=conn.execute(
-        select(guest_presence).where(
-            guest_presence.c.event_id==event_id,
-            guest_presence.c.guest_id==guest_id,
-        )
-    ).mappings().first()
-    if row:
-        return dict(row)
-    candidate={
-        "event_id":event_id,
-        "guest_id":guest_id,
-        "state":"outside",
-        "last_scan_id":None,
-        "last_direction":None,
-        "last_checkpoint":None,
-        "updated_at":now(),
-    }
-    try:
-        with conn.begin_nested():
-            conn.execute(insert(guest_presence).values(**candidate))
-        return candidate
-    except IntegrityError:
-        row=conn.execute(
-            select(guest_presence).where(
-                guest_presence.c.event_id==event_id,
-                guest_presence.c.guest_id==guest_id,
-            )
-        ).mappings().first()
-        if not row:
-            raise
-        return dict(row)
-
-
-def guest_presence_state(conn,event_id: str,guest_id: str) -> dict:
-    return _ensure_presence(conn,event_id,guest_id)
-
-
-def event_presence_map(conn,event_id: str) -> dict[str,dict]:
-    rows=conn.execute(select(guest_presence).where(guest_presence.c.event_id==event_id)).mappings()
-    return {row["guest_id"]:dict(row) for row in rows}
-
-
-def validate_guest(conn,event_or_id,guest_number: str,checkpoint: str="main",at_time: datetime|None=None,*,check_admission=True,body=None) -> dict:
-    event=_event(conn,event_or_id)
-    event_id=event["id"]
-    guest=event_guest_by_number(conn,event_id,guest_number)
-    if not guest:
-        fail("GUEST_NOT_REGISTERED",404)
-    presence=guest_presence_state(conn,event_id,guest["id"])["state"]
-    registration_status=guest.get("event_guest_status") or guest.get("status") or "registered"
-    if registration_status not in ("registered","active"):
-        return {"status":"invalid","reason":"GUEST_STATUS_"+str(registration_status).upper(),"guest":staff_guest_view(guest),"presence":presence}
-
-    access=access_config(event)
-    rule=_checkpoint_rule(access,checkpoint)
-    if not rule:
-        return {"status":"invalid","reason":"CHECKPOINT_NOT_FOUND","guest":staff_guest_view(guest),"presence":presence}
-    if rule.get("enabled") is False:
-        return {"status":"invalid","reason":"CHECKPOINT_DISABLED","guest":staff_guest_view(guest),"presence":presence}
-    if not _in_window(rule,at_time):
-        return {"status":"invalid","reason":"CHECKPOINT_WINDOW_CLOSED","guest":staff_guest_view(guest),"presence":presence}
-    allowed=rule.get("allowed_guest_types") or []
-    guest_type=guest.get("guest_type") or "visitor"
-    if allowed and guest_type not in allowed:
-        return {"status":"invalid","reason":"GUEST_TYPE_NOT_ALLOWED","guest":staff_guest_view(guest),"presence":presence}
-
-    admission={"managed":False}
-    if check_admission:
-        try:
-            admission=entitlement_status(conn,event,guest,body)
-            if get_policy(conn,event_id)["enabled"] and not admission["managed"]:
-                fail("INVITATION_REQUIRED",403)
-        except HTTPException as exc:
-            return {"status":"invalid","reason":exc.detail,"guest":staff_guest_view(guest),"presence":presence}
-    return {"status":"valid","guest":staff_guest_view(guest),"presence":presence,"checkpoint":rule,"access_control":access,"admission":admission}
-
-
-def _set_presence(conn,event_id: str,guest_id: str,state: str,scan_id: str,direction: str,checkpoint: str):
-    conn.execute(
-        update(guest_presence)
-        .where(guest_presence.c.event_id==event_id,guest_presence.c.guest_id==guest_id)
-        .values(state=state,last_scan_id=scan_id,last_direction=direction,last_checkpoint=checkpoint,updated_at=now())
-    )
-
-
-def _duplicate_scan_result(conn,event_id: str,guest_number: str,scan_id: str,mode: str,checkpoint: str,existing,quantity=1) -> dict:
-    existing=dict(existing)
-    use=conn.execute(select(admission_uses).where(admission_uses.c.scan_id==scan_id)).mappings().first()
-    if use and use["quantity"]!=quantity:
-        fail("SCAN_ID_CONFLICT",409)
-    if existing["event_id"]!=event_id or existing["guest_number"]!=guest_number.upper() or existing["direction"]!=mode or existing["checkpoint"]!=checkpoint:
-        fail("SCAN_ID_CONFLICT",409)
-    replay_guest=event_guest_by_number(conn,event_id,guest_number)
-    if not replay_guest:
-        fail("GUEST_NOT_REGISTERED",404)
-    current=guest_presence_state(conn,event_id,replay_guest["id"])
-    return {
-        "scan_id":scan_id,"status":"duplicate","mode":existing["direction"],"direction":existing["direction"],
-        "checkpoint":existing["checkpoint"],"presence":current["state"],"guest":staff_guest_view(replay_guest),
-        "admission":{"managed":bool(use),"quantity":use["quantity"] if use else 1},
-    }
-
-
-def record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: str|None,source: str) -> dict:
-    # Each scan is atomic even when the batch caller catches a rejected sibling.
-    with conn.begin_nested():
-        return _record_checkin(conn,event_or_id,guest_number,body,scanner_id=scanner_id,source=source)
-
-
-def _record_checkin(conn,event_or_id,guest_number: str,body: dict,*,scanner_id: str|None,source: str) -> dict:
-    event=_event(conn,event_or_id)
-    event_id=event["id"]
-    mode=body.get("mode") or body.get("direction") or "entry"
-    if mode not in SCAN_MODES:
-        fail("SCAN_MODE_INVALID")
-    checkpoint=text(body.get("checkpoint") or "main",40,True)
-
-    # Resolve exact replay before evaluating mutable access rules. If an ACK was
-    # lost, the same scan remains idempotent even after a gate closes or changes.
-    if mode!="validate":
-        scan_id=text(body.get("scan_id") or new_id(),64,True)
-        existing=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
-        if existing:
-            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,existing,body.get("quantity",1))
-
-    raw_guest=event_guest_by_number(conn,event_id,guest_number)
+    raw_guest = event_guest_by_number(tx, event_id, guest_number)
     if not raw_guest:
-        fail("GUEST_NOT_REGISTERED",404)
-    if get_policy(conn,event_id)["enabled"] or (raw_guest.get("metadata_json") or {}).get("invitation_id"):
-        lock_policy(conn,event_id)
-    if mode!="validate":
-        _ensure_presence(conn,event_id,raw_guest["id"])
+        fail('GUEST_NOT_REGISTERED', NotFound)
+    if get_policy(tx, event_id)['enabled'] or (raw_guest.get('metadata_json') or {}).get('invitation_id'):
+        lock_policy(tx, event_id)
+    if mode != VALIDATE:
+        _presence(tx, event_id, raw_guest['id'])
         # Serialize all entrances for one ticket on PostgreSQL as well as SQLite.
-        conn.execute(select(guest_presence).where(guest_presence.c.event_id==event_id,guest_presence.c.guest_id==raw_guest["id"]).with_for_update()).first()
-        replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+        persistence.presence.lock(tx, event_id, raw_guest['id'])
+        replay = _replay(tx, event_id, guest_number, scan_id, mode, checkpoint, body)
         if replay:
-            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
-    admission_policy=get_policy(conn,event_id)
-    access_now=access_config(event)
-    offline_scan=body.get("offline_scan") is True
-    at_time=None
-    if offline_scan:
-        if admission_policy["enabled"]:
-            fail("ONLINE_ADMISSION_REQUIRED",409)
-        supplied_policy=text(body.get("access_policy_version"),40,True)
-        current_policy=access_policy_version(access_now)
-        if supplied_policy!=current_policy:
-            fail("ACCESS_POLICY_CHANGED",409)
-        at_time=_scan_time(body.get("client_time"))
-        if (datetime.now(timezone.utc)-at_time).total_seconds()>access_now["manifest_max_age_minutes"]*60:
-            fail("OFFLINE_SCAN_EXPIRED",409)
-        if at_time>datetime.now(timezone.utc).replace(microsecond=0):
-            # Small clock differences are handled at field setup; future scans are never trusted.
-            if (at_time-datetime.now(timezone.utc)).total_seconds()>300:
-                fail("OFFLINE_SCAN_TIME_FUTURE")
-    validated=validate_guest(conn,event,guest_number,checkpoint,at_time=at_time,check_admission=mode!="exit",body=body)
-    guest=validated["guest"]
-    if mode=="validate":
+            return replay
+
+    admission_policy = get_policy(tx, event_id)
+    policy = AccessPolicy.from_site_config(event.get('draft'))
+    at_time = None
+    if body.get('offline_scan') is True:
+        at_time = offline_scan_time(policy, admission_managed=admission_policy['enabled'],
+                                    supplied_version=body.get('access_policy_version'),
+                                    client_time=body.get('client_time'))
+    validated = validate_guest(tx, event, guest_number, checkpoint, at_time=at_time,
+                               check_admission=mode != EXIT, body=body)
+    guest = validated['guest']
+    if mode == VALIDATE:
         return {
-            "scan_id":text(body.get("scan_id") or new_id(),64,True),
-            "status":validated["status"],
-            "reason":validated.get("reason"),
-            "mode":"validate",
-            "direction":None,
-            "checkpoint":checkpoint,
-            "presence":validated["presence"],
-            "guest":guest,
-            "admission":validated.get("admission"),
+            'scan_id': text(body.get('scan_id') or new_id(), 64, True), 'status': validated['status'],
+            'reason': validated.get('reason'), 'mode': VALIDATE, 'direction': None, 'checkpoint': checkpoint,
+            'presence': validated['presence'], 'guest': guest, 'admission': validated.get('admission'),
         }
-    if validated["status"]!="valid":
-        fail(validated.get("reason") or "ACCESS_DENIED",403)
+    require_valid_admission(validated)
 
-    presence=_ensure_presence(conn,event_id,guest["id"])
-    access=validated["access_control"]
-    expected="outside" if mode=="entry" else "inside"
-    next_state="inside" if mode=="entry" else "outside"
-
-    admission=validated.get("admission") or {"managed":False}
-    managed=admission.get("managed") and mode=="entry"
+    presence = _presence(tx, event_id, guest['id'])
+    admission = validated.get('admission') or {'managed': False}
+    managed = bool(admission.get('managed')) and mode == ENTRY
     if managed:
-        admission=consume_entitlement(conn,event,raw_guest,{**body,"scan_id":scan_id})
-    elif body.get("quantity",1)!=1:
-        fail("ADMISSION_QUANTITY_INVALID")
-
-    if not managed and mode=="entry" and not access["allow_reentry"] and presence.get("last_direction")=="exit" and presence.get("last_scan_id"):
-        fail("REENTRY_NOT_ALLOWED",403)
-
-    if access["anti_passback"] and not managed:
-        transition=conn.execute(
-            update(guest_presence)
-            .where(
-                guest_presence.c.event_id==event_id,
-                guest_presence.c.guest_id==guest["id"],
-                guest_presence.c.state==expected,
-            )
-            .values(
-                state=next_state,last_scan_id=scan_id,last_direction=mode,last_checkpoint=checkpoint,updated_at=now(),
-            )
-        )
-        if transition.rowcount!=1:
-            replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
-            if replay:
-                return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
-            current=conn.execute(
-                select(guest_presence).where(
-                    guest_presence.c.event_id==event_id,
-                    guest_presence.c.guest_id==guest["id"],
-                )
-            ).mappings().first()
-            state=(current or presence)["state"]
-            return {
-                "scan_id":scan_id,
-                "status":"already_inside" if mode=="entry" else "already_outside",
-                "mode":mode,"direction":mode,"checkpoint":checkpoint,"presence":state,
-                "last_scan_id":(current or presence).get("last_scan_id"),
-                "last_checkpoint":(current or presence).get("last_checkpoint"),
-                "guest":guest,
-            }
+        admission = consume_entitlement(tx, event, raw_guest, {**body, 'scan_id': scan_id})
     else:
-        _set_presence(conn,event_id,guest["id"],next_state,scan_id,mode,checkpoint)
+        require_unmanaged_quantity(body.get('quantity', 1))
 
-    try:
-        with conn.begin_nested():
-            conn.execute(insert(guest_checkins).values(
-                id=scan_id,event_id=event_id,guest_id=guest["id"],guest_number=guest["guest_number"],
-                scanner_id=scanner_id,source=source,direction=mode,checkpoint=checkpoint,
-                client_time=text(body.get("client_time"),64),scanned_at=now(),
-            ))
-    except IntegrityError:
-        replay=conn.execute(select(guest_checkins).where(guest_checkins.c.id==scan_id)).mappings().first()
+    transition = presence.pass_gate(mode, checkpoint, scan_id, policy, entitlement_managed=managed, at=now())
+    if not (transition.accepted and persistence.presence.save(tx, presence, transition)):
+        return _blocked(tx, event_id, guest_number, scan_id, mode, checkpoint, body, guest, presence)
+
+    recorded = persistence.checkins.add_if_absent(tx, {
+        'id': scan_id, 'event_id': event_id, 'guest_id': guest['id'], 'guest_number': guest['guest_number'],
+        'scanner_id': scanner_id, 'source': source, 'direction': mode, 'checkpoint': checkpoint,
+        'client_time': text(body.get('client_time'), 64), 'scanned_at': now(),
+    })
+    if not recorded:
+        replay = _replay(tx, event_id, guest_number, scan_id, mode, checkpoint, body)
         if replay:
-            return _duplicate_scan_result(conn,event_id,guest_number,scan_id,mode,checkpoint,replay,body.get("quantity",1))
-        raise
+            return replay
+        raise RuntimeError('SCAN_RECORD_FAILED')
     return {
-        "scan_id":scan_id,"status":"accepted","mode":mode,"direction":mode,"checkpoint":checkpoint,
-        "presence":next_state,"guest":guest,"admission":admission,
+        'scan_id': scan_id, 'status': ACCEPTED, 'mode': mode, 'direction': mode, 'checkpoint': checkpoint,
+        'presence': transition.next_state, 'guest': guest, 'admission': admission,
     }
 
-def build_guest_manifest(conn,event_or_id) -> dict:
-    event=_event(conn,event_or_id)
-    event_id=event["id"]
-    presence=event_presence_map(conn,event_id)
-    guests=[]
-    for guest in list_event_guests(conn,event_id):
-        p=presence.get(guest["id"],{})
-        guests.append({
-            "guest_number":guest["guest_number"],
-            "name":guest.get("name") or "",
-            "organization":guest.get("organization") or "",
-            "job_title":guest.get("job_title") or "",
-            "guest_type":guest.get("guest_type") or "visitor",
-            "status":guest.get("status") or "registered",
-            "registered_at":guest.get("registered_at"),
-            "presence":p.get("state","outside"),
-            "last_direction":p.get("last_direction") or "",
-            "last_checkpoint":p.get("last_checkpoint") or "",
-            "presence_updated_at":p.get("updated_at") or "",
-        })
-    access=access_config(event)
-    policy_version=access_policy_version(access)
-    source=json.dumps({"guests":guests,"access_control":access},ensure_ascii=False,sort_keys=True,separators=(",",":"))
+
+def _blocked(tx, event_id, guest_number, scan_id, mode, checkpoint, body, guest, presence) -> dict:
+    """Anti-passback refused the scan (in the domain, or by a concurrent change)."""
+    replay = _replay(tx, event_id, guest_number, scan_id, mode, checkpoint, body)
+    if replay:
+        return replay
+    current = persistence.presence.get(tx, event_id, guest['id']) or presence
     return {
-        "event_id":event_id,
-        "generated_at":now(),
-        "credential_version":2,
-        "manifest_version":hashlib.sha256(source.encode("utf-8")).hexdigest()[:20],
-        "access_policy_version":policy_version,
-        "guest_count":len(guests),
-        "admission_managed":get_policy(conn,event_id)["enabled"],
-        "requires_online":get_policy(conn,event_id)["enabled"],
-        "access_control":access,
-        "guests":guests,
+        'scan_id': scan_id, 'status': blocked_status(mode), 'mode': mode, 'direction': mode,
+        'checkpoint': checkpoint, 'presence': current.state, 'last_scan_id': current.last_scan_id,
+        'last_checkpoint': current.last_checkpoint, 'guest': guest,
     }
+
+
+def build_guest_manifest(tx, event_or_id) -> dict:
+    event = _event(tx, event_or_id)
+    event_id = event['id']
+    presence = event_presence_map(tx, event_id)
+    guests = []
+    for guest in list_event_guests(tx, event_id):
+        state = presence.get(guest['id'], {})
+        guests.append({
+            'guest_number': guest['guest_number'],
+            'name': guest.get('name') or '',
+            'organization': guest.get('organization') or '',
+            'job_title': guest.get('job_title') or '',
+            'guest_type': guest.get('guest_type') or 'visitor',
+            'status': guest.get('status') or 'registered',
+            'registered_at': guest.get('registered_at'),
+            'presence': state.get('state', 'outside'),
+            'last_direction': state.get('last_direction') or '',
+            'last_checkpoint': state.get('last_checkpoint') or '',
+            'presence_updated_at': state.get('updated_at') or '',
+        })
+    policy = AccessPolicy.from_site_config(event.get('draft'))
+    access = policy.to_dict()
+    source = json.dumps({'guests': guests, 'access_control': access}, ensure_ascii=False, sort_keys=True,
+                        separators=(',', ':'))
+    admission_managed = get_policy(tx, event_id)['enabled']
+    return {
+        'event_id': event_id,
+        'generated_at': now(),
+        'credential_version': 2,
+        'manifest_version': hashlib.sha256(source.encode('utf-8')).hexdigest()[:20],
+        'access_policy_version': policy.version(),
+        'guest_count': len(guests),
+        'admission_managed': admission_managed,
+        'requires_online': admission_managed,
+        'access_control': access,
+        'guests': guests,
+    }
+
+
+def checkin_overview(tx, event_id: str) -> dict:
+    presence = event_presence_map(tx, event_id)
+    return {
+        'checkins': persistence.checkins.for_event(tx, event_id, newest_first=True, limit=500),
+        'total_checkins': persistence.checkins.count_for_event(tx, event_id),
+        'admitted_people': persistence.admission.admitted_people(tx, event_id),
+        'presence': [
+            {'guest_id': guest_id, 'state': item.get('state', 'outside'), 'last_direction': item.get('last_direction'),
+             'last_checkpoint': item.get('last_checkpoint'), 'updated_at': item.get('updated_at')}
+            for guest_id, item in presence.items()
+        ],
+        'inside_count': sum(1 for item in presence.values() if item.get('state') == 'inside'),
+    }
+
+
+def attendance_report(tx, event_id: str) -> tuple[list[dict], dict[str, dict]]:
+    """Registered guests plus per-guest entry/exit statistics (for the CSV export)."""
+    guests = list_event_guests(tx, event_id)
+    stats: dict[str, dict] = {}
+    for scan in persistence.checkins.for_event(tx, event_id, newest_first=False):
+        item = stats.setdefault(scan['guest_id'], {'entries': 0, 'exits': 0, 'first_entry': '', 'last_entry': ''})
+        if scan['direction'] == ENTRY:
+            item['entries'] += 1
+            item['first_entry'] = item['first_entry'] or scan['scanned_at']
+            item['last_entry'] = scan['scanned_at']
+        else:
+            item['exits'] += 1
+    return guests, stats

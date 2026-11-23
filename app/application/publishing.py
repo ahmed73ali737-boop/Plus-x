@@ -1,46 +1,25 @@
+"""Publish a site's draft as an immutable version; read published versions."""
 from __future__ import annotations
 
-from sqlalchemy import insert, select, update
-
 from app.application.audit_service import write_audit
-from app.db import sites, versions
-from app.domain import fail, normalize_config, now
+from app.application.ports import persistence
+from app.domain import Conflict, NotFound, fail, now
+from app.domain.sites import publish
 
 
-def publish_site_version(conn, site, user) -> int:
-    config = normalize_config(site['draft'])
-    version = site['published_version'] + 1
-    result = conn.execute(
-        update(sites)
-        .where(
-            sites.c.id == site['id'],
-            sites.c.draft_rev == site['draft_rev'],
-            sites.c.published_version == site['published_version'],
-        )
-        .values(published_version=version)
-    )
-    if result.rowcount != 1:
-        fail('VERSION_CONFLICT', 409)
-    conn.execute(
-        insert(versions).values(
-            site_id=site['id'],
-            version=version,
-            config=config,
-            published_at=now(),
-        )
-    )
-    write_audit(conn, user, site['id'], 'publish', {'version': version})
-    return version
+def publish_site_version(tx, site, user) -> int:
+    publication = publish(site)
+    # Optimistic concurrency: the draft revision and version must be unchanged.
+    if not persistence.sites.advance_published_version(tx, site, publication.version):
+        fail('VERSION_CONFLICT', Conflict)
+    persistence.sites.add_version(tx, site['id'], publication.version, publication.config, now())
+    write_audit(tx, user, site['id'], 'publish', {'version': publication.version})
+    return publication.version
 
 
-def get_site_version(conn, site, version=None):
+def get_site_version(tx, site, version=None):
     wanted = site['published_version'] if version is None else version
-    value = conn.execute(
-        select(versions).where(
-            versions.c.site_id == site['id'],
-            versions.c.version == wanted,
-        )
-    ).mappings().first()
+    value = persistence.sites.get_version(tx, site['id'], wanted)
     if not value:
-        fail('NOT_PUBLISHED', 404)
+        fail('NOT_PUBLISHED', NotFound)
     return value

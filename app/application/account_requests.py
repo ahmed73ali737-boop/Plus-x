@@ -2,348 +2,385 @@
 
 No route may insert a login identity. Guest/RSVP/QR paths never call this module.
 A tracking capability is returned only to its holder, never to reviewers.
+The rules live in app.domain.account_requests.
 """
-from datetime import datetime, timedelta, timezone
-import hashlib
-import json
-import secrets
 import os
+import secrets
 
-from sqlalchemy import insert, select, update, func, or_, text as sql_text
-
-from app.account_requests_db import account_requests as ar, request_workflows as wf
-from app.application.access import event_permissions, active_window, organization_visible
+from app.application.access import active_window, event_permissions, organization_visible
 from app.application.audit_service import new_id, write_audit
-from app.application.phone_accounts import contact_identity, find_contact_user, bind_phone
+from app.application.phone_accounts import bind_phone, contact_identity, find_contact_user
+from app.application.ports import persistence
 from app.core.security import digest, hash_password
-from app.db import users, sites, memberships, assignments, organizations, event_participations, organization_people, signup_requests, requests
-from app.domain import fail, now, text, default_config, stamp
-from app.infrastructure.account_requests import add_pending_account_request, public_account_request
+from app.domain import Conflict, Forbidden, NotFound, fail, now, text
+from app.domain.account_requests import (
+    SETUP_DAYS,
+    SOURCES,
+    assignment_window,
+    check_person_link,
+    check_reviewer,
+    check_roles,
+    check_target,
+    decision_reason,
+    delegated_grant_allowed,
+    expires,
+    granted_assignment_role,
+    may_supervise,
+    new_login,
+    organizer_may_submit_for_platform,
+    payload_fingerprint_source,
+    public_account_request,
+    request_key,
+    require_active_actor,
+    require_active_target,
+    require_invitation_usable,
+    require_password_setup,
+    require_platform_inviter,
+    require_setup_renewable,
+    require_tracking_token,
+    require_unclaimed_identity,
+    requests_accepting,
+    review_disposition,
+    signup_entities as new_signup_entities,
+    submitted_password,
+    supervisor_preference,
+)
+
+__all__ = [
+    'accept_platform_invite', 'active_window', 'authorized', 'cancel', 'expire_pending', 'expires',
+    'inspect_platform_invite', 'invite_platform_candidate', 'list_for_reviewer', 'list_submitted', 'org_reviewer',
+    'organization_visible', 'renew_setup', 'request_scope_id', 'review', 'setup_password', 'status', 'submit', 'view',
+]
 
 
-def expires(days=7):
-    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+def _requests():
+    return persistence.account_requests
 
 
-def expire_pending(conn):
-    ids = conn.execute(select(ar.c.id).where(ar.c.status == 'pending', ar.c.expires_at <= now()).with_for_update()).scalars().all()
-    for rid in ids:
-        conn.execute(update(ar).where(ar.c.id == rid, ar.c.status == 'pending').values(status='expired', password_hash=None, reviewed_at=now()))
-        sync_legacy(conn, rid, 'expired')
-        write_audit(conn, None, None, 'account_request_expired', {'request_id': rid})
+def _close(tx, request_id, status, *, only_pending=False, **extra):
+    values = {'status': status, 'password_hash': None, 'reviewed_at': now(), **extra}
+    _requests().close(tx, request_id, values, only_pending=only_pending)
+    sync_legacy(tx, request_id, status)
+    return values
+
+
+def expire_pending(tx):
+    ids = _requests().expired_pending_ids(tx, now())
+    for request_id in ids:
+        _close(tx, request_id, 'expired', only_pending=True)
+        write_audit(tx, None, None, 'account_request_expired', {'request_id': request_id})
     return len(ids)
 
 
-def org_reviewer(conn, actor, oid, sensitive=False):
-    if actor['role'] == 'platform': return True
-    if actor['role'] == 'organizer' and conn.execute(select(event_participations.c.id).where(
-            event_participations.c.organization_id == oid, event_participations.c.event_id == actor['scope_id'], event_participations.c.status == 'active')).first(): return True
-    return not sensitive and bool(conn.execute(select(memberships.c.user_id).where(
-        memberships.c.user_id == actor['id'], memberships.c.organization_id == oid,
-        memberships.c.role == 'owner', memberships.c.status == 'active')).first())
+def org_reviewer(tx, actor, organization_id, sensitive=False):
+    if actor['role'] == 'platform':
+        return True
+    if actor['role'] == 'organizer' and _requests().organizer_runs_organization(tx, organization_id, actor['scope_id']):
+        return True
+    return not sensitive and persistence.site_admin.is_active_owner(tx, actor['id'], organization_id)
 
 
-def authorized(conn, actor, record):
-    if not actor or not actor['active']: return False
+def authorized(tx, actor, record):
+    if not actor or not actor['active']:
+        return False
     if record['scope_type'] == 'organization':
-        return org_reviewer(conn, actor, record['scope_id'], record.get('membership_role') in ('owner','admin'))
-    site = conn.execute(select(sites).where(sites.c.id == record['scope_id'])).mappings().first()
-    if not site: return False
-    if record['requested_role'] in ('platform','organizer') or site['kind'] == 'platform':
+        return org_reviewer(tx, actor, record['scope_id'], record.get('membership_role') in ('owner', 'admin'))
+    site = persistence.sites.get(tx, record['scope_id'])
+    if not site:
+        return False
+    if record['requested_role'] in ('platform', 'organizer') or site['kind'] == 'platform':
         return actor['role'] == 'platform'
     event_id = site['id'] if site['kind'] == 'event' else site['event_id']
-    if actor['role'] == 'platform': return True
+    if actor['role'] == 'platform':
+        return True
     if record.get('assignment_role'):
-        permissions = event_permissions(conn, actor, event_id)
-        if 'committee.manage' not in permissions: return False
-        # A delegated manager cannot grant a capability that they do not possess.
-        from app.application.access import EVENT_ROLE_PERMISSIONS
-        return EVENT_ROLE_PERMISSIONS[record['assignment_role']] <= permissions
+        return delegated_grant_allowed(record['assignment_role'], event_permissions(tx, actor, event_id))
     return actor['role'] == 'organizer' and actor['scope_id'] == event_id
 
 
-def choose_supervisor(conn, record, actor=None):
-    candidates = conn.execute(select(users).where(users.c.active == 1).order_by(users.c.id)).mappings().all()
-    # Prefer a scoped owner/organizer, and an independent reviewer where available.
-    candidates = sorted(candidates, key=lambda u: (u['id'] == (actor or {}).get('id'), 2 if u['role']=='platform' else 1 if u['role']=='organizer' else 0))
-    for candidate in candidates:
-        if candidate['id'] != (actor or {}).get('id') and candidate['id'] != record.get('existing_user_id') and candidate['email'].lower() != record['email'].lower() and authorized(conn, candidate, record):
+def _supervises(tx, actor, record):
+    return bool(record) and record['supervisor_id'] == actor['id'] and authorized(tx, actor, record)
+
+
+def choose_supervisor(tx, record, actor=None):
+    actor_id = (actor or {}).get('id')
+    for candidate in sorted(_requests().active_users(tx), key=supervisor_preference(actor_id)):
+        if may_supervise(candidate, record, actor_id) and authorized(tx, candidate, record):
             return candidate['id']
-    fail('ACCOUNT_REQUEST_SUPERVISOR_UNAVAILABLE', 409)
+    fail('ACCOUNT_REQUEST_SUPERVISOR_UNAVAILABLE', Conflict)
 
 
-def check_submitter(conn, actor, record):
-    if actor is None: return
-    if not actor['active']: fail('FORBIDDEN_ROLE', 403)
+def check_submitter(tx, actor, record):
+    if actor is None:
+        return
+    require_active_actor(actor)
     if record['scope_type'] == 'organization':
-        if not org_reviewer(conn, actor, record['scope_id'], False): fail('FORBIDDEN_SCOPE', 403)
-    elif not authorized(conn, actor, record):
+        if not org_reviewer(tx, actor, record['scope_id'], False):
+            fail('FORBIDDEN_SCOPE', Forbidden)
+    elif not authorized(tx, actor, record):
         # An organizer may submit organizer requests for platform review in their event.
-        if not (record['requested_role'] == 'organizer' and actor['role'] == 'organizer' and actor['scope_id'] == record['scope_id']):
-            fail('FORBIDDEN_SCOPE', 403)
+        if not organizer_may_submit_for_platform(actor, record):
+            fail('FORBIDDEN_SCOPE', Forbidden)
 
 
-def submit(conn, *, actor, body, purpose, scope_type, scope_id, role, membership_role=None,
+def submit(tx, *, actor, body, purpose, scope_type, scope_id, role, membership_role=None,
            assignment_role=None, person_id=None, signup_id=None, access_id=None):
-    if os.environ.get('ACCOUNT_REQUESTS_ACCEPTING','true').lower() not in ('true','1','yes'):fail('ACCOUNT_REQUESTS_PAUSED',503)
-    expire_pending(conn)
+    requests_accepting(os.environ.get('ACCOUNT_REQUESTS_ACCEPTING', 'true'))
+    expire_pending(tx)
     email, phone = contact_identity(body, preserve_email=True)
-    initial_target=find_contact_user(conn,email,phone)
-    name = text(body.get('name') or body.get('contact_name') or (initial_target['name'] if initial_target else None), 160, True)
-    if role not in ('platform','organizer','agency','member'): fail('ACCOUNT_REQUEST_ROLE_INVALID')
-    if membership_role not in (None,'owner','admin','editor','analyst'): fail('MEMBERSHIP_ROLE_INVALID')
-    from app.application.access import EVENT_ROLE_PERMISSIONS
-    if assignment_role is not None and assignment_role not in EVENT_ROLE_PERMISSIONS: fail('COMMITTEE_ROLE_INVALID')
+    initial_target = find_contact_user(tx, email, phone)
+    name = text(body.get('name') or body.get('contact_name') or (initial_target['name'] if initial_target else None),
+                160, True)
+    check_roles(role, membership_role, assignment_role)
     record = dict(email=email, requested_role=role, scope_type=scope_type, scope_id=scope_id,
                   membership_role=membership_role, assignment_role=assignment_role)
-    check_submitter(conn, actor, record)
-    target = find_contact_user(conn, email, phone)
-    if role=='platform' and target and target['role']!='platform':fail('EXISTING_ACCOUNT_ROLE_CONFLICT',409)
-    if purpose == 'personal' and target: fail('PHONE_ALREADY_REGISTERED', 409)
-    if target and not target['active']: fail('ACCOUNT_SUSPENDED', 409)
-    if body.get('user_id') and (not target or target['id'] != body['user_id']): fail('CONTACT_IDENTITIES_CONFLICT',409)
-    password = body.get('password') if actor is None else None
-    if password is not None and password != body.get('confirmation'): fail('PASSWORD_CONFIRMATION_MISMATCH')
-    token = body.get('request_key') or secrets.token_urlsafe(32)
-    if not isinstance(token, str) or not 32 <= len(token) <= 80 or not all(c.isalnum() or c in '_-' for c in token): fail('ACCOUNT_REQUEST_KEY_INVALID')
+    check_submitter(tx, actor, record)
+    target = find_contact_user(tx, email, phone)
+    check_target(purpose, role, target, body)
+    password = submitted_password(actor, body)
+    token = request_key(body.get('request_key'), secrets.token_urlsafe(32))
     key = digest(token)
-    fingerprint = digest(json.dumps([email,phone,name,purpose,scope_type,scope_id,role,membership_role,assignment_role,person_id,body.get('valid_from'),body.get('valid_until'),body.get('organization_name') if purpose=='signup' else None,body.get('participation_type') if purpose=='signup' else None,body.get('wants_account',True) if purpose=='signup' else None,body.get('message') if purpose=='signup' else None], separators=(',',':')))
-    old = conn.execute(select(ar, wf.c.payload_hash).join(wf, ar.c.id == wf.c.request_id).where(ar.c.request_key == key)).mappings().first()
+    fingerprint = digest(payload_fingerprint_source(email, phone, name, purpose, scope_type, scope_id, role,
+                                                    membership_role, assignment_role, person_id, body))
+    old = _requests().by_request_key(tx, key)
     if old:
-        if old['payload_hash'] != fingerprint: fail('ACCOUNT_REQUEST_KEY_EXISTS',409)
-        return {**view(conn, old), 'tracking_token': token, 'already_pending': True, 'grants_access': False}
-    start, end = stamp(body.get('valid_from')), stamp(body.get('valid_until'))
-    start=datetime.fromisoformat(start).astimezone(timezone.utc).isoformat() if start else None
-    end=datetime.fromisoformat(end).astimezone(timezone.utc).isoformat() if end else None
-    if start and end and start >= end: fail('ASSIGNMENT_WINDOW_INVALID')
-    supervisor = choose_supervisor(conn, {**record,'existing_user_id':target['id'] if target else None}, actor)
-    saved = add_pending_account_request(conn, **record, name=name, phone=phone,
-        supervisor_id=supervisor, requested_by=actor['id'] if actor else None,
-        expires_at=expires(), request_key=key, source={'personal':'signup','site':'admin','signup':'signup','access':'access','committee':'committee','organization':'organization'}[purpose],
+        if old['payload_hash'] != fingerprint:
+            fail('ACCOUNT_REQUEST_KEY_EXISTS', Conflict)
+        return {**view(tx, old), 'tracking_token': token, 'already_pending': True, 'grants_access': False}
+    start, end = assignment_window(body)
+    supervisor = choose_supervisor(tx, {**record, 'existing_user_id': target['id'] if target else None}, actor)
+    saved = _requests().add_pending(
+        tx, **record, name=name, phone=phone, supervisor_id=supervisor, requested_by=actor['id'] if actor else None,
+        expires_at=expires(), request_key=key, source=SOURCES[purpose],
         password=password if not target else None, person_id=person_id, allow_existing=True)
-    conn.execute(insert(wf).values(request_id=saved['id'], purpose=purpose, tracking_hash=key,
-        payload_hash=fingerprint, existing_user_id=target['id'] if target else None,
-        signup_id=signup_id, access_id=access_id, valid_from=start or None, valid_until=end or None))
-    write_audit(conn, actor, scope_id if scope_type=='site' else None, 'account_request_submitted', {'request_id':saved['id'],'scope_type':scope_type,'scope_id':scope_id})
-    return {**view(conn, saved), 'tracking_token':token, 'grants_access':False}
+    _requests().add_workflow(tx, {
+        'request_id': saved['id'], 'purpose': purpose, 'tracking_hash': key, 'payload_hash': fingerprint,
+        'existing_user_id': target['id'] if target else None, 'signup_id': signup_id, 'access_id': access_id,
+        'valid_from': start or None, 'valid_until': end or None,
+    })
+    write_audit(tx, actor, scope_id if scope_type == 'site' else None, 'account_request_submitted',
+                {'request_id': saved['id'], 'scope_type': scope_type, 'scope_id': scope_id})
+    return {**view(tx, saved), 'tracking_token': token, 'grants_access': False}
 
 
-def context(conn, rid):
-    row = conn.execute(select(wf).where(wf.c.request_id==rid)).mappings().first()
-    if not row: fail('ACCOUNT_REQUEST_NOT_FOUND',404)
+def context(tx, request_id):
+    row = _requests().workflow(tx, request_id)
+    if not row:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
     return row
 
 
-def view(conn, record):
-    result=public_account_request(record)
-    ctx=context(conn,record['id'])
-    supervisor=conn.execute(select(users.c.name).where(users.c.id==record['supervisor_id'])).scalar()
-    signup=conn.execute(select(signup_requests).where(signup_requests.c.id==ctx['signup_id'])).mappings().first() if ctx['signup_id'] else None
-    if record['scope_type']=='organization':
-        scope_name=conn.execute(select(organizations.c.name).where(organizations.c.id==record['scope_id'])).scalar()
+def request_scope_id(tx, request_id):
+    return _requests().request(tx, request_id)['scope_id']
+
+
+def view(tx, record):
+    result = public_account_request(record)
+    workflow = context(tx, record['id'])
+    signup = _requests().signup(tx, workflow['signup_id']) if workflow['signup_id'] else None
+    if record['scope_type'] == 'organization':
+        scope_name = _requests().organization_name(tx, record['scope_id'])
     else:
-        draft=conn.execute(select(sites.c.draft).where(sites.c.id==record['scope_id'])).scalar()
-        scope_name=(draft or {}).get('title')
-    result.update(account_requested=bool(signup['wants_account']) if signup else True,
-                  organization_name=signup['organization_name'] if signup else None,scope_name=scope_name or record['scope_id'],
-                  purpose=ctx['purpose'], user_id=ctx['user_id'], supervisor_name=supervisor,
-                  setup_required=bool(ctx['setup_expires_at'] and record['status']=='approved'), setup_expired=bool(ctx['setup_expires_at'] and ctx['setup_expires_at']<=now()),
-                  setup_expires_at=ctx['setup_expires_at'], result_site_id=ctx['result_site_id'], result_organization_id=ctx['result_organization_id'])
-    if result['email'].startswith('tel:'):result['email']=None
+        scope_name = _requests().site_title(tx, record['scope_id'])
+    setup_expires_at = workflow['setup_expires_at']
+    result.update(
+        account_requested=bool(signup['wants_account']) if signup else True,
+        organization_name=signup['organization_name'] if signup else None,
+        scope_name=scope_name or record['scope_id'],
+        purpose=workflow['purpose'], user_id=workflow['user_id'],
+        supervisor_name=_requests().user_name(tx, record['supervisor_id']),
+        setup_required=bool(setup_expires_at and record['status'] == 'approved'),
+        setup_expired=bool(setup_expires_at and setup_expires_at <= now()),
+        setup_expires_at=setup_expires_at, result_site_id=workflow['result_site_id'],
+        result_organization_id=workflow['result_organization_id'],
+    )
+    if result['email'].startswith('tel:'):
+        result['email'] = None
     return result
 
 
-def list_for_reviewer(conn, actor, status=None, scope_id=None):
-    expire_pending(conn)
-    q=select(ar).join(wf, ar.c.id==wf.c.request_id).where(ar.c.supervisor_id==actor['id']).order_by(ar.c.created_at)
-    if status:q=q.where(ar.c.status==status)
-    if scope_id:q=q.where(or_(ar.c.scope_id==scope_id, ar.c.organization_id.in_(select(event_participations.c.organization_id).where(event_participations.c.event_id==scope_id))))
-    return [view(conn,r) for r in conn.execute(q).mappings() if authorized(conn,actor,r)]
+def list_for_reviewer(tx, actor, status=None, scope_id=None):
+    expire_pending(tx)
+    return [view(tx, record) for record in _requests().supervised_by(tx, actor['id'], status, scope_id)
+            if authorized(tx, actor, record)]
 
 
-def sync_legacy(conn, rid, status):
-    ctx=conn.execute(select(wf).where(wf.c.request_id==rid)).mappings().first()
-    if not ctx:return
-    if ctx['signup_id']:conn.execute(update(signup_requests).where(signup_requests.c.id==ctx['signup_id']).values(status=status))
-    if ctx['access_id']:conn.execute(update(requests).where(requests.c.id==ctx['access_id']).values(status=status))
+def sync_legacy(tx, request_id, status):
+    workflow = _requests().workflow(tx, request_id)
+    if workflow:
+        _requests().sync_legacy_status(tx, workflow, status)
 
 
-def locked_identity(conn, record):
-    if conn.dialect.name=='postgresql':
-        for value in sorted({record['email'],record['phone'] or record['email']}):
-            key=int.from_bytes(hashlib.sha256(value.encode()).digest()[:8], 'big', signed=True)
-            conn.execute(sql_text('SELECT pg_advisory_xact_lock(:key)'),{'key':key})
+def signup_entities(tx, record, workflow):
+    signup = _requests().signup(tx, workflow['signup_id'])
+    organization, site, participation = new_signup_entities(record['id'], signup, new_id(), new_id(), new_id(), now())
+    _requests().add_organization(tx, organization)
+    _requests().add_site(tx, site)
+    if participation:
+        _requests().add_participation(tx, participation)
+    return site['id'], organization['id']
 
 
-def signup_entities(conn, record, ctx):
-    signup=conn.execute(select(signup_requests).where(signup_requests.c.id==ctx['signup_id'])).mappings().one()
-    oid=new_id();slug='org-'+record['id'].replace('-','')[:16]
-    conn.execute(insert(organizations).values(id=oid,slug=slug,name=signup['organization_name'],profile={'description':signup['details'].get('message','')},status='active',created_at=now()))
-    sid=new_id();kind='event' if signup['requested_role']=='organizer' else 'agency'
-    parent='platform' if kind=='event' else signup['event_id']
-    if kind=='agency' and not parent:fail('EVENT_REQUIRED')
-    conn.execute(insert(sites).values(id=sid,parent_id=parent,event_id=sid if kind=='event' else parent,kind=kind,slug=slug,draft=default_config(signup['organization_name'],kind),draft_rev=1,published_version=0))
-    if kind=='agency':conn.execute(insert(event_participations).values(id=new_id(),event_id=parent,organization_id=oid,agency_site_id=sid,participation_type=signup['participation_type'] or 'exhibitor',status='active',services=[],created_at=now()))
-    return sid, oid
-
-
-def approve_links(conn, actor, record, ctx, target, sid, oid):
-    uid=target['id']
-    if oid:
-        old=conn.execute(select(memberships).where(memberships.c.user_id==uid,memberships.c.organization_id==oid)).mappings().first()
-        values=dict(role=record['membership_role'] or 'owner',status='active')
-        if old:conn.execute(update(memberships).where(memberships.c.user_id==uid,memberships.c.organization_id==oid).values(**values))
-        else:conn.execute(insert(memberships).values(user_id=uid,organization_id=oid,created_at=now(),**values))
-    assignment_role=record['assignment_role']
-    # Existing accounts keep their global role/scope; grant only the approved scope.
-    if ctx['purpose']=='signup' and record['requested_role']=='organizer':assignment_role='event_manager'
-    if not assignment_role and not oid and record['requested_role']!='platform' and ctx['purpose'] in ('site','access','signup'):
-        assignment_role='event_manager' if record['requested_role']=='organizer' else 'site_manager'
+def approve_links(tx, record, workflow, target, site_id, organization_id):
+    user_id = target['id']
+    if organization_id:
+        _requests().upsert_membership(tx, user_id, organization_id,
+                                      {'role': record['membership_role'] or 'owner', 'status': 'active'}, now())
+    assignment_role = granted_assignment_role(record, workflow, organization_id)
     if assignment_role:
-        old=conn.execute(select(assignments.c.id).where(assignments.c.user_id==uid,assignments.c.site_id==sid,assignments.c.role==assignment_role)).scalar()
-        values=dict(status='active',valid_from=ctx['valid_from'],valid_until=ctx['valid_until'])
-        if old:conn.execute(update(assignments).where(assignments.c.id==old).values(**values))
-        else:conn.execute(insert(assignments).values(id=new_id(),user_id=uid,site_id=sid,role=assignment_role,created_at=now(),**values))
+        _requests().upsert_assignment(tx, new_id(), user_id, site_id, assignment_role, {
+            'status': 'active', 'valid_from': workflow['valid_from'], 'valid_until': workflow['valid_until'],
+        }, now())
     if record['person_id']:
-        person=conn.execute(select(organization_people).where(organization_people.c.id==record['person_id'])).mappings().first()
-        if not person or person['organization_id']!=oid or person['user_id'] not in (None,uid):fail('PERSON_ACCOUNT_CONFLICT',409)
-        conn.execute(update(organization_people).where(organization_people.c.id==person['id']).values(user_id=uid))
+        person = _requests().person(tx, record['person_id'])
+        check_person_link(person, organization_id, user_id)
+        _requests().link_person(tx, person['id'], user_id)
 
 
-def review(conn, actor, rid, action, reason=None):
-    actor=conn.execute(select(users).where(users.c.id==actor['id']).with_for_update()).mappings().one()
-    record=conn.execute(select(ar).where(ar.c.id==rid).with_for_update()).mappings().first()
-    if not record or record['supervisor_id']!=actor['id'] or not authorized(conn,actor,record):fail('ACCOUNT_REQUEST_NOT_FOUND',404)
-    ctx=context(conn,rid)
-    if actor['id']==record['requested_by'] or actor['email'].lower()==record['email'].lower() or actor['id']==ctx['existing_user_id']:
-        fail('ACCOUNT_REQUEST_SELF_REVIEW',403)
-    if action not in ('approved','rejected'):fail('REQUEST_STATUS_INVALID')
-    if record['status']!= 'pending':return {**view(conn,record),'already_reviewed':True}
-    if record['expires_at']<=now():
-        conn.execute(update(ar).where(ar.c.id==rid).values(status='expired',password_hash=None,reviewed_at=now()));sync_legacy(conn,rid,'expired')
-        return view(conn,dict(record,status='expired',password_hash=None,reviewed_at=now()))
-    reason=text(reason,500,action=='rejected') or None
-    if action=='approved':
-        signup=conn.execute(select(signup_requests).where(signup_requests.c.id==ctx['signup_id'])).mappings().first() if ctx['signup_id'] else None
+def _approve_identity(tx, record, workflow, request_id):
+    _requests().lock_identities(tx, {record['email'], record['phone'] or record['email']})
+    target = find_contact_user(tx, record['email'], record['phone'])
+    require_unclaimed_identity(workflow, target)
+    site_id = record['scope_id'] if record['scope_type'] == 'site' else None
+    organization_id = record['organization_id']
+    if workflow['purpose'] == 'signup':
+        site_id, organization_id = signup_entities(tx, record, workflow)
+    if organization_id and not site_id:
+        site_id = _requests().latest_active_agency_site(tx, organization_id)
+    is_new = not target
+    require_active_target(target)
+    if not target:
+        hashed = record['password_hash'] or hash_password(secrets.token_urlsafe(32))
+        target = new_login(new_id(), record, workflow, site_id, hashed)
+        _requests().add_user(tx, target)
+        if record['phone']:
+            bind_phone(tx, target['id'], record['phone'])
+    approve_links(tx, record, workflow, target, site_id, organization_id)
+    _requests().update_workflow(tx, request_id, {
+        'user_id': target['id'], 'result_site_id': site_id, 'result_organization_id': organization_id,
+        'setup_expires_at': expires(SETUP_DAYS) if is_new and not record['password_hash'] else None,
+    })
+
+
+def review(tx, actor, request_id, action, reason=None):
+    actor = persistence.identity.user(tx, actor['id'], for_update=True)
+    record = _requests().request(tx, request_id, for_update=True)
+    if not _supervises(tx, actor, record):
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    workflow = context(tx, request_id)
+    check_reviewer(actor, record, workflow, action)
+    disposition = review_disposition(record, now())
+    if disposition == 'already_reviewed':
+        return {**view(tx, record), 'already_reviewed': True}
+    if disposition == 'expired':
+        values = _close(tx, request_id, 'expired')
+        return view(tx, dict(record, **values))
+    reason = decision_reason(action, reason)
+    if action == 'approved':
+        signup = _requests().signup(tx, workflow['signup_id']) if workflow['signup_id'] else None
         if signup is not None and not signup['wants_account']:
-            sid,oid=signup_entities(conn,record,ctx)
-            conn.execute(update(wf).where(wf.c.request_id==rid).values(result_site_id=sid,result_organization_id=oid))
+            site_id, organization_id = signup_entities(tx, record, workflow)
+            _requests().update_workflow(tx, request_id, {'result_site_id': site_id,
+                                                         'result_organization_id': organization_id})
         else:
-            locked_identity(conn,record)
-            target=find_contact_user(conn,record['email'],record['phone'])
-            if ctx['purpose']=='personal' and target:fail('CONTACT_IDENTITIES_CONFLICT',409)
-            if ctx['existing_user_id'] and (not target or target['id']!=ctx['existing_user_id']):fail('CONTACT_IDENTITIES_CONFLICT',409)
-            sid=record['scope_id'] if record['scope_type']=='site' else None
-            oid=record['organization_id']
-            if ctx['purpose']=='signup':sid,oid=signup_entities(conn,record,ctx)
-            if oid and not sid:
-                sid=conn.execute(select(event_participations.c.agency_site_id).where(event_participations.c.organization_id==oid,event_participations.c.status=='active').order_by(event_participations.c.created_at.desc())).scalar()
-            is_new=not target
-            if target and not target['active']:fail('ACCOUNT_SUSPENDED',409)
-            if not target:
-                personal=ctx['purpose']=='personal'
-                hashed=record['password_hash'] or hash_password(secrets.token_urlsafe(32))
-                target=dict(id=new_id(),email=record['email'],name=record['name'],role='attendee' if personal else record['requested_role'],scope_id=None if personal else sid,
-                            password_hash=hashed,active=1 if record['password_hash'] else 0,must_change_password=0)
-                conn.execute(insert(users).values(**target))
-                if record['phone']:bind_phone(conn,target['id'],record['phone'])
-            approve_links(conn,actor,record,ctx,target,sid,oid)
-            conn.execute(update(wf).where(wf.c.request_id==rid).values(user_id=target['id'],result_site_id=sid,result_organization_id=oid,
-                setup_expires_at=expires(1) if is_new and not record['password_hash'] else None))
-    conn.execute(update(ar).where(ar.c.id==rid,ar.c.status=='pending').values(status=action,password_hash=None,reviewed_by=actor['id'],reviewed_at=now(),decision_reason=reason))
-    sync_legacy(conn,rid,action)
-    write_audit(conn,actor,record['scope_id'] if record['scope_type']=='site' else None,'account_request_'+action,{'request_id':rid,'scope_type':record['scope_type'],'scope_id':record['scope_id'],'result':action})
-    return view(conn,dict(record,status=action,password_hash=None,reviewed_by=actor['id'],reviewed_at=now(),decision_reason=reason))
+            _approve_identity(tx, record, workflow, request_id)
+    values = _close(tx, request_id, action, only_pending=True, reviewed_by=actor['id'], decision_reason=reason)
+    write_audit(tx, actor, record['scope_id'] if record['scope_type'] == 'site' else None, 'account_request_' + action,
+                {'request_id': request_id, 'scope_type': record['scope_type'], 'scope_id': record['scope_id'],
+                 'result': action})
+    return view(tx, dict(record, **values))
 
 
-def owned(conn, token, lock=False):
-    if not isinstance(token,str) or not 32<=len(token)<=80:fail('ACCOUNT_REQUEST_NOT_FOUND',404)
-    q=select(ar).join(wf,ar.c.id==wf.c.request_id).where(wf.c.tracking_hash==digest(token))
-    if lock:q=q.with_for_update(of=ar)
-    record=conn.execute(q).mappings().first()
-    if not record:fail('ACCOUNT_REQUEST_NOT_FOUND',404)
+def owned(tx, token, lock=False):
+    require_tracking_token(token)
+    record = _requests().by_tracking_hash(tx, digest(token), for_update=lock)
+    if not record:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
     return record
 
 
-def status(conn, token):
-    expire_pending(conn)
-    return view(conn,owned(conn,token))
+def status(tx, token):
+    expire_pending(tx)
+    return view(tx, owned(tx, token))
 
 
-def cancel(conn, token):
-    expire_pending(conn)
-    record=owned(conn,token,True)
-    if record['status']!='pending':return view(conn,record)
-    conn.execute(update(ar).where(ar.c.id==record['id']).values(status='cancelled',password_hash=None,reviewed_at=now()))
-    sync_legacy(conn,record['id'],'cancelled')
-    write_audit(conn,None,None,'account_request_cancelled',{'request_id':record['id']})
-    return view(conn,dict(record,status='cancelled',password_hash=None,reviewed_at=now()))
+def cancel(tx, token):
+    expire_pending(tx)
+    record = owned(tx, token, True)
+    if record['status'] != 'pending':
+        return view(tx, record)
+    values = _close(tx, record['id'], 'cancelled')
+    write_audit(tx, None, None, 'account_request_cancelled', {'request_id': record['id']})
+    return view(tx, dict(record, **values))
 
 
-def setup_password(conn, token, body):
-    record=owned(conn,token,True);ctx=context(conn,record['id'])
-    if record['status']!='approved' or not ctx['setup_expires_at'] or ctx['setup_expires_at']<=now():fail('ACCOUNT_SETUP_UNAVAILABLE',409)
-    if body.get('password')!=body.get('confirmation'):fail('PASSWORD_CONFIRMATION_MISMATCH')
-    hashed=hash_password(body.get('password'))
-    changed=conn.execute(update(users).where(users.c.id==ctx['user_id'],users.c.active==0).values(password_hash=hashed,active=1)).rowcount
-    if changed!=1:fail('ACCOUNT_SETUP_UNAVAILABLE',409)
-    conn.execute(update(wf).where(wf.c.request_id==record['id']).values(setup_expires_at=None))
-    write_audit(conn,None,None,'account_password_set',{'request_id':record['id']})
-    return {'ok':True,'login_required':True}
+def setup_password(tx, token, body):
+    record = owned(tx, token, True)
+    workflow = context(tx, record['id'])
+    require_password_setup(record, workflow, now(), body)
+    if not _requests().activate_with_password(tx, workflow['user_id'], hash_password(body.get('password'))):
+        fail('ACCOUNT_SETUP_UNAVAILABLE', Conflict)
+    _requests().update_workflow(tx, record['id'], {'setup_expires_at': None})
+    write_audit(tx, None, None, 'account_password_set', {'request_id': record['id']})
+    return {'ok': True, 'login_required': True}
 
 
-def renew_setup(conn, actor, rid):
-    record=conn.execute(select(ar).where(ar.c.id==rid).with_for_update()).mappings().first()
-    if not record or record['supervisor_id']!=actor['id'] or not authorized(conn,actor,record):fail('ACCOUNT_REQUEST_NOT_FOUND',404)
-    if record['requested_by']==actor['id']:fail('ACCOUNT_REQUEST_SELF_REVIEW',403)
-    ctx=context(conn,rid)
-    target=conn.execute(select(users).where(users.c.id==ctx['user_id'])).mappings().first()
-    if record['status']!='approved' or not ctx['setup_expires_at'] or not target or target['active']:fail('ACCOUNT_SETUP_UNAVAILABLE',409)
-    conn.execute(update(wf).where(wf.c.request_id==rid).values(setup_expires_at=expires(1)))
-    write_audit(conn,actor,None,'account_setup_renewed',{'request_id':rid})
-    return view(conn,record)
+def renew_setup(tx, actor, request_id):
+    record = _requests().request(tx, request_id, for_update=True)
+    if not _supervises(tx, actor, record):
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    workflow = context(tx, request_id)
+    require_setup_renewable(record, workflow, persistence.identity.user(tx, workflow['user_id']), actor)
+    _requests().update_workflow(tx, request_id, {'setup_expires_at': expires(SETUP_DAYS)})
+    write_audit(tx, actor, None, 'account_setup_renewed', {'request_id': request_id})
+    return view(tx, record)
 
 
-def list_submitted(conn, actor, status=None):
-    q=select(ar).join(wf,ar.c.id==wf.c.request_id).where(ar.c.requested_by==actor['id']).order_by(ar.c.created_at)
-    if status:q=q.where(ar.c.status==status)
-    return [view(conn,r) for r in conn.execute(q).mappings()]
+def list_submitted(tx, actor, status=None):
+    return [view(tx, record) for record in _requests().submitted_by(tx, actor['id'], status)]
 
 
-def invite_platform_candidate(conn, actor, body):
-    from app.account_requests_db import platform_account_invites as invites
-    if actor['role']!='platform' or not actor['active']:fail('FORBIDDEN_ROLE',403)
-    email,phone=contact_identity(body,preserve_email=True)
-    if find_contact_user(conn,email,phone):fail('ACCOUNT_ALREADY_EXISTS',409)
-    token=secrets.token_urlsafe(32);rid=new_id();end=expires(1)
-    conn.execute(insert(invites).values(id=rid,token_hash=digest(token),email=email,phone=phone,name=text(body.get('name'),160,True),
-        created_by=actor['id'],created_at=now(),expires_at=end))
-    write_audit(conn,actor,'platform','platform_account_invitation_created',{'invitation_id':rid})
-    return {'id':rid,'status':'invited','invitation_token':token,'expires_at':end,'grants_access':False}
+def invite_platform_candidate(tx, actor, body):
+    require_platform_inviter(actor)
+    email, phone = contact_identity(body, preserve_email=True)
+    if find_contact_user(tx, email, phone):
+        fail('ACCOUNT_ALREADY_EXISTS', Conflict)
+    token = secrets.token_urlsafe(32)
+    invite_id = new_id()
+    expires_at = expires(SETUP_DAYS)
+    _requests().add_platform_invite(tx, {
+        'id': invite_id, 'token_hash': digest(token), 'email': email, 'phone': phone,
+        'name': text(body.get('name'), 160, True), 'created_by': actor['id'], 'created_at': now(),
+        'expires_at': expires_at,
+    })
+    write_audit(tx, actor, 'platform', 'platform_account_invitation_created', {'invitation_id': invite_id})
+    return {'id': invite_id, 'status': 'invited', 'invitation_token': token, 'expires_at': expires_at,
+            'grants_access': False}
 
 
-def platform_invite(conn, token, lock=False):
-    from app.account_requests_db import platform_account_invites as invites
-    if not isinstance(token,str) or not 32<=len(token)<=80:fail('ACCOUNT_REQUEST_NOT_FOUND',404)
-    q=select(invites).where(invites.c.token_hash==digest(token))
-    if lock:q=q.with_for_update()
-    row=conn.execute(q).mappings().first()
-    if not row:fail('ACCOUNT_REQUEST_NOT_FOUND',404)
-    if not row['request_id'] and row['expires_at']<=now():fail('ACCOUNT_INVITATION_EXPIRED',409)
+def platform_invite(tx, token, lock=False):
+    require_tracking_token(token)
+    row = _requests().platform_invite(tx, digest(token), for_update=lock)
+    if not row:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+    require_invitation_usable(row, now())
     return row
 
 
-def inspect_platform_invite(conn, token):
-    row=platform_invite(conn,token)
-    return {'name':row['name'],'email':None if row['email'].startswith('tel:') else row['email'],'phone':row['phone'],
-            'expires_at':row['expires_at'],'submitted':bool(row['request_id'])}
+def inspect_platform_invite(tx, token):
+    row = platform_invite(tx, token)
+    return {'name': row['name'], 'email': None if row['email'].startswith('tel:') else row['email'],
+            'phone': row['phone'], 'expires_at': row['expires_at'], 'submitted': bool(row['request_id'])}
 
 
-def accept_platform_invite(conn, token, body):
-    from app.account_requests_db import platform_account_invites as invites
-    row=platform_invite(conn,token,True)
-    if row['request_id']:return {**view(conn,owned(conn,token)), 'tracking_token':token,'already_pending':True,'grants_access':False}
-    result=submit(conn,actor=None,body={'email':None if row['email'].startswith('tel:') else row['email'],'phone':row['phone'],
-        'name':row['name'],'password':body.get('password'),'confirmation':body.get('confirmation'),'request_key':token},purpose='site',scope_type='site',scope_id='platform',role='platform')
-    conn.execute(update(invites).where(invites.c.id==row['id']).values(request_id=result['id']))
+def accept_platform_invite(tx, token, body):
+    row = platform_invite(tx, token, True)
+    if row['request_id']:
+        return {**view(tx, owned(tx, token)), 'tracking_token': token, 'already_pending': True, 'grants_access': False}
+    result = submit(tx, actor=None, body={
+        'email': None if row['email'].startswith('tel:') else row['email'], 'phone': row['phone'],
+        'name': row['name'], 'password': body.get('password'), 'confirmation': body.get('confirmation'),
+        'request_key': token,
+    }, purpose='site', scope_type='site', scope_id='platform', role='platform')
+    _requests().link_platform_invite(tx, row['id'], result['id'])
     return result

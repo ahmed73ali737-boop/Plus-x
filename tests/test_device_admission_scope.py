@@ -1,6 +1,7 @@
 """Device telemetry cannot mutate administrative admission restrictions."""
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
+from app.api.errors import http_status
 from sqlalchemy import insert, select, update
 
 from app.application.device_service import authenticate_device, create_device, heartbeat, update_device
@@ -43,9 +44,9 @@ def test_heartbeat_cannot_erase_or_override_checkpoint_and_shift_scope(conn):
 
 @pytest.mark.parametrize('checkpoints', [None, 'main', ['main', 'main'], ['../main'], [False], [[]], ['x'*41], ['p'+str(n) for n in range(101)]])
 def test_create_rejects_invalid_checkpoint_policy(conn, checkpoints):
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(DomainError) as exc:
         make_device(conn, {'checkpoints': checkpoints})
-    assert exc.value.status_code == 422
+    assert http_status(exc.value) == 422
     assert not conn.execute(select(devices)).first()
 
 
@@ -57,7 +58,7 @@ def test_empty_checkpoint_list_is_preserved_as_explicit_deny_all(conn):
 
 def test_invalid_admin_update_does_not_erase_previous_policy(conn):
     device_id = make_device(conn, {'checkpoints': ['vip']})
-    with pytest.raises(HTTPException):
+    with pytest.raises(DomainError):
         update_device(conn, device_id, metadata_json={'checkpoints': 'all'})
     assert authenticate_device(conn, 'device-secret')['metadata_json']['checkpoints'] == ['vip']
 
@@ -69,9 +70,9 @@ def test_invalid_admin_update_does_not_erase_previous_policy(conn):
 def test_expired_or_future_device_shift_rejects_token_and_heartbeat(conn, policy):
     make_device(conn, policy)
     for operation in (lambda: authenticate_device(conn, 'device-secret'), lambda: heartbeat(conn, 'device-secret', {'metadata': {'valid_until': None}})):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(DomainError) as exc:
             operation()
-        assert exc.value.status_code == 401 and exc.value.detail == 'DEVICE_SHIFT_INACTIVE'
+        assert http_status(exc.value) == 401 and exc.value.detail == 'DEVICE_SHIFT_INACTIVE'
 
 
 def test_device_shift_compares_instants_across_timezone_offsets(conn):
@@ -85,24 +86,24 @@ def test_device_shift_compares_instants_across_timezone_offsets(conn):
     {'valid_from': '2026-10-19T14:00:00+00:00', 'valid_until': '2026-10-19T13:00:00+00:00'},
 ])
 def test_admin_rejects_invalid_or_reversed_shift(conn, policy):
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(DomainError) as exc:
         make_device(conn, policy)
-    assert exc.value.status_code == 422
+    assert http_status(exc.value) == 422
 
 
 def test_legacy_invalid_shift_fails_closed_and_unrestricted_legacy_device_still_works(conn):
     device_id = make_device(conn)
     assert authenticate_device(conn, 'device-secret')['metadata_json'] == {}
     conn.execute(update(devices).where(devices.c.id == device_id).values(metadata_json={'valid_until': 'bad-time'}))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(DomainError) as exc:
         authenticate_device(conn, 'device-secret')
-    assert exc.value.status_code == 401
+    assert http_status(exc.value) == 401
 
 
 def test_invalid_telemetry_is_rejected_without_scope_changes(conn):
     make_device(conn, {'checkpoints': ['vip']})
     for body in ({'pending_count': float('nan')}, {'pending_count': float('inf')}, {'metadata': {'kiosk': 'false'}}):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(DomainError) as exc:
             heartbeat(conn, 'device-secret', body)
-        assert exc.value.status_code == 422
+        assert http_status(exc.value) == 422
     assert authenticate_device(conn, 'device-secret')['metadata_json'] == {'checkpoints': ['vip']}

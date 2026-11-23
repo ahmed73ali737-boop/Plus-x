@@ -3,12 +3,11 @@ from hashlib import sha256
 import json
 import subprocess,tempfile
 import sys
-from sqlalchemy import insert
 from app.application.audit_service import new_id
 from app.application.self_certificate_access import require_library
 from app.application.self_certificate_clock import utc_now
-from app.self_certificates_db import assets
-from app.domain import fail
+from app.application.ports import persistence
+from app.domain import fail, Unavailable, InvalidInput
 from app.application.self_certificate_sandbox import clean_environment
 
 MAX_BACKGROUND_BYTES=3_000_000
@@ -31,22 +30,22 @@ def validate_upload(data,kind):
     except subprocess.TimeoutExpired:
         fail('ASSET_PROCESS_TIMEOUT')
     except OSError:
-        fail('ASSET_PROCESS_UNAVAILABLE',503)
+        fail('ASSET_PROCESS_UNAVAILABLE', Unavailable)
     if result.returncode!=0:
         fail('ASSET_RESOURCE_LIMIT')
     try:
         header,normalized=result.stdout.split(b'\n',1)
         info=json.loads(header)
     except (ValueError,UnicodeDecodeError):
-        fail('ASSET_PROCESS_FAILED',503)
+        fail('ASSET_PROCESS_FAILED', Unavailable)
     if 'error' in info:
-        fail(info['error'],503 if info['error']=='ASSET_PROCESS_ISOLATION_UNAVAILABLE' else 422)
+        fail(info['error'],Unavailable if info['error']=='ASSET_PROCESS_ISOLATION_UNAVAILABLE' else InvalidInput)
     if not normalized or len(normalized)>MAX_NORMALIZED_BYTES:
         fail('ASSET_RESOURCE_LIMIT')
     return normalized,info
 
-def ingest_asset(conn,user,store,data,kind):
-    principal=require_library(conn,user)
+def ingest_asset(tx,user,store,data,kind):
+    principal=require_library(tx,user)
     normalized,info=validate_upload(data,kind)
     stored=store.put(normalized)
     row=dict(id=new_id(),owner_account_id=principal['id'],kind=kind,
@@ -55,5 +54,5 @@ def ingest_asset(conn,user,store,data,kind):
         original_size_bytes=len(data),source_metadata={**info['source_metadata'],
             'uploaded_sha256':sha256(data).hexdigest()},created_at=utc_now())
     # An aborted transaction leaves a private orphan, removed by the age-delayed bounded cleaner.
-    conn.execute(insert(assets).values(**row))
+    persistence.self_certificates.add_asset(tx,row)
     return row

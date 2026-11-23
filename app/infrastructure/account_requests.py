@@ -11,22 +11,11 @@ import uuid
 from sqlalchemy import insert, select, func
 from sqlalchemy.exc import IntegrityError
 
-from app.account_requests_db import account_requests
+from app.infrastructure.persistence.account_request_tables import account_requests
 from app.core.security import hash_password
-from app.db import users
-from app.domain import fail, now, text
-
-# Explicit projection: future storage fields are private until consciously exposed.
-PUBLIC_FIELDS = (
-    'id', 'email', 'name', 'phone', 'requested_role', 'scope_type', 'scope_id',
-    'site_id', 'organization_id', 'event_id', 'person_id', 'participation_id',
-    'membership_role', 'assignment_role', 'source', 'supervisor_id', 'requested_by',
-    'reviewed_by', 'status', 'created_at', 'expires_at', 'reviewed_at', 'decision_reason',
-)
-
-
-def public_account_request(record):
-    return {key: record[key] for key in PUBLIC_FIELDS}
+from app.infrastructure.persistence.tables import users
+from app.domain import fail, now, text, Conflict
+from app.domain.account_requests import PUBLIC_FIELDS, public_account_request
 
 
 def read_account_request(conn, request_id):
@@ -67,7 +56,7 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
     except (AttributeError, TypeError, ValueError):
         fail('ACCOUNT_REQUEST_EXPIRY_INVALID')
     if not allow_existing and conn.execute(select(users.c.id).where(func.lower(func.trim(users.c.email)) == email)).first():
-        fail('ACCOUNT_ALREADY_EXISTS', 409)
+        fail('ACCOUNT_ALREADY_EXISTS', Conflict)
     record = dict(id=uuid.uuid4().hex, email=email, name=name,
                   phone=text(phone, 40) or None, requested_role=requested_role,
                   scope_type=scope_type, scope_id=scope_id,
@@ -89,8 +78,8 @@ def add_pending_account_request(conn, *, email, name, requested_role, scope_type
             ((account_requests.c.email == email) | (account_requests.c.phone == phone)) if phone else account_requests.c.email == email, account_requests.c.scope_type == scope_type,
             account_requests.c.scope_id == scope_id, account_requests.c.status == 'pending')).first()
         if duplicate:
-            fail('ACCOUNT_REQUEST_PENDING', 409)
+            fail('ACCOUNT_REQUEST_PENDING', Conflict)
         if conn.execute(select(account_requests.c.id).where(account_requests.c.request_key == request_key)).first():
-            fail('ACCOUNT_REQUEST_KEY_EXISTS', 409)
+            fail('ACCOUNT_REQUEST_KEY_EXISTS', Conflict)
         raise
     return public_account_request(record)

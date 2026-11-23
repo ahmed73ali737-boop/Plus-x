@@ -1,20 +1,21 @@
+"""Legacy site access requests (superseded by account requests, still listed)."""
 from __future__ import annotations
 
-from sqlalchemy import select, update
+from app.application.ports import persistence
+from app.domain import NotFound, fail
 
-from app.db import requests
-from app.domain import fail
-
-REQUEST_STATUSES=('pending','approved','rejected')
+REQUEST_STATUSES = ('pending', 'approved', 'rejected')
 
 
-def list_requests(conn, site_id: str):
-    return [dict(x) for x in conn.execute(select(requests).where(requests.c.site_id==site_id).order_by(requests.c.created_at.desc())).mappings()]
+def list_requests(tx, site_id: str):
+    return persistence.site_admin.access_requests(tx, site_id)
 
 
-def set_request_status(conn, site_id: str, request_id: str, status: str):
-    if status not in REQUEST_STATUSES: fail('REQUEST_STATUS_INVALID')
-    req=conn.execute(select(requests).where(requests.c.id==request_id,requests.c.site_id==site_id)).mappings().first()
-    if not req: fail('ACCESS_REQUEST_NOT_FOUND',404)
-    conn.execute(update(requests).where(requests.c.id==request_id).values(status=status))
-    return {**dict(req),'status':status}
+def set_request_status(tx, site_id: str, request_id: str, status: str):
+    if status not in REQUEST_STATUSES:
+        fail('REQUEST_STATUS_INVALID')
+    request = persistence.site_admin.access_request(tx, site_id, request_id)
+    if not request:
+        fail('ACCESS_REQUEST_NOT_FOUND', NotFound)
+    persistence.site_admin.set_access_request_status(tx, request_id, status)
+    return {**request, 'status': status}

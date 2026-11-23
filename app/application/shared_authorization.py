@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.domain import fail
+from app.domain import fail, Forbidden, Unavailable
 
 
 @dataclass(frozen=True)
@@ -36,13 +36,13 @@ def authorize_organizer_action(mode: str, port: OrganizerAuthorizationPort | Non
     if mode == "Off":
         return
     if mode != "Enforce":
-        fail("SHARED_AUTHORIZATION_MODE_INVALID", 503)
+        fail("SHARED_AUTHORIZATION_MODE_INVALID", Unavailable)
     if port is None:
-        fail("SHARED_AUTHORIZATION_UNAVAILABLE", 503)
+        fail("SHARED_AUTHORIZATION_UNAVAILABLE", Unavailable)
     actor = user.get("id")
     site_id = site.get("id")
     if not actor or not site_id or not user.get("role") or not action:
-        fail("SHARED_AUTHORIZATION_CONTEXT_MISSING", 403)
+        fail("SHARED_AUTHORIZATION_CONTEXT_MISSING", Forbidden)
     question = SharedOrganizerDecision(
         actor_id=str(actor), role=str(user["role"]),
         user_scope_id=str(user.get("scope_id") or ""),
@@ -54,6 +54,6 @@ def authorize_organizer_action(mode: str, port: OrganizerAuthorizationPort | Non
         allowed = port.allow(question)
     except Exception:
         # Never turn an unavailable provider into a permissive fallback.
-        fail("SHARED_AUTHORIZATION_UNAVAILABLE", 503)
+        fail("SHARED_AUTHORIZATION_UNAVAILABLE", Unavailable)
     if allowed is not True:
-        fail("SHARED_AUTHORIZATION_FORBIDDEN", 403)
+        fail("SHARED_AUTHORIZATION_FORBIDDEN", Forbidden)

@@ -2,7 +2,7 @@
 from copy import deepcopy
 import re
 import pytest
-from fastapi import HTTPException
+from app.domain import DomainError
 from PIL import Image
 from sqlalchemy import insert,select,update,text
 from sqlalchemy.exc import DBAPIError
@@ -25,14 +25,14 @@ def test_profile_uses_original_hashed_assets_and_opaque_card():
         assert result.getpixel((r['x'],r['y']))==(255,255,255,255)
         assert result.getpixel((r['x']+r['width'],r['y']))==source.getpixel((r['x']+r['width'],r['y']))
     forged=deepcopy(p);forged['label']=''
-    with pytest.raises(HTTPException):brand.composite_branding(source,forged)
+    with pytest.raises(DomainError):brand.composite_branding(source,forged)
 
 def test_missing_or_corrupt_branding_fails_closed(monkeypatch,tmp_path):
     monkeypatch.setattr(brand,'LOGO_PATH',tmp_path/'missing.png')
-    with pytest.raises(HTTPException) as exc:brand.system_profile(1200,800)
+    with pytest.raises(DomainError) as exc:brand.system_profile(1200,800)
     assert exc.value.detail=='BRANDING_ASSET_UNAVAILABLE'
     (tmp_path/'missing.png').write_bytes(b'fake')
-    with pytest.raises(HTTPException):brand.system_profile(1200,800)
+    with pytest.raises(DomainError):brand.system_profile(1200,800)
 
 def test_entire_name_and_stamp_rectangle_is_reserved_with_clearance():
     p=brand.system_profile(1200,800);r=p['card_rect']
@@ -41,7 +41,7 @@ def test_entire_name_and_stamp_rectangle_is_reserved_with_clearance():
     for bad in [dict(r),dict(x=0,y=r['y']-2,width=300,height=1),
         dict(x=r['x']+.1,y=r['y']+.1,width=1,height=1),
         dict(x=-1,y=1,width=20,height=20),dict(x=0,y=0,width=float('nan'),height=20)]:
-        with pytest.raises(HTTPException):brand.validate_reserved_rect(bad,p,1200,800)
+        with pytest.raises(DomainError):brand.validate_reserved_rect(bad,p,1200,800)
 
 def test_new_revisions_freeze_brand_and_legacy_null_is_not_rewritten(db):
     first=model(db)

@@ -6,12 +6,12 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy import func, insert, select
 
-from app.application.audit_service import new_id
 from app.core.files import create_private_file
 from app.core.paths import resolve_path
 from app.core.security import hash_password, new_temporary_password
 from app.db import assignments, event_participations, memberships, organizations, sites, users, versions
 from app.domain import default_config, normalize_config, now
+from app.domain.values import new_id
 
 
 def seed_demo_data(engine, credentials_path=None, count=10, *, demo_day: date | None = None):

@@ -1,187 +1,123 @@
+"""Authorization use cases: site management/read scope and event capabilities.
+
+The role/capability rules live in app.domain.authorization; this module loads
+the facts (assignments, memberships, participations) and applies them.
+"""
 from __future__ import annotations
 
-from datetime import datetime
-
-from sqlalchemy import select
-
-from app.db import assignments, event_participations, memberships
-from app.domain import fail, now
 from app.application.audit_service import AuditedDenial
-from app.infrastructure.repository import get_site
+from app.application.ports import persistence
+from app.domain import Forbidden, NotFound, fail, now
+from app.domain import authorization
+from app.domain.authorization import (
+    EVENT_PERMISSIONS,
+    EVENT_ROLE_PERMISSIONS,
+    ORGANIZATION_MANAGEMENT_ROLES,
+    SITE_MANAGEMENT_ROLES,
+    active_participation,
+    direct_agency_access,
+    event_capabilities,
+    has_full_event_authority,
+    is_active_user,
+    manages_by_assignment,
+    manages_by_role,
+    reads_by_assignment,
+)
 
-
-# Admission authority is separate from editing a site. A scanner must never gain
-# access to publishing, account administration or guest exports via require_scope.
-EVENT_PERMISSIONS = frozenset({
-    'guests.read', 'guests.register', 'guests.export', 'guests.checkin',
-    'invitations.manage', 'invitations.review', 'policy.manage', 'committee.manage',
-    'certificates.manage', 'certificates.issue', 'certificates.revoke',
-})
-EVENT_ROLE_PERMISSIONS = {
-    'event_manager': EVENT_PERMISSIONS,
-    'reception': frozenset({'guests.read', 'guests.register', 'guests.checkin'}),
-    'scanner': frozenset({'guests.read', 'guests.checkin'}),
-    'committee_supervisor': frozenset({
-        'guests.read', 'guests.register', 'guests.checkin',
-        'invitations.manage', 'invitations.review',
-    }),
-    'analyst': frozenset({'guests.read'}),
-    'auditor': frozenset({'guests.read'}),
-}
-SITE_MANAGEMENT_ROLES = frozenset({'owner', 'admin', 'editor', 'event_manager', 'site_manager'})
-ORGANIZATION_MANAGEMENT_ROLES = frozenset({'owner', 'admin', 'editor'})
+__all__ = [
+    'EVENT_PERMISSIONS', 'EVENT_ROLE_PERMISSIONS', 'ORGANIZATION_MANAGEMENT_ROLES', 'SITE_MANAGEMENT_ROLES',
+    'active_participation', 'active_window', 'can_manage', 'can_read', 'event_permissions', 'get_site',
+    'organization_visible', 'require_event_permission', 'require_read_scope', 'require_scope',
+]
 
 
 def active_window(record: dict) -> bool:
-    """Time-bounded assignment check.
+    """Assignment/shift window check against this module's clock (``now``)."""
+    return authorization.active_window(record, now())
 
-    Assignments may intentionally expire. Participation access is different:
-    an ended event must remain administrable for reporting, export and archive
-    work; only an explicit participation status change revokes that access.
-    """
-    if record.get('status', 'active') != 'active':
+
+def get_site(tx, site_id: str) -> dict:
+    site = persistence.sites.get(tx, site_id)
+    if not site:
+        fail('SITE_NOT_FOUND', NotFound)
+    return site
+
+
+def can_manage(tx, user, site) -> bool:
+    if not is_active_user(user):
         return False
-    try:
-        current = datetime.fromisoformat(now().replace('Z', '+00:00'))
-        start = datetime.fromisoformat(record['valid_from'].replace('Z', '+00:00')) if record.get('valid_from') else None
-        end = datetime.fromisoformat(record['valid_until'].replace('Z', '+00:00')) if record.get('valid_until') else None
-        return (start is None or start <= current) and (end is None or current < end)
-    except (TypeError, ValueError, AttributeError):
-        # Invalid/naive timestamps fail closed rather than granting a shift.
-        return False
-
-
-def active_participation(record: dict) -> bool:
-    return record.get('status', 'active') == 'active'
-
-
-def can_manage(conn, user, site) -> bool:
-    if not user or not user.get('active', 1):
-        return False
-    if user['role'] == 'platform':
+    if manages_by_role(user, site):
         return True
-    if user['role'] == 'organizer' and (user['scope_id'] == site['id'] or site['event_id'] == user['scope_id']):
-        return True
-    # A direct agency/site account is still governed by the participation lifecycle.
-    # If this is a legacy standalone agency page without a participation row, keep direct access.
+    access = persistence.access
     if user['role'] == 'agency' and user['scope_id'] == site['id']:
-        linked = conn.execute(select(event_participations).where(event_participations.c.agency_site_id == site['id'])).mappings().all()
-        if not linked:
-            return True
-        related_memberships = conn.execute(select(memberships).where(
-            memberships.c.user_id == user['id'],
-            memberships.c.organization_id.in_([p['organization_id'] for p in linked]),
-        )).mappings().all()
-        if related_memberships:
-            authorized_orgs = {m['organization_id'] for m in related_memberships
-                               if m['status'] == 'active' and m['role'] in ORGANIZATION_MANAGEMENT_ROLES}
-            return any(active_participation(dict(p)) and p['organization_id'] in authorized_orgs for p in linked)
-        # Legacy direct accounts without a membership keep their original scope.
-        return any(active_participation(dict(p)) for p in linked)
-
-    user_assignments = conn.execute(
-        select(assignments).where(
-            assignments.c.user_id == user['id'],
-            assignments.c.site_id == site['id'],
-        )
-    ).mappings().all()
-    if any(a['role'] in SITE_MANAGEMENT_ROLES and active_window(dict(a)) for a in user_assignments):
+        linked = access.participations_for_agency_site(tx, site['id'])
+        related = access.memberships_in(tx, user['id'], [p['organization_id'] for p in linked]) if linked else []
+        return direct_agency_access(user['id'], linked, related)
+    if manages_by_assignment(access.assignments(tx, user['id'], site['id']), now()):
         return True
-
-    organization_ids = [
-        m['organization_id']
-        for m in conn.execute(
-            select(memberships).where(
-                memberships.c.user_id == user['id'],
-                memberships.c.status == 'active',
-                memberships.c.role.in_(ORGANIZATION_MANAGEMENT_ROLES),
-            )
-        ).mappings()
-    ]
+    organization_ids = access.active_membership_org_ids(tx, user['id'], ORGANIZATION_MANAGEMENT_ROLES)
     if organization_ids:
-        participations = conn.execute(
-            select(event_participations).where(
-                event_participations.c.organization_id.in_(organization_ids),
-                event_participations.c.agency_site_id == site['id'],
-            )
-        ).mappings().all()
-        if any(active_participation(dict(p)) for p in participations):
+        participations = access.participations_of(tx, organization_ids, site['id'])
+        if any(active_participation(p) for p in participations):
             return True
     return False
 
 
-def event_permissions(conn, user, event_id: str) -> frozenset[str]:
+def event_permissions(tx, user, event_id: str) -> frozenset[str]:
     """Return event capabilities for this scope and current shift."""
-    event = get_site(conn, event_id)
+    event = get_site(tx, event_id)
     if event['kind'] != 'event':
-        fail('EVENT_REQUIRED', 422)
-    if not user or not user.get('active', 1):
+        fail('EVENT_REQUIRED')
+    if not is_active_user(user):
         return frozenset()
-    if user['role'] == 'platform' or (user['role'] == 'organizer' and user.get('scope_id') == event_id):
+    if has_full_event_authority(user, event_id):
         return EVENT_PERMISSIONS
-    grants = set()
-    for assignment in conn.execute(select(assignments).where(
-        assignments.c.user_id == user['id'], assignments.c.site_id == event_id,
-    )).mappings():
-        if active_window(dict(assignment)):
-            grants.update(EVENT_ROLE_PERMISSIONS.get(assignment['role'], ()))
-    return frozenset(grants)
+    return event_capabilities(user, event_id, persistence.access.assignments(tx, user['id'], event_id), now())
 
 
-def require_event_permission(conn, user, event_id: str, action: str):
+def require_event_permission(tx, user, event_id: str, action: str):
     """Authorize one action, failing closed for unknown permission names."""
     if action not in EVENT_PERMISSIONS:
-        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', 403, action='scope_denied', user=user)
-    if action not in event_permissions(conn, user, event_id):
-        # event_permissions has resolved this scope from the database.
-        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', 403, action='scope_denied', user=user, site_id=event_id)
-    return get_site(conn, event_id)
+        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', Forbidden, action='scope_denied', user=user)
+    if action not in event_permissions(tx, user, event_id):
+        raise AuditedDenial('FORBIDDEN_EVENT_PERMISSION', Forbidden, action='scope_denied', user=user, site_id=event_id)
+    return get_site(tx, event_id)
 
 
-def require_scope(conn, user, site_id: str):
-    site = get_site(conn, site_id)
-    if not can_manage(conn, user, site):
-        raise AuditedDenial('FORBIDDEN_SCOPE', 403, action='scope_denied', user=user, site_id=site['id'])
+def require_scope(tx, user, site_id: str):
+    site = get_site(tx, site_id)
+    if not can_manage(tx, user, site):
+        raise AuditedDenial('FORBIDDEN_SCOPE', Forbidden, action='scope_denied', user=user, site_id=site['id'])
     return site
 
 
-def can_read(conn, user, site) -> bool:
+def can_read(tx, user, site) -> bool:
     """Read-only analytics access never flows back into can_manage."""
-    if can_manage(conn, user, site):
+    if can_manage(tx, user, site):
         return True
-    if not user or not user.get('active', 1):
+    if not is_active_user(user):
         return False
-    for assignment in conn.execute(select(assignments).where(
-        assignments.c.user_id == user['id'], assignments.c.site_id == site['id'],
-        assignments.c.role.in_(('analyst', 'auditor')),
-    )).mappings():
-        if active_window(dict(assignment)):
-            return True
-    org_ids = conn.execute(select(memberships.c.organization_id).where(
-        memberships.c.user_id == user['id'], memberships.c.status == 'active',
-        memberships.c.role == 'analyst',
-    )).scalars().all()
-    if not org_ids:
+    access = persistence.access
+    if reads_by_assignment(access.assignments(tx, user['id'], site['id'], roles=('analyst', 'auditor')), now()):
+        return True
+    organization_ids = access.active_membership_org_ids(tx, user['id'], ('analyst',))
+    if not organization_ids:
         return False
-    return bool(conn.execute(select(event_participations.c.id).where(
-        event_participations.c.organization_id.in_(org_ids),
-        event_participations.c.agency_site_id == site['id'],
-        event_participations.c.status == 'active',
-    )).first())
+    return bool(access.participations_of(tx, organization_ids, site['id'], active_only=True))
 
 
-def require_read_scope(conn, user, site_id: str):
-    site = get_site(conn, site_id)
-    if not can_read(conn, user, site):
-        raise AuditedDenial('FORBIDDEN_SCOPE', 403, action='scope_denied', user=user, site_id=site['id'])
+def require_read_scope(tx, user, site_id: str):
+    site = get_site(tx, site_id)
+    if not can_read(tx, user, site):
+        raise AuditedDenial('FORBIDDEN_SCOPE', Forbidden, action='scope_denied', user=user, site_id=site['id'])
     return site
 
 
-def organization_visible(conn, user, organization_id: str) -> bool:
-    if user['role']=='platform':
+def organization_visible(tx, user, organization_id: str) -> bool:
+    if user['role'] == 'platform':
         return True
-    if conn.execute(select(memberships).where(memberships.c.user_id==user['id'],memberships.c.organization_id==organization_id,memberships.c.status=='active')).first():
+    if persistence.access.has_active_membership(tx, user['id'], organization_id):
         return True
-    if user['role']=='organizer':
-        return bool(conn.execute(select(event_participations).where(event_participations.c.organization_id==organization_id,event_participations.c.event_id==user['scope_id'])).first())
+    if user['role'] == 'organizer':
+        return persistence.access.organization_in_event(tx, organization_id, user['scope_id'])
     return False

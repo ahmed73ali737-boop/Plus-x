@@ -1,7 +1,7 @@
 """Persistent, versioned HMAC capabilities. Never log or return signing keys."""
 import base64,hashlib,hmac,json,os,re,secrets,time
 from pathlib import Path
-from app.domain import fail
+from app.domain import fail, Forbidden, NotFound, Unavailable
 from app.application.self_certificate_keys import bounded_json,VersionedKeys
 
 PART=re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
@@ -29,28 +29,28 @@ class Keyring:
             if self.current not in self.keys:raise ValueError()
             self.keys[self.current]
         except (OSError,ValueError,KeyError,TypeError):
-            fail('CERTIFICATE_KEYS_UNAVAILABLE',503)
+            fail('CERTIFICATE_KEYS_UNAVAILABLE', Unavailable)
 
     def sign(self,purpose,value,version=None):
         version=version or self.current
         try:key=self.keys.get(version)
-        except (OSError,ValueError,KeyError,TypeError):fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE',503)
-        if key is None:fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE',503)
+        except (OSError,ValueError,KeyError,TypeError):fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE', Unavailable)
+        if key is None:fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE', Unavailable)
         message=(purpose+'\0'+value).encode()
         return base64.urlsafe_b64encode(hmac.digest(key,message,'sha256')).decode().rstrip('=')
 
     def token(self,purpose,ident,version=None):
         version=version or self.current
-        if not isinstance(ident,str) or not PART.fullmatch(ident):fail('TOKEN_INVALID',404)
+        if not isinstance(ident,str) or not PART.fullmatch(ident):fail('TOKEN_INVALID', NotFound)
         return version+'.'+ident+'.'+self.sign(purpose,ident,version)
 
     def verify(self,purpose,token):
-        if not isinstance(token,str) or len(token)>220:fail('NOT_FOUND',404)
+        if not isinstance(token,str) or len(token)>220:fail('NOT_FOUND', NotFound)
         parts=token.split('.')
-        if len(parts)!=3 or not all(PART.fullmatch(p) for p in parts):fail('NOT_FOUND',404)
+        if len(parts)!=3 or not all(PART.fullmatch(p) for p in parts):fail('NOT_FOUND', NotFound)
         version,ident,signature=parts
-        if version not in self.keys:fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE',503)
-        if not hmac.compare_digest(signature,self.sign(purpose,ident,version)):fail('NOT_FOUND',404)
+        if version not in self.keys:fail('CERTIFICATE_KEY_VERSION_UNAVAILABLE', Unavailable)
+        if not hmac.compare_digest(signature,self.sign(purpose,ident,version)):fail('NOT_FOUND', NotFound)
         return ident,version
 
     def nonce(self,browser_id,link_id):
@@ -59,13 +59,13 @@ class Keyring:
         return self.current+'.'+epoch+'.'+self.sign('request-nonce',value)
 
     def check_nonce(self,nonce,browser_id,link_id):
-        if not isinstance(nonce,str) or len(nonce)>180:fail('REQUEST_NONCE_INVALID',403)
+        if not isinstance(nonce,str) or len(nonce)>180:fail('REQUEST_NONCE_INVALID', Forbidden)
         parts=nonce.split('.')
-        if len(parts)!=3:fail('REQUEST_NONCE_INVALID',403)
+        if len(parts)!=3:fail('REQUEST_NONCE_INVALID', Forbidden)
         version,epoch,signature=parts
-        if not epoch.isdigit() or abs(int(time.time())//900-int(epoch))>1:fail('REQUEST_NONCE_EXPIRED',403)
+        if not epoch.isdigit() or abs(int(time.time())//900-int(epoch))>1:fail('REQUEST_NONCE_EXPIRED', Forbidden)
         if version not in self.keys or not hmac.compare_digest(signature,self.sign('request-nonce',browser_id+':'+link_id+':'+epoch,version)):
-            fail('REQUEST_NONCE_INVALID',403)
+            fail('REQUEST_NONCE_INVALID', Forbidden)
 
 def token_hash(value):
     return hashlib.sha256(value.encode()).hexdigest()

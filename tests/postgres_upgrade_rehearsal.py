@@ -68,10 +68,10 @@ def main():
             mark('all_expected_migrations',set(c.execute(text('SELECT migration_id FROM px_schema_migrations')).scalars())==set(expected_migration_checksums()) and not inventory(c)['migration_mismatch'])
         again=runner.apply_migrations(source)
         with source.connect() as c:mark('replay_no_rotation_or_effect',state_fingerprints(c)==after and not again['applied'])
-        from fastapi import HTTPException
+        from app.domain import DomainError
         try:
             with source.begin() as c:svc.save_policy(c,ev['id'],{'enabled':True})
-        except HTTPException as error:mark('legacy_managed_guard_preserved',error.detail=='LEGACY_PASSES_REQUIRE_MIGRATION')
+        except DomainError as error:mark('legacy_managed_guard_preserved',error.detail=='LEGACY_PASSES_REQUIRE_MIGRATION')
         else:raise AssertionError('Legacy policy guard was bypassed')
         with tempfile.TemporaryDirectory(prefix='px-upgrade-') as folder:
             folder=Path(folder)

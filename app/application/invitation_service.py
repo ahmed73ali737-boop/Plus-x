@@ -1,347 +1,393 @@
 """Invitation lifecycle, atomic day entitlements and bounded CSV/XLSX import.
 
-PostgreSQL serializes admission changes with the event policy row; SQLite uses
-BEGIN IMMEDIATE. No publicly supplied phone number is treated as a credential.
+Use cases lock the event's admission policy before changing admission state.
+No publicly supplied phone number is treated as a credential. The rules live in
+app.domain.admission (AdmissionPolicy, Invitation, Entitlement).
 """
 from __future__ import annotations
+
 import base64
 import csv
 import io
-import json
-from datetime import date, datetime, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from sqlalchemy import select, insert, update, delete, func
-from sqlalchemy.exc import IntegrityError
-from app.db import sites, event_guests, guests
-from app.invitations_db import admission_policies, guest_lists, invitations, entitlements, admission_uses
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from app.application.audit_service import new_id
-from app.application.guest_service import normalize_phone, register_guest, guest_qr_payload
+from app.application.guest_service import register_guest
+from app.application.ports import persistence
 from app.core.security import digest, new_session_token
-from app.domain import fail, now, text
-from app.xlsx_reader import parse_xlsx, Rejected
+from app.domain import Conflict, Forbidden, NotFound, fail, now, text
+from app.domain.admission import (
+    DEFAULT_POLICY,
+    AdmissionPolicy,
+    Entitlement,
+    GuestImport,
+    Invitation,
+    check_window,
+    day_list,
+    integer,
+    invitation_limits,
+    iso_time,
+    new_invitation,
+    policy_from_record,
+    require_active,
+    require_token_shape,
+    validate_current_days,
+)
+from app.domain.admission import assert_public_registration as _assert_public_registration
+from app.domain.admission import clean_invitation as _clean_identity
+from app.domain.guests import guest_qr_payload, new_event_pass_number
+from app.xlsx_reader import Rejected, parse_xlsx
 
-DEFAULT_POLICY = {'enabled': False, 'visibility': 'public', 'timezone': 'Asia/Aden', 'registration_mode': 'auto',
-                  'entry_mode': 'single', 'days': [], 'max_companions': 0, 'rsvp_deadline': None,
-                  'registration_opens_at': None, 'registration_closes_at': None}
+# Rules re-exported for callers of the previous module layout.
+__all__ = [
+    'DEFAULT_POLICY', 'assert_public_registration', 'by_token', 'check_window', 'clean_invitation',
+    'consume_entitlement', 'create_invitation', 'day_list', 'entitlement_status', 'event_view', 'get_invitation',
+    'get_policy', 'integer', 'iso_time', 'lock_policy', 'parse_guest_file', 'public_view', 'reserved_people',
+    'respond', 'review', 'revoke', 'rotate', 'save_policy', 'staff_view', 'validate_current_days',
+]
 
-def integer(value, low, high, code):
-    if isinstance(value, bool): fail(code)
-    try:
-        if str(int(value)) != str(value).strip(): fail(code)
-        result = int(value)
-    except (TypeError, ValueError): fail(code)
-    if result < low or result > high: fail(code)
-    return result
 
-def iso_time(value):
-    if not value: return None
-    try:
-        result = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
-        if result.tzinfo is None: fail('TIMEZONE_OFFSET_REQUIRED')
-        return result.astimezone(timezone.utc).isoformat()
-    except (ValueError, TypeError): fail('DATETIME_INVALID')
+def _admission():
+    return persistence.admission
 
-def day_list(value):
-    if not isinstance(value, list) or len(value) > 366: fail('DAYS_INVALID')
-    result = []
-    for item in value:
-        try:
-            day = date.fromisoformat(item).isoformat()
-        except (ValueError, TypeError): fail('DAY_INVALID')
-        if day != item or day in result: fail('DAY_INVALID_OR_DUPLICATE')
-        result.append(day)
-    return sorted(result)
 
-def get_policy(conn, event_id):
-    row = conn.execute(select(admission_policies).where(admission_policies.c.event_id == event_id)).mappings().first()
-    return {**DEFAULT_POLICY, **(row['config'] if row else {}), 'rev': row['rev'] if row else 0}
+def get_policy(tx, event_id):
+    return policy_from_record(_admission().policy_record(tx, event_id))
 
-def lock_policy(conn, event_id):
-    row = conn.execute(select(admission_policies).where(admission_policies.c.event_id == event_id).with_for_update()).mappings().first()
-    if not row:
-        try:
-            with conn.begin_nested():
-                conn.execute(insert(admission_policies).values(event_id=event_id, config=DEFAULT_POLICY, rev=1, updated_at=now()))
-        except IntegrityError: pass
-        conn.execute(select(admission_policies).where(admission_policies.c.event_id == event_id).with_for_update()).first()
-    return get_policy(conn, event_id)
 
-def save_policy(conn, event_id, body):
-    previous = get_policy(conn, event_id)
-    old = lock_policy(conn, event_id)
-    if previous['rev'] == 0: old['rev'] = 0
-    if body.get('rev') is not None and body['rev'] != old['rev']: fail('ADMISSION_POLICY_REVISION_CONFLICT', 409)
-    p = {k: body.get(k, old[k]) for k in DEFAULT_POLICY}
-    if not isinstance(p['enabled'], bool): fail('ENABLED_BOOLEAN_REQUIRED')
-    if p['visibility'] not in ('public', 'private', 'unlisted'): fail('VISIBILITY_INVALID')
-    if p['registration_mode'] not in ('auto', 'manual'): fail('REGISTRATION_MODE_INVALID')
-    if p['entry_mode'] not in ('single', 'daily'): fail('ENTRY_MODE_INVALID')
-    try: ZoneInfo(p['timezone'])
-    except (ZoneInfoNotFoundError, TypeError, ValueError): fail('TIMEZONE_INVALID')
-    p['max_companions'] = integer(p['max_companions'], 0, 50, 'MAX_COMPANIONS_INVALID')
-    if not isinstance(p['days'], list) or len(p['days']) > 366: fail('DAYS_INVALID')
-    days = day_list([d.get('date') for d in p['days'] if isinstance(d, dict)])
-    if len(days) != len(p['days']): fail('DAYS_INVALID')
-    p['days'] = sorted([{'date': d['date'], 'capacity': integer(d.get('capacity', 0), 0, 1000000, 'CAPACITY_INVALID')} for d in p['days']], key=lambda d: d['date'])
-    for key in ('rsvp_deadline', 'registration_opens_at', 'registration_closes_at'): p[key] = iso_time(p[key])
-    if p['registration_opens_at'] and p['registration_closes_at'] and p['registration_opens_at'] >= p['registration_closes_at']: fail('REGISTRATION_WINDOW_INVALID')
-    # Do not silently invalidate admitted people by shrinking days/capacity.
-    all_invites = conn.execute(select(invitations).where(invitations.c.event_id == event_id)).mappings().all()
-    approved = [inv for inv in all_invites if inv['status'] == 'approved']
-    fixed = [inv for inv in all_invites if inv['status'] == 'approved' or _used(conn, inv['id'])]
-    if fixed and p['entry_mode'] != old['entry_mode']: fail('ENTRY_MODE_HAS_APPROVALS', 409)
-    if fixed and p['timezone'] != old['timezone']: fail('TIMEZONE_HAS_APPROVALS', 409)
-    if fixed and old['enabled'] and not p['enabled']: fail('ADMISSION_POLICY_HAS_APPROVALS', 409)
-    if p['enabled'] and not old['enabled']:
-        legacy = conn.execute(select(event_guests).where(event_guests.c.event_id == event_id, event_guests.c.status == 'registered')).mappings().all()
-        for row in legacy:
-            iid = (row['metadata_json'] or {}).get('invitation_id')
-            linked = conn.execute(select(invitations.c.id).where(invitations.c.id == iid, invitations.c.event_id == event_id, invitations.c.guest_id == row['guest_id'])).first() if iid else None
-            if not linked: fail('LEGACY_PASSES_REQUIRE_MIGRATION', 409)
-    for inv in fixed:
-        if any(d not in days for d in inv['days']): fail('DAY_HAS_APPROVALS', 409)
-        if not inv['days'] and days: fail('UNDATED_APPROVALS_EXIST', 409)
-    for d in p['days']:
-        reserved = reserved_people(conn, event_id, d['date'])
-        if d['capacity'] and reserved > d['capacity']: fail('CAPACITY_BELOW_RESERVED', 409)
-    conn.execute(update(admission_policies).where(admission_policies.c.event_id == event_id).values(config=p, rev=old['rev'] + 1, updated_at=now()))
-    return {**p, 'rev': old['rev'] + 1}
+def lock_policy(tx, event_id):
+    _admission().lock_policy(tx, event_id)
+    return get_policy(tx, event_id)
 
-def assert_public_registration(conn, event_id):
-    p = get_policy(conn, event_id)
-    if not p['enabled']: fail('ADMISSION_REGISTRATION_DISABLED', 409)
-    if p['visibility'] == 'private': fail('INVITATION_REQUIRED', 403)
-    check_window(p)
-    return p
 
-def check_window(policy):
-    current = now()
-    if policy['registration_opens_at'] and current < policy['registration_opens_at']: fail('REGISTRATION_NOT_OPEN', 409)
-    if policy['registration_closes_at'] and current >= policy['registration_closes_at']: fail('REGISTRATION_CLOSED', 409)
-    if policy['rsvp_deadline'] and current >= policy['rsvp_deadline']: fail('RSVP_DEADLINE_PASSED', 409)
+def _used(tx, invitation_id) -> bool:
+    return _admission().consumed_total(tx, invitation_id) > 0
 
-def clean_invitation(conn, event_id, body):
-    p = get_policy(conn, event_id)
-    name = text(body.get('name'), 160, True)
-    phone = normalize_phone(body.get('phone'), body.get('country_code') or '+967')
-    list_id = text(body.get('list_id'), 64) or None
-    if list_id and not conn.execute(select(guest_lists.c.id).where(guest_lists.c.id == list_id, guest_lists.c.event_id == event_id)).first(): fail('GUEST_LIST_SCOPE', 403)
-    maximum = integer(body.get('max_companions', p['max_companions']), 0, p['max_companions'], 'MAX_COMPANIONS_INVALID')
-    days = day_list(body.get('days', []))
-    policy_days = {d['date'] for d in p['days']}
-    if policy_days and any(d not in policy_days for d in days): fail('DAY_NOT_IN_EVENT')
-    return {'name': name, 'phone': phone, 'list_id': list_id, 'max_companions': maximum, 'allowed_days': days}
 
-def create_invitation(conn, event_id, body):
-    lock_policy(conn, event_id)
-    values = clean_invitation(conn, event_id, body)
-    if conn.execute(select(invitations.c.id).where(invitations.c.event_id == event_id, invitations.c.phone == values['phone'])).first(): fail('INVITATION_ALREADY_EXISTS', 409)
-    token = new_session_token()
-    row = {'id': new_id(), 'event_id': event_id, **values, 'token_hash': digest(token), 'guest_id': None,
-           'status': 'invited', 'response': 'pending', 'companions': 0, 'days': [], 'answers': {}, 'consent_at': None,
-           'reviewed_by': None, 'reviewed_at': None, 'revision': 1, 'created_at': now(), 'updated_at': now()}
-    conn.execute(insert(invitations).values(**row))
-    return row, token
-
-def get_invitation(conn, event_id, invitation_id):
-    row = conn.execute(select(invitations).where(invitations.c.id == invitation_id, invitations.c.event_id == event_id)).mappings().first()
-    if not row: fail('INVITATION_NOT_FOUND', 404)
-    return dict(row)
-
-def by_token(conn, token):
-    if not isinstance(token, str) or len(token) < 32 or len(token) > 200: fail('INVITATION_NOT_FOUND', 404)
-    row = conn.execute(select(invitations).where(invitations.c.token_hash == digest(token))).mappings().first()
-    if not row: fail('INVITATION_NOT_FOUND', 404)
-    return dict(row)
-
-def _used(conn, invitation_id):
-    return conn.execute(select(func.coalesce(func.sum(entitlements.c.consumed), 0)).where(entitlements.c.invitation_id == invitation_id)).scalar_one() > 0
-
-def _block_pass(conn, invitation, status):
-    if invitation.get('guest_id'):
-        conn.execute(update(event_guests).where(event_guests.c.event_id == invitation['event_id'], event_guests.c.guest_id == invitation['guest_id']).values(status=status, updated_at=now()))
-    conn.execute(update(entitlements).where(entitlements.c.invitation_id == invitation['id']).values(status='revoked'))
-
-def reserved_people(conn, event_id, day, exclude=None):
-    rows = conn.execute(select(invitations).where(invitations.c.event_id == event_id)).mappings().all()
+def reserved_people(tx, event_id, day, exclude=None) -> int:
     total = 0
-    for row in rows:
-        if row['id'] == exclude or day not in row['days']: continue
-        if row['status'] == 'approved': total += 1 + row['companions']
-        else:
-            total += conn.execute(select(func.coalesce(func.sum(entitlements.c.consumed), 0)).where(entitlements.c.invitation_id == row['id'], entitlements.c.day.in_([day, '*']))).scalar_one()
+    for invitation in _admission().invitations(tx, event_id):
+        if invitation['id'] == exclude or day not in invitation['days']:
+            continue
+        consumed = 0 if invitation['status'] == 'approved' else _admission().consumed_for_day(tx, invitation['id'], day)
+        total += Invitation.reserved_people(invitation, consumed)
     return total
 
-def validate_current_days(invitation, policy):
-    available = {d['date'] for d in policy['days']}
-    if available and (not invitation['days'] or any(d not in available for d in invitation['days'])): fail('ATTENDANCE_DAYS_REQUIRED_OR_INVALID')
-    if not available and invitation['days']: fail('DAY_NOT_IN_EVENT')
 
-def _approve(conn, event, invitation, policy, reviewer=None):
-    validate_current_days(invitation, policy)
-    for d in policy['days']:
-        if d['date'] in invitation['days'] and d['capacity']:
-            total = reserved_people(conn, event['id'], d['date'], invitation['id'])
-            if total + 1 + invitation['companions'] > d['capacity']: fail('DAY_CAPACITY_FULL', 409)
-    known_profile = conn.execute(select(guests.c.id).where(guests.c.phone_e164 == invitation['phone'])).first()
+def save_policy(tx, event_id, body):
+    previous = get_policy(tx, event_id)
+    current = lock_policy(tx, event_id)
+    if previous['rev'] == 0:
+        current['rev'] = 0
+    revised = AdmissionPolicy.revise(current, body)
+    all_invitations = _admission().invitations(tx, event_id)
+    fixed = [inv for inv in all_invitations if inv['status'] == 'approved' or _used(tx, inv['id'])]
+    AdmissionPolicy.guard_fixed_admissions(current, revised, fixed)
+    if revised['enabled'] and not current['enabled']:
+        _require_migrated_legacy_passes(tx, event_id)
+    reserved = {item['date']: reserved_people(tx, event_id, item['date']) for item in revised['days']}
+    AdmissionPolicy.guard_days(revised, fixed, reserved)
+    _admission().save_policy(tx, event_id, revised, current['rev'] + 1)
+    return {**revised, 'rev': current['rev'] + 1}
+
+
+def _require_migrated_legacy_passes(tx, event_id) -> None:
+    """Enabling managed admission requires every registered pass to belong to an invitation."""
+    for registration in persistence.guests.registrations(tx, event_id, status='registered'):
+        invitation_id = (registration['metadata_json'] or {}).get('invitation_id')
+        linked = invitation_id and _admission().invitation_links_guest(tx, invitation_id, event_id, registration['guest_id'])
+        if not linked:
+            fail('LEGACY_PASSES_REQUIRE_MIGRATION', Conflict)
+
+
+def assert_public_registration(tx, event_id):
+    return _assert_public_registration(get_policy(tx, event_id))
+
+
+def clean_invitation(tx, event_id, body):
+    policy = get_policy(tx, event_id)
+    values = _clean_identity(policy, body)
+    if values['list_id'] and not _admission().guest_list_in_event(tx, values['list_id'], event_id):
+        fail('GUEST_LIST_SCOPE', Forbidden)
+    return {**values, **invitation_limits(policy, body)}
+
+
+def create_invitation(tx, event_id, body):
+    lock_policy(tx, event_id)
+    values = clean_invitation(tx, event_id, body)
+    if _admission().invitation_with_phone_exists(tx, event_id, values['phone']):
+        fail('INVITATION_ALREADY_EXISTS', Conflict)
+    token = new_session_token()
+    row = new_invitation(new_id(), event_id, values, digest(token))
+    _admission().add_invitation(tx, row)
+    return row, token
+
+
+def get_invitation(tx, event_id, invitation_id):
+    row = _admission().invitation(tx, event_id, invitation_id)
+    if not row:
+        fail('INVITATION_NOT_FOUND', NotFound)
+    return row
+
+
+def by_token(tx, token):
+    require_token_shape(token)
+    row = _admission().invitation_by_token_hash(tx, digest(token))
+    if not row:
+        fail('INVITATION_NOT_FOUND', NotFound)
+    return row
+
+
+def _block_pass(tx, invitation, status):
+    if invitation.get('guest_id'):
+        persistence.guests.update_registration_of_guest(tx, invitation['event_id'], invitation['guest_id'],
+                                                        {'status': status, 'updated_at': now()})
+    _admission().revoke_entitlements(tx, invitation['id'])
+
+
+def _approve(tx, event, invitation, policy, reviewer=None):
+    reserved = {item['date']: reserved_people(tx, event['id'], item['date'], invitation['id'])
+                for item in policy['days'] if item['date'] in invitation['days'] and item['capacity']}
+    Invitation.check_capacity(invitation, policy, reserved)
     profile = {'phone': invitation['phone'], 'consent': True}
-    if not known_profile: profile['name'] = invitation['name']
-    guest = register_guest(conn, event, profile, allow_profile_update=True)
-    reg = conn.execute(select(event_guests).where(event_guests.c.event_id == event['id'], event_guests.c.guest_id == guest['id'])).mappings().one()
-    conn.execute(update(event_guests).where(event_guests.c.id == reg['id']).values(status='registered', metadata_json={**reg['metadata_json'], 'invitation_id': invitation['id'], 'selected_days': invitation['days'], 'party_size': 1 + invitation['companions']}, updated_at=now()))
-    conn.execute(delete(entitlements).where(entitlements.c.invitation_id == invitation['id']))
-    slots = invitation['days'] if policy['entry_mode'] == 'daily' and invitation['days'] else ['*']
-    for day in slots:
-        conn.execute(insert(entitlements).values(id=new_id(), invitation_id=invitation['id'], event_id=event['id'], guest_id=guest['id'], day=day, quantity=1 + invitation['companions'], consumed=0, status='active'))
+    if not persistence.guests.find_id_by_phone(tx, invitation['phone']):
+        profile['name'] = invitation['name']
+    guest = register_guest(tx, event, profile, allow_profile_update=True)
+    registration = persistence.guests.registration(tx, event['id'], guest['id'])
+    persistence.guests.update_registration(tx, registration['id'], {
+        'status': 'registered',
+        'metadata_json': {**registration['metadata_json'], 'invitation_id': invitation['id'],
+                          'selected_days': invitation['days'], 'party_size': 1 + invitation['companions']},
+        'updated_at': now(),
+    })
+    _admission().replace_entitlements(tx, invitation['id'], [
+        {'id': new_id(), 'invitation_id': invitation['id'], 'event_id': event['id'], 'guest_id': guest['id'],
+         'day': day, 'quantity': 1 + invitation['companions'], 'consumed': 0, 'status': 'active'}
+        for day in Invitation.entitlement_slots(invitation, policy)
+    ])
     return {'guest_id': guest['id'], 'status': 'approved', 'reviewed_by': reviewer, 'reviewed_at': now()}
 
-def respond(conn, event, token, body):
-    invitation = by_token(conn, token)
-    if invitation['event_id'] != event['id']: fail('INVITATION_NOT_FOUND', 404)
-    p = lock_policy(conn, event['id'])
-    invitation = by_token(conn, token)
-    if invitation['status'] in ('revoked', 'rejected'): fail('INVITATION_INACTIVE', 409)
-    check_window(p)
-    response = body.get('response')
-    if response not in ('accepted', 'declined'): fail('RSVP_RESPONSE_INVALID')
-    if body.get('consent') is not True: fail('GUEST_CONSENT_REQUIRED')
-    companions = integer(body.get('companions', 0), 0, invitation['max_companions'], 'COMPANIONS_INVALID')
-    days = day_list(body.get('days', []))
-    allowed = invitation['allowed_days'] or [d['date'] for d in p['days']]
-    if response == 'accepted' and allowed and (not days or any(d not in allowed for d in days)): fail('ATTENDANCE_DAYS_REQUIRED_OR_INVALID')
-    if not allowed and days: fail('DAY_NOT_IN_EVENT')
-    if response == 'accepted': validate_current_days({**invitation, 'days': days}, p)
-    answers = body.get('answers', {})
-    if not isinstance(answers, dict) or len(json.dumps(answers, ensure_ascii=False)) > 8000: fail('ANSWERS_INVALID')
-    if invitation['response'] == response and invitation['companions'] == companions and invitation['days'] == days and invitation['answers'] == answers:
-        return invitation
-    if _used(conn, invitation['id']): fail('ATTENDANCE_ALREADY_STARTED', 409)
-    values = {'response': response, 'companions': companions, 'days': days, 'answers': answers, 'consent_at': now(), 'revision': invitation['revision'] + 1, 'updated_at': now(), 'reviewed_at': None, 'reviewed_by': None}
-    pending = {**invitation, **values}
-    if response == 'declined':
-        values['status'] = 'declined'
-        _block_pass(conn, invitation, 'cancelled')
-    elif p['registration_mode'] == 'manual':
-        values['status'] = 'pending_approval'
-        _block_pass(conn, invitation, 'pending')
-    else: values.update(_approve(conn, event, pending, p))
-    conn.execute(update(invitations).where(invitations.c.id == invitation['id']).values(**values))
-    return {**invitation, **values}
 
-def review(conn, event, invitation_id, decision, reviewer, revision):
-    p = lock_policy(conn, event['id'])
-    invitation = get_invitation(conn, event['id'], invitation_id)
-    if revision is None or isinstance(revision, bool) or revision != invitation['revision']: fail('INVITATION_REVISION_CONFLICT', 409)
-    if decision not in ('approve', 'reject'): fail('REVIEW_DECISION_INVALID')
-    if invitation['status'] != 'pending_approval' or invitation['response'] != 'accepted': fail('INVITATION_NOT_PENDING_REVIEW', 409)
-    if _used(conn, invitation_id): fail('ATTENDANCE_ALREADY_STARTED', 409)
-    if decision == 'approve': values = _approve(conn, event, invitation, p, reviewer)
+def respond(tx, event, token, body):
+    invitation = by_token(tx, token)
+    if invitation['event_id'] != event['id']:
+        fail('INVITATION_NOT_FOUND', NotFound)
+    policy = lock_policy(tx, event['id'])
+    invitation = by_token(tx, token)
+    changes = Invitation.rsvp(invitation, policy, body)
+    if changes is None:
+        return invitation
+    Invitation.forbid_after_attendance(_used(tx, invitation['id']))
+    outcome = Invitation.outcome_after_rsvp(changes, policy)
+    if outcome == 'declined':
+        changes['status'] = 'declined'
+        _block_pass(tx, invitation, 'cancelled')
+    elif outcome == 'pending_approval':
+        changes['status'] = 'pending_approval'
+        _block_pass(tx, invitation, 'pending')
+    else:
+        changes.update(_approve(tx, event, {**invitation, **changes}, policy))
+    _admission().update_invitation(tx, invitation['id'], changes)
+    return {**invitation, **changes}
+
+
+def review(tx, event, invitation_id, decision, reviewer, revision):
+    policy = lock_policy(tx, event['id'])
+    invitation = get_invitation(tx, event['id'], invitation_id)
+    Invitation.check_review(invitation, decision, revision)
+    Invitation.forbid_after_attendance(_used(tx, invitation_id))
+    if decision == 'approve':
+        values = _approve(tx, event, invitation, policy, reviewer)
     else:
         values = {'status': 'rejected', 'reviewed_by': reviewer, 'reviewed_at': now()}
-        _block_pass(conn, invitation, 'cancelled')
+        _block_pass(tx, invitation, 'cancelled')
     values.update(revision=invitation['revision'] + 1, updated_at=now())
-    conn.execute(update(invitations).where(invitations.c.id == invitation_id).values(**values))
+    _admission().update_invitation(tx, invitation_id, values)
     return {**invitation, **values}
 
-def revoke(conn, event_id, invitation_id):
-    lock_policy(conn, event_id)
-    invitation = get_invitation(conn, event_id, invitation_id)
-    _block_pass(conn, invitation, 'revoked')
-    conn.execute(update(invitations).where(invitations.c.id == invitation_id).values(status='revoked', revision=invitation['revision'] + 1, updated_at=now()))
-    return get_invitation(conn, event_id, invitation_id)
 
-def rotate(conn, event_id, invitation_id):
-    lock_policy(conn, event_id)
-    invitation = get_invitation(conn, event_id, invitation_id)
-    if invitation['status'] in ('revoked', 'rejected'): fail('INVITATION_INACTIVE', 409)
+def revoke(tx, event_id, invitation_id):
+    lock_policy(tx, event_id)
+    invitation = get_invitation(tx, event_id, invitation_id)
+    _block_pass(tx, invitation, 'revoked')
+    _admission().update_invitation(tx, invitation_id, {'status': 'revoked', 'revision': invitation['revision'] + 1,
+                                                       'updated_at': now()})
+    return get_invitation(tx, event_id, invitation_id)
+
+
+def rotate(tx, event_id, invitation_id):
+    lock_policy(tx, event_id)
+    invitation = get_invitation(tx, event_id, invitation_id)
+    require_active(invitation)
     token = new_session_token()
-    conn.execute(update(invitations).where(invitations.c.id == invitation_id).values(token_hash=digest(token), revision=invitation['revision'] + 1, updated_at=now()))
+    _admission().update_invitation(tx, invitation_id, {'token_hash': digest(token),
+                                                       'revision': invitation['revision'] + 1, 'updated_at': now()})
     # Rotate the admission pass as well, invalidating the old printed QR.
     if invitation.get('guest_id'):
-        import secrets
-        conn.execute(update(event_guests).where(event_guests.c.event_id == event_id, event_guests.c.guest_id == invitation['guest_id']).values(pass_number='G-' + secrets.token_hex(15).upper(), pass_token_hash=digest(new_session_token()), updated_at=now()))
-    return get_invitation(conn, event_id, invitation_id), token
+        persistence.guests.update_registration_of_guest(tx, event_id, invitation['guest_id'], {
+            'pass_number': new_event_pass_number(), 'pass_token_hash': digest(new_session_token()),
+            'updated_at': now(),
+        })
+    return get_invitation(tx, event_id, invitation_id), token
+
 
 def staff_view(invitation):
     return {key: value for key, value in invitation.items() if key != 'token_hash'}
 
+
 def event_view(event):
-    config=event.get('draft') or {}
-    return {'id':event['id'],'slug':event['slug'],'title':config.get('title') or event['slug'],
-            **{key:config.get(key) or '' for key in ('start','end','location','description')}}
+    config = event.get('draft') or {}
+    return {'id': event['id'], 'slug': event['slug'], 'title': config.get('title') or event['slug'],
+            **{key: config.get(key) or '' for key in ('start', 'end', 'location', 'description')}}
 
 
-def public_view(conn, event, invitation, origin):
+def public_view(tx, event, invitation, origin):
     fields = ('name', 'status', 'response', 'max_companions', 'companions', 'days', 'allowed_days', 'revision')
-    result = {'invitation': {k: invitation[k] for k in fields}, 'event': event_view(event), 'policy': get_policy(conn, event['id'])}
+    result = {'invitation': {key: invitation[key] for key in fields}, 'event': event_view(event),
+              'policy': get_policy(tx, event['id'])}
     if invitation['status'] == 'approved' and invitation.get('guest_id'):
-        reg = conn.execute(select(event_guests).where(event_guests.c.event_id == event['id'], event_guests.c.guest_id == invitation['guest_id'])).mappings().first()
-        if reg and reg.get('pass_number') and reg['status'] == 'registered':
-            result.update(guest_number=reg['pass_number'], qr_url=guest_qr_payload(event['slug'], reg['pass_number'], origin), pass_url=guest_qr_payload(event['slug'], reg['pass_number'], origin), qr_image_url=f"/api/public/events/{event['slug']}/guests/{reg['pass_number']}/qr")
+        registration = persistence.guests.registration(tx, event['id'], invitation['guest_id'])
+        if registration and registration.get('pass_number') and registration['status'] == 'registered':
+            pass_url = guest_qr_payload(event['slug'], registration['pass_number'], origin)
+            result.update(guest_number=registration['pass_number'], qr_url=pass_url, pass_url=pass_url,
+                          qr_image_url=f"/api/public/events/{event['slug']}/guests/{registration['pass_number']}/qr")
     return result
 
-def entitlement_status(conn, event, guest, body=None):
-    body = body or {}
-    meta = guest.get('metadata_json') or {}
-    invitation_id = meta.get('invitation_id')
-    if not invitation_id: return {'managed': False}
-    invitation = get_invitation(conn, event['id'], invitation_id)
-    if invitation['guest_id'] != guest['id']: fail('ENTITLEMENT_GUEST_SCOPE', 403)
-    if invitation['status'] != 'approved': fail('INVITATION_INACTIVE', 409)
-    p = get_policy(conn, event['id'])
-    # The server's event-local day is authoritative; client clocks cannot extend validity.
-    day = datetime.now(ZoneInfo(p['timezone'])).date().isoformat()
-    if invitation['days'] and day not in invitation['days']: fail('ATTENDANCE_DAY_NOT_ALLOWED', 409)
-    slot = day if p['entry_mode'] == 'daily' and invitation['days'] else '*'
-    entitlement = conn.execute(select(entitlements).where(entitlements.c.invitation_id == invitation_id, entitlements.c.event_id == event['id'], entitlements.c.guest_id == guest['id'], entitlements.c.day == slot, entitlements.c.status == 'active')).mappings().first()
-    if not entitlement: fail('ENTITLEMENT_NOT_FOUND', 409)
-    quantity = integer(body.get('quantity', 1), 1, 51, 'ADMISSION_QUANTITY_INVALID')
-    if quantity > entitlement['quantity'] - entitlement['consumed']: fail('ADMISSION_ALREADY_USED', 409)
-    return {'managed': True, 'entitlement_id': entitlement['id'], 'quantity': quantity, 'remaining': entitlement['quantity'] - entitlement['consumed'], 'day': day}
 
-def consume_entitlement(conn, event, guest, body):
+def entitlement_status(tx, event, guest, body=None):
+    body = body or {}
+    invitation_id = (guest.get('metadata_json') or {}).get('invitation_id')
+    if not invitation_id:
+        return {'managed': False}
+    invitation = get_invitation(tx, event['id'], invitation_id)
+    Entitlement.check_scope(invitation, guest)
+    policy = get_policy(tx, event['id'])
+    # The server's event-local day is authoritative; client clocks cannot extend validity.
+    day, slot = Entitlement.admission_day(invitation, policy, datetime.now(ZoneInfo(policy['timezone'])))
+    entitlement = _admission().active_entitlement(tx, invitation_id, event['id'], guest['id'], slot)
+    if not entitlement:
+        fail('ENTITLEMENT_NOT_FOUND', Conflict)
+    quantity = Entitlement.requested_quantity(entitlement, body)
+    return {'managed': True, 'entitlement_id': entitlement['id'], 'quantity': quantity,
+            'remaining': entitlement['quantity'] - entitlement['consumed'], 'day': day}
+
+
+def admission_use(tx, scan_id):
+    return _admission().admission_use(tx, scan_id)
+
+
+def consume_entitlement(tx, event, guest, body):
     # Shared lifecycle lock prevents changing/rotating an entitlement while a
-    # gate commits consumption. Gate adapter takes this before presence locks.
-    if (guest.get('metadata_json') or {}).get('invitation_id'): lock_policy(conn, event['id'])
+    # gate commits consumption. The gate takes this before presence locks.
+    if (guest.get('metadata_json') or {}).get('invitation_id'):
+        lock_policy(tx, event['id'])
     scan_id = text(body.get('scan_id'), 64, True)
-    existing = conn.execute(select(admission_uses).where(admission_uses.c.scan_id == scan_id)).mappings().first()
+    existing = _admission().admission_use(tx, scan_id)
     if existing:
-        entitlement = conn.execute(select(entitlements).where(entitlements.c.id == existing['entitlement_id'])).mappings().one()
-        if entitlement['event_id'] != event['id'] or entitlement['guest_id'] != guest['id'] or existing['quantity'] != body.get('quantity', 1): fail('SCAN_ID_CONFLICT', 409)
+        entitlement = _admission().entitlement(tx, existing['entitlement_id'])
+        Entitlement.check_replay(entitlement, existing, event['id'], guest['id'], body.get('quantity', 1))
         return {'managed': True, 'duplicate': True, 'quantity': existing['quantity']}
-    status = entitlement_status(conn, event, guest, body)
-    if not status['managed']: return status
-    changed = conn.execute(update(entitlements).where(entitlements.c.id == status['entitlement_id'], entitlements.c.status == 'active', entitlements.c.consumed + status['quantity'] <= entitlements.c.quantity).values(consumed=entitlements.c.consumed + status['quantity']))
-    if changed.rowcount != 1: fail('ADMISSION_ALREADY_USED', 409)
-    conn.execute(insert(admission_uses).values(scan_id=scan_id, entitlement_id=status['entitlement_id'], quantity=status['quantity'], used_at=now()))
+    status = entitlement_status(tx, event, guest, body)
+    if not status['managed']:
+        return status
+    if not _admission().consume(tx, status['entitlement_id'], status['quantity']):
+        fail('ADMISSION_ALREADY_USED', Conflict)
+    _admission().add_admission_use(tx, {'scan_id': scan_id, 'entitlement_id': status['entitlement_id'],
+                                        'quantity': status['quantity'], 'used_at': now()})
     return {**status, 'remaining': status['remaining'] - status['quantity']}
 
+
+# Staff use cases behind the invitation HTTP routes ---------------------------
+
+def list_guest_lists(tx, event_id):
+    return _admission().guest_lists(tx, event_id)
+
+
+def create_guest_list(tx, event_id, body):
+    row = {'id': new_id(), 'event_id': event_id, 'name': text(body.get('name'), 160, True), 'created_at': now()}
+    if not _admission().add_guest_list_if_absent(tx, row):
+        fail('GUEST_LIST_ALREADY_EXISTS', Conflict)
+    return row
+
+
+def invitation_overview(tx, event, origin):
+    rows = [staff_view(row) for row in _admission().invitations(tx, event['id'], newest_first=True)]
+    for row in rows:
+        credential = public_view(tx, event, row, origin)
+        row.update({key: credential[key] for key in ('guest_number', 'qr_url', 'pass_url', 'qr_image_url')
+                    if key in credential})
+    counts = {state: sum(row['status'] == state for row in rows)
+              for state in ('invited', 'pending_approval', 'approved', 'declined', 'rejected', 'revoked')}
+    people = sum(1 + row['companions'] for row in rows if row['status'] == 'approved')
+    return {'invitations': rows, 'counts': counts, 'confirmed_people': people,
+            'admission_uses': _admission().consumed_for_event(tx, event['id'])}
+
+
+def preview_import(tx, event_id, user, body):
+    raw = parse_guest_file(text(body.get('filename'), 200, True), body.get('content_base64'))
+    rows, errors, seen = [], [], set()
+    for index, item in enumerate(raw, 2):
+        if body.get('list_id') and not item.get('list_id'):
+            item['list_id'] = body['list_id']
+        try:
+            clean = clean_invitation(tx, event_id, item)
+            if clean['phone'] in seen:
+                fail('DUPLICATE_PHONE_IN_FILE')
+            if _admission().invitation_with_phone_exists(tx, event_id, clean['phone']):
+                fail('INVITATION_ALREADY_EXISTS', Conflict)
+            seen.add(clean['phone'])
+            rows.append({'name': clean['name'], 'phone': clean['phone'], 'list_id': clean['list_id'],
+                         'max_companions': clean['max_companions'], 'days': clean['allowed_days']})
+        except Exception as error:
+            if not hasattr(error, 'detail'):
+                raise
+            errors.append({'row': index, 'error': error.detail})
+    import_id = new_id()
+    _admission().add_import(tx, {'id': import_id, 'event_id': event_id, 'user_id': user['id'], 'rows': rows,
+                                 'errors': errors, 'state': 'preview', 'created_at': now()})
+    return {'import_id': import_id, 'rows': rows, 'errors': errors, 'valid_count': len(rows), 'total_count': len(raw)}
+
+
+def commit_import(tx, event_id, user, import_id):
+    """Create every previewed invitation; returns (preview id, [(row, token), ...])."""
+    preview = _admission().lock_import(tx, text(import_id, 64, True), event_id, user['id'])
+    GuestImport.require_committable(preview, datetime.now(timezone.utc))
+    created = [create_invitation(tx, event_id, row) for row in preview['rows']]
+    _admission().mark_import_committed(tx, preview['id'])
+    return preview['id'], created
+
+
+def register_publicly(tx, event, body):
+    """Public self-registration; returns (invitation, token) or None when verification is required."""
+    from app.domain.guests import DEFAULT_COUNTRY_CODE, normalize_phone
+
+    lock_policy(tx, event['id'])
+    policy = assert_public_registration(tx, event['id'])
+    phone = normalize_phone(body.get('phone'), body.get('country_code') or DEFAULT_COUNTRY_CODE)
+    # Knowing a phone number must never recover an existing invitation/pass.
+    if (_admission().invitation_with_phone_exists(tx, event['id'], phone)
+            or persistence.guests.registered_with_phone(tx, event['id'], phone)):
+        return None
+    row, token = create_invitation(tx, event['id'], {'name': body.get('name'), 'phone': phone,
+                                                     'max_companions': policy['max_companions']})
+    return respond(tx, event, token, {**body, 'response': 'accepted'}), token
+
+
 def parse_guest_file(filename, content_base64):
-    try:
-        if not isinstance(content_base64, str) or len(content_base64) > 4 * 1024 * 1024: fail('IMPORT_FILE_LIMIT')
-        raw = base64.b64decode(content_base64, validate=True)
-    except (ValueError, TypeError): fail('IMPORT_BASE64_INVALID')
-    if len(raw) > 3 * 1024 * 1024: fail('IMPORT_FILE_LIMIT')
-    if filename.lower().endswith('.xlsx'):
+    raw = GuestImport.decode_upload(content_base64)
+    kind = GuestImport.file_kind(filename)
+    if kind == 'xlsx':
         try:
             workbook = parse_xlsx(raw)['workbook']
-        except (Rejected, ValueError, KeyError): fail('IMPORT_XLSX_INVALID')
-        if len(workbook) != 1: fail('IMPORT_ONE_SHEET_REQUIRED')
+        except (Rejected, ValueError, KeyError):
+            fail('IMPORT_XLSX_INVALID')
+        if len(workbook) != 1:
+            fail('IMPORT_ONE_SHEET_REQUIRED')
         values = next(iter(workbook.values()))
-    elif filename.lower().endswith('.csv'):
-        try: values = list(csv.reader(io.StringIO(raw.decode('utf-8-sig'))))
-        except (UnicodeDecodeError, csv.Error): fail('IMPORT_CSV_INVALID')
-    else: fail('IMPORT_CSV_OR_XLSX_REQUIRED')
-    if not values or len(values) < 2 or len(values) > 1001: fail('IMPORT_ROWS_1_TO_1000')
-    headers = [str(v).strip().lower() for v in values[0]]
-    if len(set(headers)) != len(headers) or not {'name', 'phone'}.issubset(headers): fail('IMPORT_HEADERS_NAME_PHONE')
-    if set(headers) - {'name', 'phone', 'list_id', 'max_companions', 'days'}: fail('IMPORT_UNKNOWN_COLUMN')
-    rows = []
-    for value in values[1:]:
-        if not any(str(v).strip() for v in value): continue
-        if len(value) > len(headers): fail('IMPORT_COLUMN_COUNT')
-        row = {k: value[i] if i < len(value) else '' for i, k in enumerate(headers)}
-        if not row.get('max_companions'): row.pop('max_companions', None)
-        row['days'] = [x.strip() for x in str(row.get('days', '')).split(';') if x.strip()]
-        rows.append(row)
-    return rows
+    else:
+        try:
+            values = list(csv.reader(io.StringIO(raw.decode('utf-8-sig'))))
+        except (UnicodeDecodeError, csv.Error):
+            fail('IMPORT_CSV_INVALID')
+    return GuestImport.rows_from_table(values)

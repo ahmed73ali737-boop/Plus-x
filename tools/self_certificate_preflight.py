@@ -2,7 +2,7 @@
 import argparse,json
 from pathlib import Path
 from app.db import make_engine
-from app.application.self_certificate_integrity import preflight
+from app.infrastructure.persistence.self_certificate_integrity import preflight
 
 def main():
     parser=argparse.ArgumentParser()

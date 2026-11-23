@@ -117,7 +117,7 @@ def test_frontend_guest_offline_and_brand_contracts_present():
     appjs=Path('web/app.mjs').read_text(encoding='utf-8')
     guest=Path('web/guest.mjs').read_text(encoding='utf-8')
     design=Path('web/design.css').read_text(encoding='utf-8')
-    domain=Path('app/domain.py').read_text(encoding='utf-8')
+    domain=Path('app/domain/site_config.py').read_text(encoding='utf-8')
     sw=Path('web/sw.js').read_text(encoding='utf-8')
     for token in ["'guests'","'guest_outbox'","'guest_manifests'","'checkin_outbox'"]:
         assert token in offline

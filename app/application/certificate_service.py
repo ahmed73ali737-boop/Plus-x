@@ -1,164 +1,72 @@
-"""Certificate use cases, distinct from RSVP and admission authority.
-
-Templates are immutable versions; issuing freezes design and resolved data.
-The hash detects accidental changes; it is NOT a digital issuer signature.
-"""
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from hashlib import sha256
 from html import escape
+import base64
 import io
-import re
 import secrets
+from xml.etree import ElementTree
+
 import qrcode
 import qrcode.image.svg
-from sqlalchemy import insert, select, update
-from sqlalchemy.exc import IntegrityError
-from app.certificates_db import certificate_templates, certificates, certificate_replacements
-from app.core.serialization import canonical_json
+
 from app.application.audit_service import new_id
-from app.domain import fail, now, text, number, stamp
-from app.application.certificate_rendering import image_data, font_hash, font_bytes, validate_layout
-import base64
+from app.application.certificate_rendering import font_bytes, font_hash, image_data, validate_layout
+from app.application.ports import persistence
+from app.domain import Conflict, NotFound, fail, now, text
+from app.domain.certificates import (
+    ALIASES, FIELDS, PLACEHOLDER, Certificate, CertificateDesign, IssueRequest, default_design, fingerprint,
+    issue_timezone, resolve_placeholders,
+)
 
-FIELDS = ('participant_name', 'course_title', 'issuer_name', 'grade', 'training_hours', 'issue_date', 'serial')
-ALIASES = {'اسم_المشارك': 'participant_name', 'اسم_المتدرب': 'participant_name',
-           'اسم_الدورة': 'course_title', 'الجهة_المصدرة': 'issuer_name', 'الدرجة': 'grade',
-           'ساعات_التدريب': 'training_hours', 'تاريخ_الإصدار': 'issue_date', 'رقم_الشهادة': 'serial'}
-PLACEHOLDER = re.compile(r'\{\{?\s*([^{}]+?)\s*\}\}?')
-
-
-def fingerprint(value):
-    return sha256(canonical_json(value).encode()).hexdigest()
-
-
-def issue_timezone(value):
-    name = text(value or 'UTC', 80, True)
-    try: ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError): fail('CERTIFICATE_TIMEZONE_INVALID')
-    return name
-
-
-def default_design():
-    return {'width': 1120, 'height': 792, 'background': '#fffdf6', 'layers': [
-        {'text': 'شهادة مشاركة', 'x': 560, 'y': 130, 'size': 48},
-        {'text': '{{participant_name}}', 'x': 560, 'y': 300, 'size': 44},
-        {'text': '{{course_title}}', 'x': 560, 'y': 415, 'size': 32},
-        {'text': '{{issuer_name}}', 'x': 560, 'y': 500, 'size': 26},
-        {'text': '{{issue_date}}', 'x': 560, 'y': 565, 'size': 22},
-        {'text': '{{serial}}', 'x': 560, 'y': 690, 'size': 16, 'direction': 'ltr'},
-    ], 'qr': {'x': 80, 'y': 580, 'size': 130}}
-
-
-def color(value):
-    if not isinstance(value, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', value):
-        fail('CERTIFICATE_COLOR_INVALID')
-    return value
+__all__ = [
+    'ALIASES', 'FIELDS', 'PLACEHOLDER', 'create_template', 'default_design', 'find_certificate', 'fingerprint',
+    'get_certificate', 'is_superseded', 'issue', 'issue_timezone', 'list_certificates', 'list_templates',
+    'normalize_design', 'now', 'public_view', 'render_svg', 'replace', 'revoke', 'rotate_access', 'state',
+]
 
 
 def normalize_design(raw):
-    if not isinstance(raw, dict): fail('CERTIFICATE_DESIGN_INVALID')
-    w = number(raw.get('width'), 1120, 600, 2400)
-    h = number(raw.get('height'), 792, 400, 2400)
-    layers = raw.get('layers', [])
-    if not isinstance(layers, list) or not 1 <= len(layers) <= 40: fail('CERTIFICATE_LAYERS_INVALID')
-    clean = []
-    for layer in layers:
-        if not isinstance(layer, dict): fail('CERTIFICATE_LAYER_INVALID')
-        if layer.get('kind') == 'image':
-            iw = number(layer.get('width'), 160, 10, w)
-            ih = number(layer.get('height'), 80, 10, h)
-            clean.append({'kind': 'image', 'image_data': image_data(layer.get('image_data')),
-                          'x': number(layer.get('x'), 0, 0, w-iw), 'y': number(layer.get('y'), 0, 0, h-ih),
-                          'width': iw, 'height': ih})
-            continue
-        content = text(layer.get('text'), 600, True)
-        for variable in PLACEHOLDER.findall(content):
-            if ALIASES.get(variable, variable) not in FIELDS: fail('CERTIFICATE_VARIABLE_UNKNOWN')
-        font = layer.get('font', 'Arial')
-        if font not in ('DejaVu Sans', 'Arial', 'Times New Roman', 'serif', 'sans-serif'): fail('CERTIFICATE_FONT_INVALID')
-        align = layer.get('align', 'middle')
-        direction = layer.get('direction', 'rtl')
-        if align not in ('start', 'middle', 'end') or direction not in ('rtl', 'ltr'): fail('CERTIFICATE_ALIGNMENT_INVALID')
-        clean.append({'text': content, 'x': number(layer.get('x'), w/2, 0, w),
-                      'y': number(layer.get('y'), h/2, 0, h), 'size': number(layer.get('size'), 28, 10, 100),
-                      'color': color(layer.get('color', '#17313b')), 'font': 'DejaVu Sans', 'align': align, 'direction': direction})
-    qr = raw.get('qr', {})
-    if not isinstance(qr, dict): fail('CERTIFICATE_QR_INVALID')
-    size = number(qr.get('size'), 130, 100, min(w, h)/2)
-    result = {'width': w, 'height': h, 'background': color(raw.get('background', '#fffdf6')), 'layers': clean,
-            'qr': {'x': number(qr.get('x'), 40, 0, w-size), 'y': number(qr.get('y'), h-size-40, 0, h-size), 'size': size}}
-    if raw.get('background_image'): result['background_image'] = image_data(raw['background_image'])
-    if len(canonical_json(result).encode()) > 3*1024*1024: fail('CERTIFICATE_DESIGN_SIZE_LIMIT')
-    return result
-
-
-def create_template(conn, event_id, body):
-    row = {'id': new_id(), 'event_id': event_id, 'name': text(body.get('name'), 160, True),
-           'design': normalize_design(body.get('design', default_design())), 'created_at': now()}
-    conn.execute(insert(certificate_templates).values(**row))
-    return row
-
-
-def get_certificate(conn, event_id, certificate_id):
-    row = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                         certificates.c.id == certificate_id)).mappings().first()
-    if not row: fail('CERTIFICATE_NOT_FOUND', 404)
-    return dict(row)
-
-
-def issue(conn, event_id, body):
-    template_id = text(body.get('template_id'), 64, True)
-    request_key = text(body.get('request_key'), 80, True)
-    recipient_key = text(body.get('recipient_key'), 160, True)
-    award_key = text(body.get('award_key'), 80, True)
-    data = body.get('data')
-    if not isinstance(data, dict) or set(data) - set(FIELDS[:5]): fail('CERTIFICATE_DATA_INVALID')
-    data = {k: text(data.get(k), 250, k in FIELDS[:3]) for k in FIELDS[:5]}
-    if data['training_hours']:
-        number(data['training_hours'], low=0, high=100000)
-    expiry = stamp(body.get('expires_at')) or None
-    zone = issue_timezone(body.get('timezone'))
-    request_data = {'template_id': template_id, 'recipient_key': recipient_key,
-                    'award_key': award_key, 'data': data, 'expires_at': expiry}
-    request_hash = fingerprint({**request_data, 'timezone': zone})
-    existing = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                                    certificates.c.request_key == request_key)).mappings().first()
-    if existing:
-        legacy_retry = zone == 'UTC' and existing['request_hash'] == fingerprint(request_data)
-        if existing['request_hash'] != request_hash and not legacy_retry: fail('CERTIFICATE_REQUEST_CONFLICT', 409)
-        return dict(existing), None, False
-    if expiry and datetime.fromisoformat(expiry) <= datetime.now(timezone.utc): fail('CERTIFICATE_EXPIRY_INVALID')
-    template = conn.execute(select(certificate_templates).where(certificate_templates.c.id == template_id,
-                                   certificate_templates.c.event_id == event_id)).mappings().first()
-    if not template: fail('CERTIFICATE_TEMPLATE_NOT_FOUND', 404)
-    serial = 'CERT-' + secrets.token_hex(16).upper()
-    issued_at = now()
-    data.update(serial=serial, issue_date=datetime.fromisoformat(issued_at).astimezone(ZoneInfo(zone)).date().isoformat())
-    validate_layout(template['design'], data)
-    snapshot = {'design': template['design'], 'data': data, 'template_id': template_id, 'font_hash': font_hash(), 'renderer': 'certificate-raster-v1', 'issue_timezone': zone}
-    token = secrets.token_urlsafe(32)
-    row = {'id': new_id(), 'event_id': event_id, 'template_id': template_id, 'request_key': request_key,
-           'request_hash': request_hash, 'recipient_key': recipient_key, 'award_key': award_key,
-           'serial': serial, 'access_hash': sha256(token.encode()).hexdigest(), 'snapshot': snapshot,
-           'snapshot_hash': fingerprint(snapshot), 'status': 'issued', 'issued_at': issued_at,
-           'expires_at': expiry, 'revoked_at': None, 'revoke_reason': None}
-    try:
-        with conn.begin_nested(): conn.execute(insert(certificates).values(**row))
-    except IntegrityError:
-        # A concurrent retry returns the committed winner; different requests cannot duplicate an award.
-        winner = conn.execute(select(certificates).where(certificates.c.event_id == event_id,
-                                      certificates.c.request_key == request_key)).mappings().first()
-        if winner and winner['request_hash'] == request_hash: return dict(winner), None, False
-        fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', 409)
-    return row, token, True
+    return CertificateDesign.normalize(raw, image_data)
 
 
 def state(row):
-    if row['status'] == 'revoked': return 'revoked'
-    if row['snapshot_hash'] != fingerprint(row['snapshot']): return 'integrity_error'
-    if row['expires_at'] and datetime.fromisoformat(row['expires_at']) <= datetime.now(timezone.utc): return 'expired'
-    return 'valid'
+    return Certificate.state(row)
+
+
+def create_template(tx, event_id, body):
+    row = {'id': new_id(), 'event_id': event_id, 'name': text(body.get('name'), 160, True),
+           'design': normalize_design(body.get('design', default_design())), 'created_at': now()}
+    persistence.certificates.add_template(tx, row)
+    return row
+
+
+def get_certificate(tx, event_id, certificate_id):
+    row = persistence.certificates.certificate(tx, event_id, certificate_id)
+    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return row
+
+
+def issue(tx, event_id, body):
+    request = IssueRequest.parse(body)
+    existing = persistence.certificates.by_request_key(tx, event_id, request.request_key)
+    if existing:
+        return dict(request.require_replay_of(existing)), None, False
+    request.require_future_expiry(datetime.now(timezone.utc))
+    template = persistence.certificates.template(tx, event_id, request.template_id)
+    if not template:
+        fail('CERTIFICATE_TEMPLATE_NOT_FOUND', NotFound)
+    token = secrets.token_urlsafe(32)
+    row = Certificate.issue(
+        request, template, certificate_id=new_id(), event_id=event_id,
+        serial='CERT-' + secrets.token_hex(16).upper(), access_hash=sha256(token.encode()).hexdigest(),
+        issued_at=now(), font_hash=font_hash(), check_layout=validate_layout)
+    if not persistence.certificates.add_if_absent(tx, row):
+        # A concurrent retry returns the committed winner; different requests cannot duplicate an award.
+        winner = persistence.certificates.by_request_key(tx, event_id, request.request_key)
+        if winner and winner['request_hash'] == request.request_hash:
+            return winner, None, False
+        fail('CERTIFICATE_DUPLICATE_OR_CONCURRENT_REQUEST', Conflict)
+    return row, token, True
 
 
 def public_view(row):
@@ -169,36 +77,35 @@ def public_view(row):
             'issue_timezone': row['snapshot'].get('issue_timezone', 'UTC')}
 
 
-def revoke(conn, event_id, certificate_id, reason):
-    reason = text(reason, 500, True)
-    row = get_certificate(conn, event_id, certificate_id)
-    if row['status'] == 'revoked': return row
-    conn.execute(update(certificates).where(certificates.c.id == certificate_id, certificates.c.status == 'issued')
-                 .values(status='revoked', revoked_at=now(), revoke_reason=reason))
-    return get_certificate(conn, event_id, certificate_id)
+def revoke(tx, event_id, certificate_id, reason):
+    reason = Certificate.revocation_reason(reason)
+    row = get_certificate(tx, event_id, certificate_id)
+    if Certificate.is_revoked(row):
+        return row
+    persistence.certificates.revoke(tx, certificate_id, now(), reason)
+    return get_certificate(tx, event_id, certificate_id)
 
 
-def replace(conn, event_id, certificate_id, body):
-    original = get_certificate(conn, event_id, certificate_id)
-    reason = text(body.get('reason'), 500, True)
+def replace(tx, event_id, certificate_id, body):
+    original = get_certificate(tx, event_id, certificate_id)
+    reason = Certificate.revocation_reason(body.get('reason'))
     # This internal award key represents a correction of this exact issue, not
     # another independent award. The immutable source snapshot remains intact.
-    row, token, created = issue(conn, event_id, {**body, 'recipient_key': original['recipient_key'],
-        'award_key': 'replacement/'+original['id'], 'template_id': body.get('template_id', original['template_id'])})
-    link = conn.execute(select(certificate_replacements).where(certificate_replacements.c.previous_id == certificate_id)).mappings().first()
+    row, token, created = issue(tx, event_id, {**body, 'recipient_key': original['recipient_key'],
+        'award_key': Certificate.replacement_award_key(original), 'template_id': body.get('template_id', original['template_id'])})
+    link = persistence.certificates.replacement_of(tx, certificate_id)
     if link:
-        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', 409)
+        if link['replacement_id'] != row['id']: fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
         return row, token, created
-    try:
-        with conn.begin_nested():
-            conn.execute(insert(certificate_replacements).values(previous_id=certificate_id, replacement_id=row['id'], reason=reason, created_at=now()))
-    except IntegrityError: fail('CERTIFICATE_ALREADY_REPLACED', 409)
-    revoke(conn, event_id, certificate_id, reason)
+    if not persistence.certificates.add_replacement_if_absent(tx, {'previous_id': certificate_id, 'replacement_id': row['id'],
+                                                                      'reason': reason, 'created_at': now()}):
+        fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+    revoke(tx, event_id, certificate_id, reason)
     return row, token, created
 
 
 def render_svg(row, verification_url):
-    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', 410)
+    Certificate.require_valid(row)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     w, h = design['width'], design['height']
     output = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">',
@@ -211,18 +118,46 @@ def render_svg(row, verification_url):
         if layer.get('kind') == 'image':
             output.append(f'<image x="{layer["x"]}" y="{layer["y"]}" width="{layer["width"]}" height="{layer["height"]}" href="{layer["image_data"]}"/>')
             continue
-        content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
+        content = resolve_placeholders(layer['text'], data)
         output.append(f'<text x="{layer["x"]}" y="{layer["y"]}" font-size="{layer["size"]}" '
                       f'fill="{layer["color"]}" font-family="CertificateSans" text-anchor="{layer["align"]}" '
                       f'direction="{layer["direction"]}" unicode-bidi="plaintext">{escape(content)}</text>')
     qr = qrcode.make(verification_url, image_factory=qrcode.image.svg.SvgPathImage)
     buffer = io.BytesIO(); qr.save(buffer)
     # Embed only the library-generated path, with a quiet zone retained in its viewBox.
-    from xml.etree import ElementTree as ET
-    qr_root = ET.fromstring(buffer.getvalue())
+    qr_root = ElementTree.fromstring(buffer.getvalue())
     pos = design['qr']
     output.append(f'<svg x="{pos["x"]}" y="{pos["y"]}" width="{pos["size"]}" height="{pos["size"]}" viewBox="{qr_root.attrib["viewBox"]}">')
     output.append('<rect width="100%" height="100%" fill="#ffffff"/>')
-    output.extend(ET.tostring(child, encoding='unicode') for child in qr_root)
+    output.extend(ElementTree.tostring(child, encoding='unicode') for child in qr_root)
     output.extend(['</svg>', '</svg>'])
     return ''.join(output)
+
+
+def list_templates(tx, event_id):
+    return persistence.certificates.templates(tx, event_id)
+
+
+def list_certificates(tx, event_id, offset, limit):
+    return persistence.certificates.page(tx, event_id, offset, limit)
+
+
+def find_certificate(tx, field, value):
+    """Public lookup by serial or by access-token hash; unknown values are concealed."""
+    if len(value) > 120: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    row = persistence.certificates.find_by(tx, field, value)
+    if not row: fail('CERTIFICATE_NOT_FOUND', NotFound)
+    return row
+
+
+def is_superseded(tx, certificate_id):
+    return persistence.certificates.replacement_of(tx, certificate_id) is not None
+
+
+def rotate_access(tx, event_id, certificate_id):
+    """Issue a new recipient access link; the previous link stops working."""
+    row = get_certificate(tx, event_id, certificate_id)
+    Certificate.require_valid(row)
+    token = secrets.token_urlsafe(32)
+    persistence.certificates.set_access_hash(tx, row['id'], sha256(token.encode()).hexdigest())
+    return row, token

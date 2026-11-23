@@ -219,7 +219,7 @@ def test_creation_route_inventory_has_one_authority():
         tree=ast.parse(file.read_text())
         for node in ast.walk(tree):
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='insert' and node.args and isinstance(node.args[0],ast.Name) and node.args[0].id in ('users','memberships','assignments'):
-                if file.relative_to(root).as_posix() not in ('app/application/account_requests.py','app/infrastructure/seed.py'):offenders.append(str(file))
+                if file.relative_to(root).as_posix() not in ('app/infrastructure/persistence/account_request_repository.py','app/infrastructure/seed.py'):offenders.append(str(file))
     assert not offenders
 
 

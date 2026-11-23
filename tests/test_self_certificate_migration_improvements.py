@@ -64,7 +64,7 @@ def test_ownership_migration_stops_without_reassigning_legacy_bad_row():
             conn.execute(insert(links).values(id='link',owner_account_id='a',event_id='event',event_name_snapshot='event',model_name_snapshot='model',revision_id='old',public_id='public',key_version='v1',public_token_hash='1'*64,status='active',share_text_snapshot='text',config_hash='2'*64,input_hash=None,idempotency_key='operation',row_version=1,created_at='2026-01-01'))
             conn.execute(insert(browser_sessions).values(id='browser',token_hash='3'*64,created_at='2026-01-01',last_seen_at='2026-01-01'))
             conn.execute(insert(requests).values(id='bad-owner',owner_account_id='b',link_id='link',browser_session_id='browser',revision_id='old',participant_name_original='اسم مصطنع',participant_name_normalized='اسم مصطنع',phone_original='0770000000',phone_normalized='0770000000',consent=True,consent_text='إقرار',consent_text_version='v1',submitted_at_utc='2026-01-01',status='registered',layout={}))
-        from app.application.self_certificate_integrity import preflight
+        from app.infrastructure.persistence.self_certificate_integrity import preflight
         with engine.connect() as conn:
             assert not preflight(conn)['ok']
         with pytest.raises(DBAPIError,match='PREFLIGHT_FAILED'):
