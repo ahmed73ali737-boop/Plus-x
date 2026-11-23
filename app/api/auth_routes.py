@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.api.errors import install_error_handlers
 from app.application import account_requests as account_request_service
 from app.application import account_service as accounts
+from app.application import phone_verification_service as phone_verification
 from app.application.phone_accounts import account_phone
 from app.core.security import hash_password
 from app.domain import Conflict, Forbidden, fail
@@ -84,7 +85,20 @@ def install_auth_routes(app, engine, identify):
     def options():
         return {'authentication': 'phone_password', 'verification_required': False, 'approval_required': True,
                 'recovery_available': False, 'recovery': 'administrator_assisted',
+                'phone_verification_available': phone_verification.available(),
                 'legacy_email_login_available': True}
+
+    @app.post('/api/auth/phone/verify/start')
+    def phone_verify_start(request: Request):
+        with engine.begin() as tx:
+            user, _ = identify(request, tx, True)
+            return phone_verification.start(tx, user)
+
+    @app.post('/api/auth/phone/verify/check')
+    def phone_verify_check(body: dict, request: Request):
+        with engine.begin() as tx:
+            user, _ = identify(request, tx, True)
+            return phone_verification.check(tx, user, body)
 
     @app.post('/api/auth/register')
     def register(body: dict):
