@@ -112,10 +112,10 @@ written (the system's durable domain events).
 
 | Use case | Actor | Input | Output | Rules (owner) | Events |
 |---|---|---|---|---|---|
-| Templates, issue, revoke, replace, rotate access | `certificates.*` | design, data | certificate + links | `certificate_service` (immutable snapshot, request idempotency, award uniqueness); repository insert-if-absent | `certificate_template_created`, `certificate_issued`, `certificate_revoked`, `certificate_replaced`, `certificate_access_rotated` |
-| Bulk import + queued issuance | `certificates.issue` / worker | CSV/XLSX + mapping | queued jobs, progress | `certificate_batches` (one job per transaction) | `certificate_batch_queued`, `certificate_issued` |
+| Templates, issue, revoke, replace, rotate access | `certificates.*` | design, data | certificate + links | **`certificates.CertificateDesign`** (bounded design), **`IssueRequest`** (idempotency key + hash, legacy-UTC replay, future expiry), **`Certificate`** (`issue` snapshot, derived `state`, `require_valid`, replacement award key); repository insert-if-absent | `certificate_template_created`, `certificate_issued`, `certificate_revoked`, `certificate_replaced`, `certificate_access_rotated` |
+| Bulk import + queued issuance | `certificates.issue` / worker | CSV/XLSX + mapping | queued jobs, progress | **`certificate_imports`** (`decode_upload`, `headers_of`, `check_mapping`, `preview_rows`, `IssuanceBatch` commit-once/TTL/per-row request key); one job per transaction in `certificate_batches` | `certificate_batch_queued`, `certificate_issued` |
 | Self-service library (models, assets, links) | Library manager | design, uploads | models/links | `self_certificate_access` (library authority), owner-filtered repository, owner-chain triggers (defence in depth) | `self_certificate_model_*`, `self_certificate_link_*` |
-| Participant self-declaration | Participant | name, phone, consent, nonce | request state (202 when created) | `domain.self_certificates.participant_submission`, browser dedup, `owner_can_accept` | — |
+| Participant self-declaration | Participant | name, phone, consent, nonce | request state (202 when created) | `domain.self_certificates` (`participant_submission`, `declared_phone`, `browser_remaining_seconds`, `require_accepting`, `require_revision_intact`, `require_failed_request/job`), browser dedup, `owner_can_accept` | — |
 | Render / export workers | Workers | leased jobs | issued certificates / files | leased queue with fencing in `SqlSelfCertificateRepository`; retry policy in `self_certificate_worker.fail_job` | `self_certificate_retry` |
 
 ## Journeys per actor
@@ -149,3 +149,31 @@ written (the system's durable domain events).
 | Use cases with in-memory ports (scan cycle, anti-passback, concurrent gate, re-entry, manifest, publishing) | `tests/test_use_cases.py` |
 | HTTP behaviour and SQL adapters (pre-existing suite, unchanged expectations) | `tests/test_*.py` (e.g. `test_guest_identity.py`, `test_admission_gate_integration.py`, `test_invitations.py`, `test_account_approval.py`, `test_self_certificate_*.py`, `test_pilot.py`) |
 | Native PostgreSQL acceptance | `tests/postgres_native_acceptance.py`, `tests/postgres_invitations_acceptance.py`, `tests/postgres_capacity_smoke.py` (+ account suites with `PX_ACCOUNT_*_TEST_DATABASE_URL`) |
+
+## Phase 2 — shrink-only ratchet and what moved
+
+`tests/architecture_baseline.json` records, per `app/application` module, how many `fail(...)`
+rule checks are still written outside the domain; `tests/test_architecture.py::test_rules_in_application_ratchet_only_shrinks`
+fails when a count grows, when a new module appears, **or** when a count dropped without the
+baseline being lowered. Phase-2 start: 344 checks in 36 modules; now: 250.
+
+| Context | Rules now owned by the domain | Domain class / module | Tests |
+|---|---|---|---|
+| Certificate issuance (integrity, credentials) | design bounds, issue request + idempotency, snapshot freeze, derived validity, revoke/replace key | `domain/certificates.py` (`CertificateDesign`, `IssueRequest`, `Certificate`) | `tests/test_domain_certificates.py` |
+| Bulk certificate issuance | upload limits, header/mapping rules, per-row errors, commit-once, TTL, canonical availability | `domain/certificate_imports.py` | `tests/test_domain_certificate_imports.py` |
+| Account approvals (maker/checker) | pause switch, designated supervisor only, review disposition (replay/expired), identity collision, setup window, setup renewal, platform invitation | `domain/account_requests.py` | `tests/test_domain_account_approval.py` |
+| Account administration | reset authority and scope, platform/site status changes, credential re-entry | `domain/accounts.py` | `tests/test_domain_accounts.py` |
+| Gate admission | scan-id replay equality, managed admission needs entitlement, single-person unmanaged scan | `domain/gate.py` | `tests/test_domain_gate_rules.py` |
+| Invitation import | upload limits, table shape, preview commit lifecycle | `domain/admission.py` (`GuestImport`) | `tests/test_domain_guest_import.py` |
+| Site administration | staff-only directory actions, signup role, membership manager, person link, content-import commit | `domain/sites.py`, `domain/organizations.py` | `tests/test_domain_site_admin.py` |
+| Self-declared certificates | phone normalisation, browser remember window, accepting switch, revision integrity, retry | `domain/self_certificates.py` | `tests/test_domain_self_certificates.py` |
+
+### Not yet migrated (what the ratchet still counts)
+
+The 250 remaining checks are mostly lookups that raise not-found, feature/pilot gates and
+authorization orchestration that needs repository reads (`access.py`, `site_admin.py`,
+`self_certificate_*` workers, `phone_accounts.py`, `collection_service.py`). Request-level
+rules in those modules should keep moving into aggregates (next candidates by risk:
+`self_certificate_links`, `self_certificate_assets`, `phone_accounts`, `collection_service`).
+Use cases still pass rows as dicts rather than rich entities; the domain classes above
+operate on those records and are the seam for introducing entities later.

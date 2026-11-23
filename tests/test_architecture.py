@@ -134,3 +134,33 @@ def test_every_port_is_implemented_by_its_sql_adapter():
                     if not member.startswith('_') and callable(value)]
         missing = [member for member in declared if not callable(getattr(adapter, member, None))]
         assert declared and not missing, (name, missing)
+
+
+BASELINE = ROOT / 'tests' / 'architecture_baseline.json'
+
+
+def application_rule_checks() -> dict[str, int]:
+    """fail(...) calls per application module: business rules not yet owned by the domain."""
+    counts = {}
+    for path in modules('application'):
+        calls = sum(1 for node in ast.walk(ast.parse(path.read_text(encoding='utf-8')))
+                    if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'fail')
+        if calls:
+            counts[str(path.relative_to(ROOT))] = calls
+    return counts
+
+
+def test_rules_in_application_ratchet_only_shrinks():
+    """Move a rule into app/domain, then lower its module's count in architecture_baseline.json.
+
+    A higher count means a new rule was written outside the domain; an equal-or-lower
+    baseline that is not lowered would let the debt grow back unnoticed.
+    """
+    import json
+
+    baseline = json.loads(BASELINE.read_text(encoding='utf-8'))['fail_calls_in_application']
+    actual = application_rule_checks()
+    grew = {name: (baseline.get(name, 0), count) for name, count in actual.items() if count > baseline.get(name, 0)}
+    assert not grew, f'rules added to the application layer (baseline, actual): {grew}'
+    stale = {name: (limit, actual.get(name, 0)) for name, limit in baseline.items() if actual.get(name, 0) < limit}
+    assert not stale, f'lower these baselines (baseline, actual): {stale}'
