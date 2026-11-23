@@ -10,7 +10,8 @@ import io
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, features
 import qrcode
-from app.domain import fail, Gone, Unavailable
+from app.domain import fail, Unavailable
+from app.domain.certificates import Certificate, resolve_placeholders
 
 FONT = Path(__file__).resolve().parents[2] / 'web/fonts/CertificateSans.ttf'
 
@@ -48,11 +49,10 @@ def text_layout(content, layer, size):
 
 
 def validate_layout(design, data):
-    from app.application.certificate_service import PLACEHOLDER, ALIASES
     draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
     for layer in design['layers']:
         if layer.get('kind') == 'image': continue
-        content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
+        content = resolve_placeholders(layer['text'], data)
         content, font, options = text_layout(content, layer, layer['size'])
         left, top, right, bottom = draw.textbbox((layer['x'], layer['y']), content, font=font, **options)
         if left < 0 or top < 0 or right > design['width'] or bottom > design['height']:
@@ -78,8 +78,7 @@ def image_data(raw):
 
 
 def render(row, verification_url, output_format='PNG'):
-    from app.application.certificate_service import state, PLACEHOLDER, ALIASES
-    if state(row) != 'valid': fail('CERTIFICATE_NOT_VALID', Gone)
+    Certificate.require_valid(row)
     if row['snapshot'].get('font_hash', font_hash()) != font_hash(): fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', Unavailable)
     design, data = row['snapshot']['design'], row['snapshot']['data']
     # 3508px across a 297mm landscape page is approximately 300 DPI.
@@ -100,7 +99,7 @@ def render(row, verification_url, output_format='PNG'):
         if layer.get('kind') == 'image':
             paint_image(layer['image_data'], layer['x'], layer['y'], layer['width'], layer['height'])
             continue
-        content = PLACEHOLDER.sub(lambda m: data[ALIASES.get(m[1], m[1])], layer['text'])
+        content = resolve_placeholders(layer['text'], data)
         content, font, options = text_layout(content, layer, layer['size'] * scale)
         draw.text((layer['x']*scale, layer['y']*scale), content, font=font, fill=layer['color'], **options)
     pos = design['qr']
