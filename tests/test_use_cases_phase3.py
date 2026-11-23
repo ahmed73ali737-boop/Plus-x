@@ -6,7 +6,7 @@ import pytest
 from app.application import access, collection_service, phone_accounts
 from app.application.audit_service import AuditedDenial
 from app.application.ports import persistence
-from app.domain import Conflict, InvalidInput, NotFound
+from app.domain import Conflict, Forbidden, InvalidInput, NotFound
 from app.domain.site_config import default_config
 from test_use_cases import FakeAudit, FakeSites, FakeTransactions
 
@@ -188,3 +188,63 @@ def test_bind_phone_binds_once_and_refuses_takeover_or_change(restore_ports):
         phone_accounts.bind_phone(None, 'u1', '+967772222222')
     with pytest.raises(Conflict, match='PHONE_CHANGE_REQUIRES_SUPPORT'):
         phone_accounts.bind_phone(None, 'u1', '+967774444444')
+
+
+class FakeSiteAdmin:
+    def __init__(self):
+        self.organizations = {'org1': {'id': 'org1', 'slug': 'org-one', 'name': 'Org'}}
+        self.people = {'p1': {'id': 'p1', 'organization_id': 'org1', 'name': 'P', 'email': '', 'phone': '', 'user_id': None}}
+        self.added = []
+
+    def organization(self, tx, organization_id):
+        return self.organizations.get(organization_id)
+
+    def person(self, tx, person_id):
+        return self.people.get(person_id)
+
+    def add_person(self, tx, person):
+        self.added.append(person)
+
+    def membership(self, tx, member_id, organization_id):
+        return None
+
+    def is_active_owner(self, tx, user_id, organization_id):
+        return False
+
+
+class PeopleAccess(FakeAccess):
+    def __init__(self, membership=None, member_of=()):
+        super().__init__()
+        self.role, self.member_of = membership, set(member_of)
+
+    def has_active_membership(self, tx, user_id, organization_id=None, role=None):
+        return organization_id in self.member_of
+
+    def membership_role(self, tx, user_id, organization_id):
+        return self.role
+
+
+def test_people_management_conceals_hidden_organizations_and_denies_plain_members(restore_ports):
+    from app.application import site_admin
+    admin = FakeSiteAdmin()
+    install(sites=FakeSites(), site_admin=admin, access=PeopleAccess(membership='editor', member_of={'org1'}))
+    body = {'name': 'New person', 'email': '', 'phone': ''}
+    with pytest.raises(NotFound, match='ORGANIZATION_NOT_FOUND'):
+        site_admin.add_person(None, user('agency'), 'ghost', body)
+    with pytest.raises(Forbidden, match='FORBIDDEN_ROLE'):
+        site_admin.add_person(None, user('agency'), 'org1', body)
+    assert admin.added == []
+    # an organization the actor cannot see is not found, even for an existing person
+    install(sites=FakeSites(), site_admin=admin, access=PeopleAccess(member_of=()))
+    with pytest.raises(NotFound, match='PERSON_NOT_FOUND'):
+        site_admin.update_person(None, user('agency'), 'org1', 'p1', {'name': 'X'})
+    with pytest.raises(NotFound, match='PERSON_NOT_FOUND'):
+        site_admin.request_person_account(None, user('agency'), 'org1', 'p1', {})
+
+
+def test_people_managers_can_add_people(restore_ports):
+    from app.application import site_admin
+    admin = FakeSiteAdmin()
+    install(sites=FakeSites(), site_admin=admin, access=PeopleAccess(membership='admin', member_of={'org1'}))
+    result = site_admin.add_person(None, user('agency'), 'org1', {'name': 'New person'})
+    assert result['organization_id'] == 'org1' and admin.added[0]['name'] == 'New person'

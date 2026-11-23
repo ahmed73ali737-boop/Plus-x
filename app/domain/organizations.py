@@ -2,7 +2,10 @@
 event participations."""
 from __future__ import annotations
 
-from app.domain.errors import Conflict, Forbidden, fail
+from collections.abc import Callable
+
+from app.domain.errors import Conflict, Forbidden, NotFound, fail
+from app.domain.guards import reject_existing, require_found
 from app.domain.values import EMAIL, SLUG, boolean, text
 
 PERSON_ROLES = ('owner', 'manager', 'member', 'representative', 'staff', 'speaker')
@@ -150,3 +153,59 @@ def requested_membership_role(membership: dict, body: dict):
     """The new role when a change is requested (needs a reviewed request), else None."""
     role = body.get('role', membership['role'])
     return role if role != membership['role'] else None
+
+
+def require_visible_organization(organization: dict | None, visible: Callable[[], bool],
+                                 code: str = 'ORGANIZATION_NOT_FOUND') -> dict:
+    """An organization the actor may not see is reported as not found, never as forbidden."""
+    if not organization or not visible():
+        fail(code, NotFound)
+    return organization
+
+
+def may_manage_people(user: dict, visible: Callable[[], bool], membership_role: Callable[[], str | None]) -> bool:
+    """Staff who can see the organization, or its own owners/admins, manage its people."""
+    if can_manage_people_by_role(user) and visible():
+        return True
+    return membership_role() in ('owner', 'admin')
+
+
+def require_people_manager(allowed: bool) -> None:
+    if not allowed:
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def require_person_of_visible_organization(organization: dict | None, person: dict | None, organization_id: str,
+                                           visible: Callable[[], bool]) -> dict:
+    """The person must belong to the named, visible organization; otherwise it does not exist for the actor."""
+    if not organization or not person or person['organization_id'] != organization_id or not visible():
+        fail('PERSON_NOT_FOUND', NotFound)
+    return person
+
+
+def require_manageable_person(person: dict | None, organization_id: str, can_manage: Callable[[], bool]) -> dict:
+    """Account requests for a person are concealed from actors who cannot manage the organization's people."""
+    if not person or person['organization_id'] != organization_id or not can_manage():
+        fail('PERSON_NOT_FOUND', NotFound)
+    return person
+
+
+def require_membership(membership: dict | None) -> dict:
+    return require_found(membership, 'MEMBERSHIP_NOT_FOUND')
+
+
+def require_organization(organization: dict | None) -> dict:
+    return require_found(organization, 'ORGANIZATION_NOT_FOUND')
+
+
+def require_free_organization_slug(existing: dict | None) -> None:
+    reject_existing(existing, 'ORGANIZATION_SLUG_EXISTS')
+
+
+def require_participation(participation: dict | None) -> dict:
+    return require_found(participation, 'PARTICIPATION_NOT_FOUND')
+
+
+def require_new_participation(exists: bool) -> None:
+    """One participation per organization and event."""
+    reject_existing(exists, 'PARTICIPATION_EXISTS')

@@ -29,7 +29,6 @@
     "app/application/self_certificate_slots.py": 1,
     "app/application/self_certificate_storage.py": 10,
     "app/application/self_certificate_worker.py": 8,
-    "app/application/shared_authorization.py": 5,
-    "app/application/site_admin.py": 17
+    "app/application/shared_authorization.py": 5
   }
 }

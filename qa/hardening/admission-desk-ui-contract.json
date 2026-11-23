@@ -1,0 +1,84 @@
+{
+  "suite": "ADMISSION_DESK_AND_LIVE_FUNCTIONAL_CONTRACT",
+  "scope": "Actual modules; controlled DOM, API transport and timers; not native network",
+  "passed": 19,
+  "failed": 0,
+  "cases": [
+    {
+      "name": "scanner_renders_search_and_checkin_without_reception",
+      "status": "passed"
+    },
+    {
+      "name": "analyst_has_no_checkin_or_reception_controls",
+      "status": "passed"
+    },
+    {
+      "name": "reception_register_permission_mounts_reception_form",
+      "status": "passed"
+    },
+    {
+      "name": "search_filters_by_name_and_pass_and_has_empty_state",
+      "status": "passed"
+    },
+    {
+      "name": "accepted_scan_sends_quantity_and_clears_pending",
+      "status": "passed"
+    },
+    {
+      "name": "lost_ack_reuses_scan_id_and_quantity_until_duplicate_receipt",
+      "status": "passed"
+    },
+    {
+      "name": "changing_quantity_during_pending_does_not_send_new_command",
+      "status": "passed"
+    },
+    {
+      "name": "http_conflict_preserves_unknown_pending_and_never_toasts_success",
+      "status": "passed"
+    },
+    {
+      "name": "double_click_while_inflight_reuses_one_scan_identity",
+      "status": "passed"
+    },
+    {
+      "name": "confirmed_scan_survives_summary_refresh_failure",
+      "status": "passed"
+    },
+    {
+      "name": "dashboard_preserves_server_totals_above_history_window",
+      "status": "passed"
+    },
+    {
+      "name": "dashboard_refresh_updates_three_semantically_distinct_totals",
+      "status": "passed"
+    },
+    {
+      "name": "dashboard_network_failure_keeps_values_and_marks_stale",
+      "status": "passed"
+    },
+    {
+      "name": "dashboard_recovers_after_stale_without_recreating_panel",
+      "status": "passed"
+    },
+    {
+      "name": "dashboard_timer_schedules_ten_seconds_once",
+      "status": "passed"
+    },
+    {
+      "name": "unmounted_dashboard_stops_future_api_calls_and_rescheduling",
+      "status": "passed"
+    },
+    {
+      "name": "manual_refresh_replaces_existing_timer",
+      "status": "passed"
+    },
+    {
+      "name": "overlapping_refresh_newer_response_must_not_be_overwritten",
+      "status": "passed"
+    },
+    {
+      "name": "overlapping_refresh_must_not_create_duplicate_timer_loops",
+      "status": "passed"
+    }
+  ]
+}

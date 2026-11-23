@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.domain.errors import Conflict, Forbidden, NotFound, fail
+from app.domain.guards import reject_existing, require_found
 from app.domain.site_config import default_config, normalize_config
 from app.domain.values import slug, text
 
@@ -153,3 +154,41 @@ class ContentImport:
     @staticmethod
     def stale_draft() -> None:
         fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)
+
+
+def require_requestable_target(site: dict) -> None:
+    """Account access is requested for an event or an agency page, never for the platform site."""
+    if site['kind'] == 'platform':
+        fail('EVENT_REQUIRED')
+
+
+def requested_role_for(site: dict) -> str:
+    """Access to an event is granted as organizer, to an agency page as agency staff."""
+    return 'organizer' if site['kind'] == 'event' else 'agency'
+
+
+def require_workflow_request(linked_request_id: str | None) -> str:
+    """Legacy requests that never entered the reviewed workflow must be resubmitted."""
+    if not linked_request_id:
+        fail('LEGACY_REQUEST_REQUIRES_RESUBMISSION', Conflict)
+    return linked_request_id
+
+
+def require_request_in_scope(request_scope_id: str | None, site_id: str) -> None:
+    """A site manager may review only requests aimed at that site; others are concealed."""
+    if request_scope_id != site_id:
+        fail('ACCOUNT_REQUEST_NOT_FOUND', NotFound)
+
+
+def require_free_slug(existing_site: dict | None) -> None:
+    reject_existing(existing_site, 'SLUG_EXISTS')
+
+
+def require_site(site: dict | None) -> dict:
+    return require_found(site, 'SITE_NOT_FOUND')
+
+
+def require_draft_saved(saved: bool) -> None:
+    """The guarded save touched no row: another editor moved the draft first."""
+    if not saved:
+        fail('DRAFT_CHANGED_REFRESH_REQUIRED', Conflict)
