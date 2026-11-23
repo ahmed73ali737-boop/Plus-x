@@ -13,8 +13,9 @@ mode) or a single ``*`` entitlement, each admitting ``1 + companions`` people.
 """
 from __future__ import annotations
 
+import base64
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain.errors import Conflict, Forbidden, NotFound, fail
@@ -317,3 +318,71 @@ class Entitlement:
     def check_replay(entitlement: dict, use: dict, event_id: str, guest_id: str, quantity) -> None:
         if entitlement['event_id'] != event_id or entitlement['guest_id'] != guest_id or use['quantity'] != quantity:
             fail('SCAN_ID_CONFLICT', Conflict)
+
+
+class GuestImport:
+    """Bounded bulk invitation import: upload limits, table shape and the preview lifecycle.
+
+    A preview is created with its row errors; it can be committed once, only when
+    it has rows, no errors and is younger than ``PREVIEW_TTL``.
+    """
+
+    PREVIEW_TTL = timedelta(hours=1)
+    MAX_ENCODED_BYTES = 4 * 1024 * 1024
+    MAX_BYTES = 3 * 1024 * 1024
+    MAX_TABLE_ROWS = 1001
+    COLUMNS = {'name', 'phone', 'list_id', 'max_companions', 'days'}
+
+    @staticmethod
+    def file_kind(filename: str) -> str:
+        lowered = filename.lower()
+        if lowered.endswith('.xlsx'):
+            return 'xlsx'
+        if lowered.endswith('.csv'):
+            return 'csv'
+        fail('IMPORT_CSV_OR_XLSX_REQUIRED')
+
+    @staticmethod
+    def decode_upload(content_base64) -> bytes:
+        try:
+            if not isinstance(content_base64, str) or len(content_base64) > GuestImport.MAX_ENCODED_BYTES:
+                fail('IMPORT_FILE_LIMIT')
+            raw = base64.b64decode(content_base64, validate=True)
+        except (ValueError, TypeError):
+            fail('IMPORT_BASE64_INVALID')
+        if len(raw) > GuestImport.MAX_BYTES:
+            fail('IMPORT_FILE_LIMIT')
+        return raw
+
+    @staticmethod
+    def rows_from_table(values: list) -> list[dict]:
+        if not values or len(values) < 2 or len(values) > GuestImport.MAX_TABLE_ROWS:
+            fail('IMPORT_ROWS_1_TO_1000')
+        headers = [str(value).strip().lower() for value in values[0]]
+        if len(set(headers)) != len(headers) or not {'name', 'phone'}.issubset(headers):
+            fail('IMPORT_HEADERS_NAME_PHONE')
+        if set(headers) - GuestImport.COLUMNS:
+            fail('IMPORT_UNKNOWN_COLUMN')
+        rows = []
+        for value in values[1:]:
+            if not any(str(item).strip() for item in value):
+                continue
+            if len(value) > len(headers):
+                fail('IMPORT_COLUMN_COUNT')
+            row = {key: value[index] if index < len(value) else '' for index, key in enumerate(headers)}
+            if not row.get('max_companions'):
+                row.pop('max_companions', None)
+            row['days'] = [item.strip() for item in str(row.get('days', '')).split(';') if item.strip()]
+            rows.append(row)
+        return rows
+
+    @staticmethod
+    def require_committable(preview: dict | None, at: datetime) -> None:
+        if not preview:
+            fail('IMPORT_PREVIEW_NOT_FOUND', NotFound)
+        if preview['state'] != 'preview':
+            fail('IMPORT_ALREADY_COMMITTED', Conflict)
+        if preview['errors'] or not preview['rows']:
+            fail('IMPORT_ERRORS_MUST_BE_FIXED', Conflict)
+        if datetime.fromisoformat(preview['created_at']) < at - GuestImport.PREVIEW_TTL:
+            fail('IMPORT_PREVIEW_EXPIRED', Conflict)

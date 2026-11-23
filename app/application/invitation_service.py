@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import csv
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from app.application.audit_service import new_id
@@ -21,6 +21,7 @@ from app.domain.admission import (
     DEFAULT_POLICY,
     AdmissionPolicy,
     Entitlement,
+    GuestImport,
     Invitation,
     check_window,
     day_list,
@@ -45,7 +46,6 @@ __all__ = [
     'get_policy', 'integer', 'iso_time', 'lock_policy', 'parse_guest_file', 'public_view', 'reserved_people',
     'respond', 'review', 'revoke', 'rotate', 'save_policy', 'staff_view', 'validate_current_days',
 ]
-IMPORT_PREVIEW_TTL = timedelta(hours=1)
 
 
 def _admission():
@@ -352,14 +352,7 @@ def preview_import(tx, event_id, user, body):
 def commit_import(tx, event_id, user, import_id):
     """Create every previewed invitation; returns (preview id, [(row, token), ...])."""
     preview = _admission().lock_import(tx, text(import_id, 64, True), event_id, user['id'])
-    if not preview:
-        fail('IMPORT_PREVIEW_NOT_FOUND', NotFound)
-    if preview['state'] != 'preview':
-        fail('IMPORT_ALREADY_COMMITTED', Conflict)
-    if preview['errors'] or not preview['rows']:
-        fail('IMPORT_ERRORS_MUST_BE_FIXED', Conflict)
-    if datetime.fromisoformat(preview['created_at']) < datetime.now(timezone.utc) - IMPORT_PREVIEW_TTL:
-        fail('IMPORT_PREVIEW_EXPIRED', Conflict)
+    GuestImport.require_committable(preview, datetime.now(timezone.utc))
     created = [create_invitation(tx, event_id, row) for row in preview['rows']]
     _admission().mark_import_committed(tx, preview['id'])
     return preview['id'], created
@@ -382,15 +375,9 @@ def register_publicly(tx, event, body):
 
 
 def parse_guest_file(filename, content_base64):
-    try:
-        if not isinstance(content_base64, str) or len(content_base64) > 4 * 1024 * 1024:
-            fail('IMPORT_FILE_LIMIT')
-        raw = base64.b64decode(content_base64, validate=True)
-    except (ValueError, TypeError):
-        fail('IMPORT_BASE64_INVALID')
-    if len(raw) > 3 * 1024 * 1024:
-        fail('IMPORT_FILE_LIMIT')
-    if filename.lower().endswith('.xlsx'):
+    raw = GuestImport.decode_upload(content_base64)
+    kind = GuestImport.file_kind(filename)
+    if kind == 'xlsx':
         try:
             workbook = parse_xlsx(raw)['workbook']
         except (Rejected, ValueError, KeyError):
@@ -398,29 +385,9 @@ def parse_guest_file(filename, content_base64):
         if len(workbook) != 1:
             fail('IMPORT_ONE_SHEET_REQUIRED')
         values = next(iter(workbook.values()))
-    elif filename.lower().endswith('.csv'):
+    else:
         try:
             values = list(csv.reader(io.StringIO(raw.decode('utf-8-sig'))))
         except (UnicodeDecodeError, csv.Error):
             fail('IMPORT_CSV_INVALID')
-    else:
-        fail('IMPORT_CSV_OR_XLSX_REQUIRED')
-    if not values or len(values) < 2 or len(values) > 1001:
-        fail('IMPORT_ROWS_1_TO_1000')
-    headers = [str(value).strip().lower() for value in values[0]]
-    if len(set(headers)) != len(headers) or not {'name', 'phone'}.issubset(headers):
-        fail('IMPORT_HEADERS_NAME_PHONE')
-    if set(headers) - {'name', 'phone', 'list_id', 'max_companions', 'days'}:
-        fail('IMPORT_UNKNOWN_COLUMN')
-    rows = []
-    for value in values[1:]:
-        if not any(str(item).strip() for item in value):
-            continue
-        if len(value) > len(headers):
-            fail('IMPORT_COLUMN_COUNT')
-        row = {key: value[index] if index < len(value) else '' for index, key in enumerate(headers)}
-        if not row.get('max_companions'):
-            row.pop('max_companions', None)
-        row['days'] = [item.strip() for item in str(row.get('days', '')).split(';') if item.strip()]
-        rows.append(row)
-    return rows
+    return GuestImport.rows_from_table(values)
