@@ -1,10 +1,6 @@
 {
   "_comment": "Shrink-only ratchet: number of fail(...) rule checks still written in app/application modules (rules not yet owned by the domain). Lower a count when you move rules into app/domain; never raise one or add a module. Phase-2 start: 344 total across 36 modules.",
   "fail_calls_in_application": {
-    "app/application/access_request_service.py": 2,
-    "app/application/account_requests.py": 11,
-    "app/application/account_service.py": 2,
-    "app/application/auth_service.py": 3,
     "app/application/certificate_batches.py": 4,
     "app/application/certificate_rendering.py": 7,
     "app/application/certificate_service.py": 7,

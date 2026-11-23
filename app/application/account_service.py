@@ -17,7 +17,7 @@ from app.core.security import (
     new_temporary_password,
     verify_password,
 )
-from app.domain import DomainError, NotFound, Unauthenticated, fail, now, text
+from app.domain import DomainError, Unauthenticated, now, text
 from app.domain.accounts import (
     PREFERENCE_DEFAULTS,
     SESSION_HOURS,
@@ -25,7 +25,9 @@ from app.domain.accounts import (
     check_preferences,
     platform_status,
     require_credentials,
+    require_active_target_account,
     require_known_user,
+    require_notification,
     require_organizer_reset_scope,
     require_platform,
     require_reset_authority,
@@ -169,8 +171,7 @@ def inbox(tx, user) -> dict:
 
 
 def mark_read(tx, user, notification_id: str) -> None:
-    if not persistence.identity.mark_read(tx, notification_id, user['id']):
-        fail('NOT_FOUND', NotFound)
+    require_notification(persistence.identity.mark_read(tx, notification_id, user['id']))
 
 
 def send_notification(tx, sender, body: dict) -> dict:
@@ -179,8 +180,7 @@ def send_notification(tx, sender, body: dict) -> dict:
         target = find_by_phone(tx, body['phone'])
     else:
         target = persistence.identity.user_with_exact_email(tx, text(body.get('email'), 200, True).lower())
-    if not target or not target['active']:
-        fail('ACCOUNT_NOT_FOUND', NotFound)
+    require_active_target_account(target)
     notification_id = new_id()
     persistence.identity.add_notification(tx, {
         'id': notification_id, 'user_id': target['id'], 'sender_id': sender['id'],

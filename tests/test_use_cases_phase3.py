@@ -248,3 +248,41 @@ def test_people_managers_can_add_people(restore_ports):
     install(sites=FakeSites(), site_admin=admin, access=PeopleAccess(membership='admin', member_of={'org1'}))
     result = site_admin.add_person(None, user('agency'), 'org1', {'name': 'New person'})
     assert result['organization_id'] == 'org1' and admin.added[0]['name'] == 'New person'
+
+
+class FakeIdentitySessions:
+    def __init__(self, session=None, user=None):
+        self._session, self._user = session, user
+
+    def session(self, tx, token_hash):
+        return self._session
+
+    def user(self, tx, user_id, for_update=False):
+        return self._user
+
+
+class FakeRequest:
+    def __init__(self, cookie='tok', csrf=''):
+        self.cookies = {'px_session': cookie} if cookie else {}
+        self.headers = {'x-csrf': csrf}
+
+
+def test_identify_request_fails_closed_on_every_missing_piece(restore_ports):
+    from app.application.auth_service import identify_request
+    from app.domain import Forbidden, Unauthenticated
+    live = {'expires_at': '9999-01-01T00:00:00+00:00', 'csrf': 'c', 'user_id': 'u1'}
+    active = {'id': 'u1', 'active': 1}
+    cases = [(FakeIdentitySessions(None, active), FakeRequest(), False),
+             (FakeIdentitySessions({**live, 'expires_at': '2000-01-01T00:00:00+00:00'}, active), FakeRequest(), False),
+             (FakeIdentitySessions(live, None), FakeRequest(), False),
+             (FakeIdentitySessions(live, {'id': 'u1', 'active': 0}), FakeRequest(), False),
+             (FakeIdentitySessions(live, active), FakeRequest(cookie=''), False)]
+    for identity, request, write in cases:
+        install(identity=identity)
+        with pytest.raises(Unauthenticated, match='LOGIN_REQUIRED'):
+            identify_request(request, None, write)
+    install(identity=FakeIdentitySessions(live, active))
+    assert identify_request(FakeRequest(), None)[0] is active          # reads need no CSRF header
+    with pytest.raises(Forbidden, match='CSRF_REQUIRED'):
+        identify_request(FakeRequest(csrf='wrong'), None, write=True)
+    assert identify_request(FakeRequest(csrf='c'), None, write=True)[1] is live

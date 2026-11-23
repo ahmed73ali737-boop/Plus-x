@@ -94,3 +94,66 @@ def test_organizer_may_submit_organizer_requests_for_their_event_only():
     assert organizer_may_submit_for_platform({'role': 'organizer', 'scope_id': 'e1'}, record)
     assert not organizer_may_submit_for_platform({'role': 'organizer', 'scope_id': 'e2'}, record)
     assert not organizer_may_submit_for_platform({'role': 'agency', 'scope_id': 'e1'}, record)
+
+
+# Phase 3: maker/checker orchestration guards -----------------------------------------------------
+
+def test_a_request_needs_a_designated_supervisor():
+    from app.domain.account_requests import require_supervisor
+    assert require_supervisor('u1') == 'u1'
+    for none in (None, ''):
+        with pytest.raises(Conflict) as error:
+            require_supervisor(none)
+        assert error.value.code == 'ACCOUNT_REQUEST_SUPERVISOR_UNAVAILABLE'
+
+
+def test_submitter_scope_rules_are_evaluated_lazily():
+    from app.domain.account_requests import require_submitter_in_scope, submitter_in_scope
+    asked = []
+
+    def fact(name, value):
+        return lambda: asked.append(name) or value
+
+    assert submitter_in_scope('organization', fact('org', True), fact('auth', False), fact('platform', False))
+    assert asked == ['org']
+    asked.clear()
+    assert not submitter_in_scope('organization', fact('org', False), fact('auth', True), fact('platform', True))
+    assert asked == ['org']                # organization scope never falls back to site authority
+    asked.clear()
+    assert submitter_in_scope('site', fact('org', False), fact('auth', True), fact('platform', False))
+    assert asked == ['auth']
+    assert submitter_in_scope('site', fact('org', False), fact('auth', False), fact('platform', True))
+    assert not submitter_in_scope('site', fact('org', True), fact('auth', False), fact('platform', False))
+    require_submitter_in_scope(True)
+    with pytest.raises(Forbidden) as denied:
+        require_submitter_in_scope(False)
+    assert denied.value.code == 'FORBIDDEN_SCOPE'
+
+
+def test_request_key_replays_return_the_stored_request_but_a_changed_payload_conflicts():
+    from app.domain.account_requests import is_replay
+    assert is_replay(None, 'h') is False
+    assert is_replay({'payload_hash': 'h'}, 'h') is True
+    with pytest.raises(Conflict) as error:
+        is_replay({'payload_hash': 'h'}, 'other')
+    assert error.value.code == 'ACCOUNT_REQUEST_KEY_EXISTS'
+
+
+def test_requests_outside_supervision_are_concealed_and_setup_activates_once():
+    from app.domain.account_requests import (
+        require_new_account, require_request, require_setup_activated, require_supervision)
+    assert require_request({'id': 1}) == {'id': 1}
+    with pytest.raises(NotFound) as missing:
+        require_request(None)
+    assert missing.value.code == 'ACCOUNT_REQUEST_NOT_FOUND'
+    require_supervision(True)
+    with pytest.raises(NotFound):
+        require_supervision(False)
+    require_setup_activated(True)
+    with pytest.raises(Conflict) as used:
+        require_setup_activated(False)
+    assert used.value.code == 'ACCOUNT_SETUP_UNAVAILABLE'
+    require_new_account(None)
+    with pytest.raises(Conflict) as exists:
+        require_new_account({'id': 'u'})
+    assert exists.value.code == 'ACCOUNT_ALREADY_EXISTS'

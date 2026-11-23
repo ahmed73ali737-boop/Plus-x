@@ -162,3 +162,16 @@ def test_organization_participation_and_membership_lookups():
     with pytest.raises(Conflict) as dup:
         require_new_participation(True)
     assert dup.value.code == 'PARTICIPATION_EXISTS'
+
+
+def test_legacy_access_request_status_and_lookup():
+    from app.domain.sites import require_access_request, require_access_request_status
+    for status in ('pending', 'approved', 'rejected'):
+        assert require_access_request_status(status) == status
+    with pytest.raises(InvalidInput) as bad:
+        require_access_request_status('deleted')
+    assert bad.value.code == 'REQUEST_STATUS_INVALID'
+    assert require_access_request({'id': 1}) == {'id': 1}
+    with pytest.raises(NotFound) as missing:
+        require_access_request(None)
+    assert missing.value.code == 'ACCESS_REQUEST_NOT_FOUND'

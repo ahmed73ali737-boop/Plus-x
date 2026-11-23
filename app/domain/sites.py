@@ -192,3 +192,16 @@ def require_draft_saved(saved: bool) -> None:
     """The guarded save touched no row: another editor moved the draft first."""
     if not saved:
         fail('DRAFT_CHANGED_REFRESH_REQUIRED', Conflict)
+
+
+ACCESS_REQUEST_STATUSES = ('pending', 'approved', 'rejected')
+
+
+def require_access_request_status(status) -> str:
+    if status not in ACCESS_REQUEST_STATUSES:
+        fail('REQUEST_STATUS_INVALID')
+    return status
+
+
+def require_access_request(request: dict | None) -> dict:
+    return require_found(request, 'ACCESS_REQUEST_NOT_FOUND')
