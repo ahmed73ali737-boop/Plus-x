@@ -23,10 +23,16 @@ from app.domain.organizations import (
     person_changes,
     person_values,
     require_event_operator,
+    require_membership_manager,
+    require_participation_event,
+    require_unlinked_person,
+    requested_membership_role,
+    signup_role,
     signup_values,
 )
 from app.domain.site_config import KINDS, QTYPES, SECTIONS
 from app.domain.sites import (
+    ContentImport,
     agency_draft,
     agency_slug,
     authorize_new_site,
@@ -35,6 +41,9 @@ from app.domain.sites import (
     new_site_draft,
     public_path,
     require_draft_revision,
+    require_event_site,
+    require_not_agency,
+    require_platform_or_organizer,
     require_publish_revision,
     site_slug,
 )
@@ -68,14 +77,9 @@ def request_signup(tx, body: dict) -> dict:
     site_id = text(body.get('site_id'), 64, True)
     site = get_site(tx, site_id)
     require_public_event(tx, event_id_for_site(tx, site))
-    role = body.get('requested_role')
-    if role not in ('organizer', 'participant'):
-        fail('REQUESTED_ROLE_INVALID')
-    if role == 'organizer' and site['kind'] != 'platform':
-        fail('FORBIDDEN_SCOPE', Forbidden)
+    role = signup_role(body.get('requested_role'), site)
     event_id = event_id_for_site(tx, site)
-    if role == 'participant' and not event_id:
-        fail('EVENT_REQUIRED')
+    require_participation_event(role, event_id)
     email, phone = contact_identity(body, preserve_email=True)
     request_id = new_id()
     row = signup_values(request_id, site_id, event_id, role, email, phone, body, now())
@@ -90,8 +94,7 @@ def request_signup(tx, body: dict) -> dict:
 
 
 def signup_requests_for(tx, user, site_id: str | None) -> list[dict]:
-    if user['role'] not in ('platform', 'organizer'):
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_platform_or_organizer(user)
     rows = persistence.site_admin.signup_requests(tx)
     if user['role'] == 'organizer':
         rows = [row for row in rows if row.get('event_id') == user['scope_id']]
@@ -174,8 +177,7 @@ def site_by_slug(tx, slug: str) -> dict:
 
 def site_users(tx, user, site_id: str) -> dict:
     require_scope(tx, user, site_id)
-    if user['role'] == 'agency':
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_not_agency(user)
     awaiting_setup = persistence.identity.users_awaiting_setup(tx, site_id)
     rows = [{**row, 'setup_required': row['id'] in awaiting_setup,
              'email': None if row['email'].startswith('tel:') else row['email']}
@@ -185,8 +187,7 @@ def site_users(tx, user, site_id: str) -> dict:
 
 def request_site_user(tx, user, site_id: str, body: dict) -> dict:
     site = require_scope(tx, user, site_id)
-    if user['role'] == 'agency' or site['kind'] == 'platform':
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_not_agency(user, site)
     return account_request_service.submit(tx, actor=user, body=body, purpose='site', scope_type='site',
                                           scope_id=site_id, role='organizer' if site['kind'] == 'event' else 'agency')
 
@@ -222,18 +223,13 @@ def preview_import(tx, user, site: dict, records: list, errors: list, ignored_sh
 
 def commit_import(tx, user, site_id: str, import_id: str) -> dict:
     site = require_scope(tx, user, site_id)
-    job = persistence.site_admin.content_import(tx, import_id)
-    if not job or job['site_id'] != site_id or job['user_id'] != user['id']:
-        fail('IMPORT_NOT_FOUND', NotFound)
+    job = ContentImport.require_owned(persistence.site_admin.content_import(tx, import_id), site_id, user['id'])
     if job['state'] == 'committed':
         return {'status': 'already_committed', 'added': len(job['records'])}
-    if job['errors']:
-        fail('IMPORT_HAS_ERRORS')
-    if job['base_rev'] != site['draft_rev']:
-        fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)
+    ContentImport.require_committable(job, site['draft_rev'])
     config = normalize_config({**site['draft'], 'records': site['draft']['records'] + job['records']})
     if not persistence.sites.save_draft(tx, site_id, job['base_rev'], config):
-        fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)
+        ContentImport.stale_draft()
     persistence.site_admin.mark_import_committed(tx, import_id)
     write_audit(tx, user, site_id, 'import_committed', {'job': import_id, 'records': len(job['records'])})
     return {'status': 'committed', 'added': len(job['records'])}
@@ -271,8 +267,7 @@ def _add_agency_participation(tx, event, organization, body, draft) -> tuple[str
 
 
 def create_organization(tx, user, body: dict) -> dict:
-    if user['role'] not in ('platform', 'organizer'):
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_platform_or_organizer(user)
     organization = new_organization(new_id(), body, now())
     if persistence.site_admin.organization_by_slug(tx, organization['slug']):
         fail('ORGANIZATION_SLUG_EXISTS', Conflict)
@@ -287,8 +282,7 @@ def create_organization(tx, user, body: dict) -> dict:
 
 def event_participations(tx, user, event_id: str) -> list[dict]:
     event = require_scope(tx, user, event_id)
-    if event['kind'] != 'event':
-        fail('EVENT_REQUIRED')
+    require_event_site(event)
     return persistence.site_admin.participations_of_event(tx, event_id)
 
 
@@ -367,8 +361,7 @@ def request_person_account(tx, user, organization_id: str, person_id: str, body:
     person = persistence.site_admin.person(tx, person_id)
     if not person or person['organization_id'] != organization_id or not _can_manage_people(tx, user, organization_id):
         fail('PERSON_NOT_FOUND', NotFound)
-    if person['user_id']:
-        fail('PERSON_ALREADY_LINKED', Conflict)
+    require_unlinked_person(person)
     contact = {**body, 'name': person['name'], 'email': body.get('email') or person['email'],
                'phone': body.get('phone') or person['phone']}
     return account_request_service.submit(tx, actor=user, body=contact, purpose='organization',
@@ -390,12 +383,11 @@ def organization_members(tx, user, organization_id: str) -> list[dict]:
 def update_member(tx, user, organization_id: str, member_id: str, body: dict) -> dict:
     _visible_organization(tx, user, organization_id)
     is_owner = persistence.site_admin.is_active_owner(tx, user['id'], organization_id)
-    if user['role'] not in ('platform', 'organizer') and not is_owner:
-        fail('FORBIDDEN_ROLE', Forbidden)
+    require_membership_manager(user, is_owner)
     membership = persistence.site_admin.membership(tx, member_id, organization_id)
     if not membership:
         fail('MEMBERSHIP_NOT_FOUND', NotFound)
-    if body.get('role', membership['role']) != membership['role']:
+    if requested_membership_role(membership, body) is not None:
         # A role change is a new reviewed account request, never a silent update.
         target = persistence.identity.user(tx, member_id)
         contact = {'name': target['name'], 'email': target['email'] if not target['email'].startswith('tel:') else None,

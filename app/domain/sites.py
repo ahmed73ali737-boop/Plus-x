@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.domain.errors import Conflict, Forbidden, fail
+from app.domain.errors import Conflict, Forbidden, NotFound, fail
 from app.domain.site_config import default_config, normalize_config
 from app.domain.values import slug, text
 
@@ -114,3 +114,42 @@ def event_status(config: dict, current) -> str:
     if end and current >= end:
         return 'completed'
     return 'current'
+
+
+def require_platform_or_organizer(user: dict) -> None:
+    """Directory-wide administration (signup queue, organization creation) is staff-only."""
+    if user['role'] not in ('platform', 'organizer'):
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def require_not_agency(user: dict, site: dict | None = None) -> None:
+    """Exhibitor staff never manage site users; nobody manages users of the platform site."""
+    if user['role'] == 'agency' or (site is not None and site['kind'] == 'platform'):
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def require_event_site(site: dict) -> None:
+    if site['kind'] != 'event':
+        fail('EVENT_REQUIRED')
+
+
+class ContentImport:
+    """A previewed content import commits once, to the revision it was previewed against."""
+
+    @staticmethod
+    def require_owned(job: dict | None, site_id: str, user_id: str) -> dict:
+        if not job or job['site_id'] != site_id or job['user_id'] != user_id:
+            fail('IMPORT_NOT_FOUND', NotFound)
+        return job
+
+    @staticmethod
+    def require_committable(job: dict, draft_rev: int) -> None:
+        """Call only for a job that is not already committed (that case replays idempotently)."""
+        if job['errors']:
+            fail('IMPORT_HAS_ERRORS')
+        if job['base_rev'] != draft_rev:
+            fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)
+
+    @staticmethod
+    def stale_draft() -> None:
+        fail('DRAFT_CHANGED_REPREVIEW_REQUIRED', Conflict)

@@ -2,7 +2,7 @@
 event participations."""
 from __future__ import annotations
 
-from app.domain.errors import Forbidden, fail
+from app.domain.errors import Conflict, Forbidden, fail
 from app.domain.values import EMAIL, SLUG, boolean, text
 
 PERSON_ROLES = ('owner', 'manager', 'member', 'representative', 'staff', 'speaker')
@@ -120,3 +120,33 @@ def signup_values(request_id: str, site_id: str, event_id, role: str, email: str
         'wants_account': 1 if boolean(body.get('wants_account', True)) else 0, 'status': 'pending',
         'details': {'message': text(body.get('message'), 1500)}, 'created_at': at,
     }
+
+
+def signup_role(role, site: dict) -> str:
+    """Public signup may ask to organize (from the platform site) or to participate."""
+    if role not in ('organizer', 'participant'):
+        fail('REQUESTED_ROLE_INVALID')
+    if role == 'organizer' and site['kind'] != 'platform':
+        fail('FORBIDDEN_SCOPE', Forbidden)
+    return role
+
+
+def require_participation_event(role: str, event_id) -> None:
+    if role == 'participant' and not event_id:
+        fail('EVENT_REQUIRED')
+
+
+def require_unlinked_person(person: dict) -> None:
+    if person['user_id']:
+        fail('PERSON_ALREADY_LINKED', Conflict)
+
+
+def require_membership_manager(user: dict, is_active_owner: bool) -> None:
+    if user['role'] not in ('platform', 'organizer') and not is_active_owner:
+        fail('FORBIDDEN_ROLE', Forbidden)
+
+
+def requested_membership_role(membership: dict, body: dict):
+    """The new role when a change is requested (needs a reviewed request), else None."""
+    role = body.get('role', membership['role'])
+    return role if role != membership['role'] else None
