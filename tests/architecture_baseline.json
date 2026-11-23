@@ -8,7 +8,6 @@
     "app/application/certificate_batches.py": 4,
     "app/application/certificate_rendering.py": 7,
     "app/application/certificate_service.py": 7,
-    "app/application/collection_service.py": 5,
     "app/application/committee_service.py": 3,
     "app/application/device_service.py": 3,
     "app/application/event_lookup.py": 3,

@@ -6,7 +6,6 @@ The authority rules live in app.domain.authorization; this module loads the fact
 from app.application.access import active_window
 from app.application.ports import persistence
 from app.domain import Forbidden, PreconditionRequired, Unauthenticated, authorization
-from app.domain.authorization import LIBRARY_CAPABILITIES as CAPABILITIES
 from app.domain.guards import require_found
 
 
