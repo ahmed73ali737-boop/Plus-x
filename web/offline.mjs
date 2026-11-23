@@ -13,7 +13,19 @@ export async function bundle(slug){try{const b=await api('/api/public/site/'+enc
 export async function status(){const [xs,guests,checkins]=await Promise.all([all('outbox'),all('guest_outbox'),all('checkin_outbox')]);const count=(arr,state)=>arr.filter(x=>x.status===state).length;return{pending:count(xs,'pending')+count(guests,'pending')+count(checkins,'pending'),rejected:count(xs,'rejected')+count(guests,'rejected')+count(checkins,'rejected'),interaction_pending:count(xs,'pending'),guest_pending:count(guests,'pending'),checkin_pending:count(checkins,'pending'),items:xs,guest_items:guests,checkin_items:checkins};}
 export async function prepare(b){if(!('serviceWorker'in navigator)||!window.isSecureContext)throw new Error('العمل دون اتصال يحتاج HTTPS أو localhost.');await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready;let count=0;const missing=[];const cached=[];const slugs=[b.slug,...b.agencies.map(x=>x.slug),...(b.event?[b.event.slug]:[])];for(const slug of [...new Set(slugs)]){try{const x=await api('/api/public/site/'+slug);await put('bundles',{id:slug,data:x,cached_at:new Date().toISOString()});cached.push(x);}catch{missing.push(slug);}}
 const cache=await caches.open('px-media-v02');const urls=new Set();for(const x of cached){for(const cfg of [x.config,x.event?.config].filter(Boolean)){for(const path of [cfg.logo,cfg.cover,...cfg.records.map(r=>r.media),...cfg.records.flatMap(r=>(r.options||[]).map(o=>o.media))].filter(Boolean))urls.add(path);}}
-for(const u of urls){try{const full=new URL(u,location.origin);if(full.origin!==location.origin){missing.push(u);continue;}const r=await fetch(u,{cache:'reload'});if(!r.ok)throw new Error();await cache.put(u,r);count++;}catch{missing.push(u);}}
+for(const u of urls){try{
+  // Only public media belongs in this cache, never API responses or HTML.
+  const full=new URL(u,location.origin);
+  const mediaRoot='/media/';
+  if(full.origin!==location.origin||full.username||full.password)throw new Error('MEDIA_ORIGIN');
+  // Server config can contain origin-root media paths even in a mounted image.
+  const legacyRoot='/'+'media/';
+  if(full.pathname.startsWith(legacyRoot))full.pathname=mediaRoot+full.pathname.slice(legacyRoot.length);
+  if(!full.pathname.startsWith(mediaRoot))throw new Error('MEDIA_PATH');
+  const r=await fetch(full.href,{cache:'reload'});if(!r.ok||r.redirected)throw new Error('MEDIA_RESPONSE');
+  await cache.put(full.href,r);count++;
+}catch{missing.push(u);}}
+
 let persistent=false;try{persistent=await navigator.storage?.persist?.()||false;}catch{}
 const ready={pages:cached.length,assets:count,missing,persistent,prepared_at:new Date().toISOString()};await put('bundles',{id:'ready:'+b.slug,data:ready});return ready;}
 export async function saveDeviceToken(token,eventId=''){token=String(token||'').trim();if(token.length<20)throw new Error('رمز الجهاز غير صالح.');await put('bundles',{id:'device-auth',data:{token},cached_at:new Date().toISOString()});let prepared_guests=null;if(eventId&&navigator.onLine){try{const r=await fetch('/api/device/events/'+encodeURIComponent(eventId)+'/guest-manifest',{credentials:'same-origin',cache:'no-store',headers:{'X-PulseX-Device-Token':token}});if(r.ok){const data=await r.json();prepared_guests=(data.guests||[]).length;await put('guest_manifests',{id:eventId,data,token,cached_at:new Date().toISOString()});for(const guest of data.guests||[])await put('gate_presence',{id:eventId+':'+guest.guest_number,event_id:eventId,guest_number:guest.guest_number,state:guest.presence||'outside',updated_at:new Date().toISOString(),source:'manifest'});}}catch{}}return{paired:true,prepared_guests};}

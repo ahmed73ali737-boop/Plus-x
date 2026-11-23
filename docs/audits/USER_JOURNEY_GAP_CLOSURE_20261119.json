@@ -1,0 +1,79 @@
+{
+  "base_commit": "efd4b1285ac9c6fd87f56930f014dd1653337262",
+  "branch": "fix/user-journey-boundaries-20261119",
+  "source_sha256": {
+    "app/core/settings.py": "22805b41a1cfc4a6bda36dd03a18c714ea1f36e1860c5fb88a6ca57cf8c97059",
+    "app/server.py": "3ff017432fd3c6808589eeee3a54407a5de2fad7655dfe969b63437ae86bd6c8",
+    "app/api/self_certificate_routes.py": "2704f359a635077046b532f109367987638a037d3663c85a003f91001bd4bfdd",
+    "compose.development.yaml": "6b0416185c3d17af0810b789722534ebf47fb5f3cc8eec993a46ecead2fc3418",
+    "ops/prepare_development_web.py": "a63cba8c26ee133efec5508348d2e05b83e17fe6cc26032d98c0986fe6475388",
+    "web/guest.mjs": "3ec9a38751b33c6cb230e58b42d0b9a96e54d4be5f26c3e655eb44a994fc326d",
+    "web/offline.mjs": "0644377de7e0a65bef7abf43ae3e50d5c2f2fb983965b5931031c522372d9478",
+    "web/sw.js": "1d7a7afe06935b91c6dad5ac35390d90d8bba1f109b57c602932f0c4a9e15b2e",
+    "tests/test_journey_boundaries.py": "72b0a1e1fc96106d4957a589125e78c40dd2ab469570079b5248a637a7ddcf99",
+    "tests/journey_boundaries.mjs": "00c492cb2123dfa72e7bef81ce734ec0e2629b705758a42d454107108a57b703"
+  },
+  "local_log_evidence": {
+    "/tmp/plusx-journey-before.log": {
+      "sha256": "1ab7c4ef23c56377112e12f3333b80cbe51d029087516c97b272e32466132c80",
+      "summary": [
+        "10 failed, 1 passed, 1 warning in 4.18s"
+      ]
+    },
+    "/tmp/plusx-journey-js-before.log": {
+      "sha256": "e20b529a4337029d2f799cd92dbe07ce0910710a1470a93de6d1b9602d08bca1",
+      "summary": [
+        "# tests 3",
+        "# pass 0",
+        "# fail 3",
+        "# skipped 0"
+      ]
+    },
+    "/tmp/plusx-journey-baseline-existing.log": {
+      "sha256": "9274b4ff5e389bacc06a39d00e656395e50edf2d03d30e7578f2284c374b48c1",
+      "summary": [
+        "28 passed, 1 warning in 18.13s"
+      ]
+    },
+    "/tmp/plusx-journey-final-python.log": {
+      "sha256": "0284f1d71ce4d01b2dd2ab7a5f420238fceb8cff21b16f74fbe37f3db36f2a0b",
+      "summary": [
+        "56 passed, 1 warning in 22.58s"
+      ]
+    },
+    "/tmp/plusx-journey-node.log": {
+      "sha256": "d953aff884a101dbf904809e6cf5e624745a009d895216258ad96b0f65a26b89",
+      "summary": [
+        "# tests 18",
+        "# pass 18",
+        "# fail 0",
+        "# skipped 0"
+      ]
+    },
+    "/tmp/plusx-journey-certificate.log": {
+      "sha256": "2aecf643a3f0d4f32a1a47c4203afcfb3eca6480b94c233fd3fe3dddfdcab1e0",
+      "summary": [
+        "1 passed, 1 warning in 5.28s"
+      ]
+    },
+    "/tmp/plusx-journey-android.log": {
+      "sha256": "bf97765d8a6aae8ac143de9c4e9126efa4bfacee3fb4942dc31f2e6dd05eb654",
+      "summary": [
+        "1 passed, 1 warning in 0.91s"
+      ]
+    }
+  },
+  "criteria": {
+    "total": 19,
+    "before_pass": 5,
+    "after_pass": 17,
+    "before_percent": 26.32,
+    "after_percent": 89.47,
+    "full_e2e_verified": 0
+  },
+  "syntax_checks": 60,
+  "manifest_checks": 2,
+  "compose_config": "passed",
+  "deployment_changed": false,
+  "publication": "local only; no coordinator lease"
+}

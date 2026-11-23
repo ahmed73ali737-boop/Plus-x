@@ -5,3 +5,15 @@ qa
 tests
 reference
 __pycache__
+
+secrets.*
+backups
+.git
+*ACCESS*.md
+
+.local
+.env.*
+credentials.private.json
+*.pem
+*.key
+deploy/evidence

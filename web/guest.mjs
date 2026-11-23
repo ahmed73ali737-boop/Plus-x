@@ -109,7 +109,7 @@ async function registerGuestOfflineFirst(slug,values){
   return reconciled||local;
 }
 function guestHeader(page,slug){
-  const title=page.config?.title||'Eventna إيفنتنا';const mark=title.trim().slice(0,1).toUpperCase()||'E';
+  const title=page.config?.title||'إيفنتنا';const mark=title.trim().slice(0,1).toUpperCase()||'E';
   return h('header',{class:'topbar site-topbar'},h('div',{class:'topbar-inner'},brand(title,mark,'/e/'+slug),h('nav',{class:'toplinks'},h('a',{href:'/e/'+slug},'الفعالية'),h('a',{href:'/e/'+slug+'/guest'},'بطاقة الزائر'),h('a',{href:'/e/'+slug+'/scan'},'المسح')),h('span',{class:'tag'},navigator.onLine?'متصل':'دون اتصال')));
 }
 async function reconcileGuestPass(slug,g){
@@ -202,7 +202,7 @@ export async function guestPage(slug,number=''){
 export function parseGuestNumber(value){
   const raw=String(value||'').trim().toUpperCase();
   if(/^G-[0-9A-F]{30}$/.test(raw))return raw;
-  try{const u=new URL(value,location.origin);if(!['http:','https:'].includes(u.protocol))return '';const m=u.pathname.toUpperCase().match(/^\/E\/[^/]+\/GUEST\/(G-[0-9A-F]{30})\/?$/);if(m)return m[1];}catch{}
+  try{const u=new URL(value,location.origin);if(!['http:','https:'].includes(u.protocol)||u.origin!==location.origin)return '';const m=u.pathname.toUpperCase().match(/^\/E\/[^/]+\/GUEST\/(G-[0-9A-F]{30})\/?$/);if(m)return m[1];}catch{}
   return '';
 }
 function gatePresenceKey(eventId,guestNumber){return eventId+':'+guestNumber;}

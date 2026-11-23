@@ -1,0 +1,510 @@
+{
+  "utc": "2026-11-19T21:32:39.119913+00:00",
+  "head": "0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+  "main": "26be494d09c93deb6d632e3f552f6141f47481f1",
+  "evidence_hashes": {
+    "deploy/evidence/plusx-branding-20261118.md": "14e895cbb925c82afc39865038235e3b3fd09bd79a672ee78978a911269131ce",
+    "deploy/evidence/plusx-deployment-20261119T211333Z.json": "67697c5819a9ede5f8a8f7cabcb6f3e1d599b4d5f627992c2d65a8f0feddce37",
+    "deploy/evidence/plusx-deployment-verification-20261119.md": "5dd6d4529dc74fca3573eaf1248683f8ede3e88bb9f31439db3a4b48560ea479"
+  },
+  "containers": [
+    {
+      "id": "c47994e1b5d07c02351acc85febaa387502d8050f7da639566a28a8b0c92c69a",
+      "name": "/erp-verified-development-operations-1",
+      "started": "2026-11-19T21:13:59.484165229Z",
+      "image": "sha256:8b3f2ee010dbbb6ce7b5cd5775bc62dcd7eed1cde016db6d7cc9b5346ecd105a"
+    },
+    {
+      "id": "b4041c57c59b62d5eb94e73e6ba3557942168dd2f6951128d26afcd6874590ad",
+      "name": "/treasury-development-app-1",
+      "started": "2026-11-19T21:13:15.461286144Z",
+      "image": "sha256:7ddd8f77e73cd4a6ad117902333fb834a163eb6c594af75c8f3ccd7c6124c220"
+    },
+    {
+      "id": "4ec3f3e0bf14aff64919e04c6a4cbc9c92687106a11b85a5cfeb4b7ade06d642",
+      "name": "/mj-development-gateway-1",
+      "started": "2026-11-19T16:21:39.017085251Z",
+      "image": "sha256:3897c811dffd993420b7290d6f4edf443f3ea1be48e65cf5030805676be4ccc6"
+    },
+    {
+      "id": "00e8db6571928a5053aacdea3837135f5c7246627e4d3b868cb9513fe0c3a90a",
+      "name": "/banks360-development-api-1",
+      "started": "2026-11-19T16:20:49.853440293Z",
+      "image": "sha256:f36984b873562cfe756b005b5529f5227d68e4c73ec93e7e6cb8e09def1ba00a"
+    },
+    {
+      "id": "90e663e1814f28aa819354cf267aef1a684373c7053976c37185336299047a49",
+      "name": "/website-vps-app-current-1",
+      "started": "2026-11-19T16:20:32.080670523Z",
+      "image": "sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee"
+    },
+    {
+      "id": "158ca6c1b193baa4d3093b086a96bde5ef6d49dd961c99dafabec1ca6b28f26c",
+      "name": "/assets-development-api-1",
+      "started": "2026-11-19T16:19:33.176877161Z",
+      "image": "sha256:b042cfbe3605c318f4e742c4ed48020090bb18259a1e9a174b7408f1a0c389e6"
+    },
+    {
+      "id": "0db6a0008c49f91c89691002b6ed8903190a8fceca2f2c49c9c7ba310ac2a246",
+      "name": "/ads-development-api-1",
+      "started": "2026-11-19T16:19:26.182238334Z",
+      "image": "sha256:2d2727e40b0abfd778ff29306360fcd8ad6e22b5ca111e2389f98370f352109f"
+    },
+    {
+      "id": "4e44074560b5e5137891182ebbfbe69026080a061198c67ce6b5a84c1b2da102",
+      "name": "/agr-development-web-1",
+      "started": "2026-11-19T16:18:53.652935588Z",
+      "image": "sha256:eb313483fc7d31785eb64b583f3aa31ceec1c6c1bd561b77e20c5d0043b06d88"
+    },
+    {
+      "id": "853adee42815fe0038ffa8de7f4beb93016551a7148c0029f0f902c7872496f9",
+      "name": "/agr-development-api-1",
+      "started": "2026-11-19T16:18:22.509498389Z",
+      "image": "sha256:e3f3ea4f06e6a0e61508268ab2aa6f341122267aaa22cda7dd4d83176f344f10"
+    },
+    {
+      "id": "1246ba1b84d0a37baee4b5ed4df962769fd282e654c828dbd49b4ba01fb88b5d",
+      "name": "/sila-development-web-1",
+      "started": "2026-11-19T16:11:29.86895125Z",
+      "image": "sha256:25e492e6c890f2fe997823fa12556cdd82d7bb942f84d9a99654d4c5a7aad178"
+    },
+    {
+      "id": "254534f752c644fd33593a4e932274dc1e3ff9a5411e2f30d5257392c2f6da2a",
+      "name": "/sila-development-api-1",
+      "started": "2026-11-19T16:11:29.514906327Z",
+      "image": "sha256:8675e77715a7c3d9b224afa731473894482b8116c6820c918925baf67d7027fd"
+    },
+    {
+      "id": "0c8e3efbe77a28a04485720a6b961971e668675caa5f666a2524dc5de78a666a",
+      "name": "/erp-accounting-private-finance-1",
+      "started": "2026-11-19T16:09:35.586284785Z",
+      "image": "sha256:910008a712695e98f08b276dd5987b62d1f5dc6d3f91d2b8620af9f40ea3939a"
+    },
+    {
+      "id": "233f1df861cecb79d6a6814758155bc5a60a05c466891aa3b912100499ca6c4e",
+      "name": "/uip_platform_host",
+      "started": "2026-11-19T16:09:11.37961047Z",
+      "image": "sha256:d857ffb795739ef8e04bb54cd515b777462f217a65b95b368c35652fc011461c"
+    },
+    {
+      "id": "ceb1ce68878a3b5c41b2656907b3719beb32d3aa78e32940943ef71d39268b00",
+      "name": "/business-transformer-vps-nginx-1",
+      "started": "2026-11-19T16:08:17.855260348Z",
+      "image": "sha256:40dc68f53e654f7aa7d5723daceb57c4f8d3b751237af8d6fda2d30c2d3b0e21"
+    },
+    {
+      "id": "f6542b267b5e2512ca08f85bb005726e99ca4f25ee385bdc2f1d9b9f2e661093",
+      "name": "/business-transformer-vps-egress-1",
+      "started": "2026-11-19T16:08:15.061636299Z",
+      "image": "sha256:884c76602dd5aab58e68eae4f4bab6248c21c378e9d5b795cc53aad9fe04c571"
+    },
+    {
+      "id": "91475dee924f43a04d615674be8aeb706a80eee3191109182edce0ae3e900286",
+      "name": "/business-transformer-vps-worker-1",
+      "started": "2026-11-19T16:08:01.373621417Z",
+      "image": "sha256:884c76602dd5aab58e68eae4f4bab6248c21c378e9d5b795cc53aad9fe04c571"
+    },
+    {
+      "id": "68ad4acead2751861a6310fc4fb8db719fc2d46ecf3b77b4dd226de8f2e2339a",
+      "name": "/business-transformer-vps-gateway-1",
+      "started": "2026-11-19T16:07:24.952742486Z",
+      "image": "sha256:23dad100269fcb1c45ad9192ad32ffd23b9f5f7b7352767893c6a86df0e6d7e0"
+    },
+    {
+      "id": "b16431f807213458636aa0cbb3a0a2ba3afb6c8ee8501dd3cb027f10f8cbe9eb",
+      "name": "/business-transformer-vps-api-1",
+      "started": "2026-11-19T16:06:52.42586138Z",
+      "image": "sha256:884c76602dd5aab58e68eae4f4bab6248c21c378e9d5b795cc53aad9fe04c571"
+    },
+    {
+      "id": "49595bedef581ca349a8dbb8a3a6420e6f0dd758036dc66f4cab5f27e675487c",
+      "name": "/smart-development-app-1",
+      "started": "2026-11-19T16:06:28.551318338Z",
+      "image": "sha256:8e28966e7f2e6e8814fbfba9f9982fe6794842b63fd4baeae4ebf20f8f300c9e"
+    },
+    {
+      "id": "22159f6a6c6aeb130e11e12151d3b14b1c1bb855b09e9bcb13dc0d5e57e12bf0",
+      "name": "/report-vps-app-1",
+      "started": "2026-11-19T16:06:20.861487127Z",
+      "image": "sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee"
+    },
+    {
+      "id": "9000ceb169dd03cc97c884861f5402c2f21ce4ec9182454bfd215374bc533203",
+      "name": "/personal-development-app-1",
+      "started": "2026-11-19T16:05:54.619570352Z",
+      "image": "sha256:6552e03fbf9fd35901750d2c5dcffe29e153bac625a84fc8214e55b36d1ba1c2"
+    },
+    {
+      "id": "d455fea00139d4e18dfe1544ff08f2da506bd0f6e16b25cdb708a5c2cbfa5886",
+      "name": "/invest-subpath-20261118",
+      "started": "2026-11-19T16:05:46.830128048Z",
+      "image": "sha256:b99750c400f1ed870c492256ce2247b7ca26e77dc4ccba496e4854b174610bb9"
+    },
+    {
+      "id": "12d3f43e0d488ef1b039bd07c14d8da88a69b85d8776d1ab19fc49449546e45d",
+      "name": "/enterprise-development-web-1",
+      "started": "2026-11-19T16:05:22.273858013Z",
+      "image": "sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606"
+    },
+    {
+      "id": "9d3de7fcabafa337ae0822f7a02feedef265b2361094d73a770b2bbe7958505c",
+      "name": "/enterprise-development-frontend-1",
+      "started": "2026-11-19T16:05:00.194097511Z",
+      "image": "sha256:a8cafd446f5b6e758848d6b1e5b9ea23d4108fcbd8b60b79ed59fbf70d97d7be"
+    },
+    {
+      "id": "afea199584ffd34bbd1f26345e1b2c88a04eb19e4d89acd420f1ebac50b469af",
+      "name": "/enterprise-development-api-1",
+      "started": "2026-11-19T16:04:42.107935576Z",
+      "image": "sha256:0daa9cac3970c88a11a7502d8d757de099483ff8c4bbb7cdc038b13302ecb691"
+    },
+    {
+      "id": "a0225f9fc040212fa421324458a2e294b94c71e96f98685d14363ec5165e6787",
+      "name": "/ecourt-development-app-1",
+      "started": "2026-11-19T16:04:33.648931992Z",
+      "image": "sha256:8cdc441d6367d421aee812f9455451024843f55490ed2bc49db698767e3dd458"
+    },
+    {
+      "id": "b18ef26df599b4b7fd71bee46e4e12897d23f476bd0acdf0cae81e99bdea1f4d",
+      "name": "/dynamic-development-api-1",
+      "started": "2026-11-19T16:03:43.278510027Z",
+      "image": "sha256:23840e8483c58ddb527829c5b97eec51a2da99fe5563eea266db81daeb1e2e4d"
+    },
+    {
+      "id": "9ca79c1534c3c68a26a16d899e40a124f776e9c626d20cbdcb374f57ab91e368",
+      "name": "/dynamic-development-web-1",
+      "started": "2026-11-19T16:03:26.284205865Z",
+      "image": "sha256:2fabf9c429e590b218abd05c01d4a56917c94fc3072b30b884682caa98de5d29"
+    },
+    {
+      "id": "140e4ccdf4caeb6f8fb3f51a5266f2f8a504a1e692aae2786f76ccf36c1e9aeb",
+      "name": "/channel-development-gateway-1",
+      "started": "2026-11-19T16:03:19.181794008Z",
+      "image": "sha256:a98b2b0e40a75cb097cb4bda7f96fe0157a964be49286787bc4b0f26e191aae7"
+    },
+    {
+      "id": "d99e8e04fda2ae18cf2572e424f457b7dab5bd2e93c168a9831fd354d372f361",
+      "name": "/logistics-development-api-1",
+      "started": "2026-11-19T16:02:43.772835033Z",
+      "image": "sha256:bd2c68628f9b8f437c41fc7a5d72be4b2e727a9a99ad59684a51dce643af4fd9"
+    },
+    {
+      "id": "e670ab8a81cc3211530fd5769f575cadb329d4b01116ad7e7379fbadb692e455",
+      "name": "/plusx-development-app-1",
+      "started": "2026-11-19T15:34:42.550529026Z",
+      "image": "sha256:75aa89422fea6626b036039b5867de72f09d7e53592fb29990903ae833b1ec33"
+    },
+    {
+      "id": "bde47b5866d3fcdfbf8b6f7f8a374218feb90eac61f0c56b94071d0c3f9a3f25",
+      "name": "/erp-finance123-stage-operations-1",
+      "started": "2026-11-19T06:49:43.768154096Z",
+      "image": "sha256:2216159a7629e474558b9e963bc4612402c69eb731a7589983b56a73befca1d2"
+    },
+    {
+      "id": "8b99666dbe8b9aa79ba3b0d1942612f19bd50aae7c0133212ed7922c2c746886",
+      "name": "/erp-finance123-stage-finance-1",
+      "started": "2026-11-19T06:47:32.492745944Z",
+      "image": "sha256:1ec100b448278d9b907985107a474f16d60df5e88cd4a2dff63c4c0af23f349d"
+    },
+    {
+      "id": "9402521c83d5e11ddd1f1e574a561c688c074869686e91182b39a068b84fe7a7",
+      "name": "/erp-finance123-test-pg",
+      "started": "2026-11-19T06:03:16.363905106Z",
+      "image": "sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"
+    },
+    {
+      "id": "2832a58396aace843b158fce23fe80fc657ede1d7acea2d4c96168ab4650a6dc",
+      "name": "/erp-accounting-private-postgres-1",
+      "started": "2026-11-19T05:09:40.430716209Z",
+      "image": "sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"
+    },
+    {
+      "id": "11ada22e7329b286d5792a0b6e40fdcd1cbacc5a36c334e38e8b425821d5105b",
+      "name": "/uoip-660922a431-postgres-1",
+      "started": "2026-11-18T22:41:11.965397806Z",
+      "image": "sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f"
+    },
+    {
+      "id": "d65e6c4e921a105c8f198a426f7046a8fb29bb3cdb211069a2e9a1c0083195b0",
+      "name": "/uoip-660922a431-nats-1",
+      "started": "2026-11-18T22:41:12.747333946Z",
+      "image": "sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927"
+    },
+    {
+      "id": "f7d289ef8bb232c013b5c7dc7acbcf8937c00715b8849b71f81e18802d344ae0",
+      "name": "/uoip-660922a431-mysql-1",
+      "started": "2026-11-18T22:41:11.535040983Z",
+      "image": "sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902"
+    },
+    {
+      "id": "5a704e713104d7b11f88b08ea8c14a52201647ab305f15e85af001fa216a7d2b",
+      "name": "/uoip-b01f1e9604-postgres-1",
+      "started": "2026-11-18T18:34:00.278692594Z",
+      "image": "sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f"
+    },
+    {
+      "id": "58f32eb9fcafa2e4611621952e35e8b8a49804ad76b2a7853fe1f7662a4eae03",
+      "name": "/uoip-b01f1e9604-nats-1",
+      "started": "2026-11-18T18:34:01.49961474Z",
+      "image": "sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927"
+    },
+    {
+      "id": "9d9c95164fe21727328ff3b092063e5dcf5c79c79b4fad14257f5a9d00014bed",
+      "name": "/uoip-b01f1e9604-mysql-1",
+      "started": "2026-11-18T18:34:00.851928466Z",
+      "image": "sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902"
+    },
+    {
+      "id": "f93903de15887f72c34d2a16ea20326bd9c35e291e1c47c3968e0c3f674e1229",
+      "name": "/agr-development-backup-1",
+      "started": "2026-11-18T18:32:19.534620903Z",
+      "image": "sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+    },
+    {
+      "id": "c80d91e098d57fb161f1febc7145548d6f54704ea07365d3e76e9739ddd3db82",
+      "name": "/enterprise-development-keycloak-1",
+      "started": "2026-11-18T18:24:05.110579894Z",
+      "image": "sha256:044a457e04987e1fff756be3d2fa325a4ef420fa356b7034ecc9f1b693c32761"
+    },
+    {
+      "id": "e753e4c5656f9c7fa55592b23d331f0d82ec28da0cdfa4211d0cecb9ebefe3d0",
+      "name": "/enterprise-development-db-1",
+      "started": "2026-11-18T18:23:57.423536475Z",
+      "image": "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab"
+    },
+    {
+      "id": "2b781ed887179ae6076d72daade8970a981c680abf9d8bc339652e7bfeaf93f2",
+      "name": "/enterprise-development-idp-db-1",
+      "started": "2026-11-18T18:23:58.939149114Z",
+      "image": "sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab"
+    },
+    {
+      "id": "1d310d0a6796a8ac4cb8d8196b7ab2f0e5fa9621043d140654c7145414131fac",
+      "name": "/business-transformer-vps-keycloak-1",
+      "started": "2026-11-18T18:22:06.558075813Z",
+      "image": "sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332"
+    },
+    {
+      "id": "7eba78c54af85e9224d054cbd888677d796434d7435bf81c4dd8cf0fe5240db2",
+      "name": "/business-transformer-vps-postgres-1",
+      "started": "2026-11-18T18:21:59.7114425Z",
+      "image": "sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81"
+    },
+    {
+      "id": "91a6e0ac64f55ae792ed577d47081be7460d01a2b23cee452108961c699e0153",
+      "name": "/smart-development-sandbox-1",
+      "started": "2026-11-18T18:14:38.015689859Z",
+      "image": "sha256:e2ac8e8f66ae21a060b0a8e3005c70f6ed9441aabf409434463d1f6eecd38026"
+    },
+    {
+      "id": "2e756f5e8eecd65a20c48af2355d39df87ed3ac787dff73b0a343594be1bc16b",
+      "name": "/smart-development-db-1",
+      "started": "2026-11-18T18:14:36.457108901Z",
+      "image": "sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac"
+    },
+    {
+      "id": "13f0d01c189a3cbfbbff0f0f6f465d2ff1b5da23a42f8daff4773ced036ae563",
+      "name": "/banks360-development-postgres-1",
+      "started": "2026-11-18T18:08:03.248429921Z",
+      "image": "sha256:b903423f18d6b9887232b3ca46ae789122fdc9c42ab05bff6bc293b7d0387a7d"
+    },
+    {
+      "id": "4bb1d712602579c98502a58ddd9cbefdfd4949133157730300b51c16c5c05f0a",
+      "name": "/ucad-development-api-1",
+      "started": "2026-11-18T17:17:59.843414855Z",
+      "image": "sha256:6abc2c04f273ba39a4ef8164fe41b0b86006583d0f235dd39c6d98475b36a576"
+    },
+    {
+      "id": "ddf86db5502f02cae5dda37041e300093d7a7d5f2c7bab17b7fc5544d4deff39",
+      "name": "/aihub-pg18-acceptance-20261118",
+      "started": "2026-11-18T16:43:21.655464423Z",
+      "image": "sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015"
+    },
+    {
+      "id": "84edebe7595ce20763107570784c9678fb755f0ec55f530eee24d0aed7604c9b",
+      "name": "/channel-development-postgres-1",
+      "started": "2026-11-18T16:35:39.699932207Z",
+      "image": "sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f"
+    },
+    {
+      "id": "7477c95dd14dddc00706a76814e34d1e49b66fde5b22a1469a3b008e70f2a170",
+      "name": "/smart-factory-runtime-20261118-grafana-1",
+      "started": "2026-11-18T04:37:46.802992947Z",
+      "image": "sha256:bc4bf0f6981764044ec565fac1c85c53d947be3a9bd2300824a243e87412cce4"
+    },
+    {
+      "id": "090f44cfec8acda28de956151a4164640ab1a48de7608fdf22389b3359f9fd58",
+      "name": "/smart-factory-runtime-20261118-prometheus-1",
+      "started": "2026-11-18T04:34:25.010124885Z",
+      "image": "sha256:69961df6ffa67598048a31aa2822d61f3c93b91d7db24e44d9bb03f99d520da9"
+    },
+    {
+      "id": "1577d1c9914e49ee3e8c0f560e125e8bb5a3a507fcd73b2fd48a99bd6e0be427",
+      "name": "/bt-factory-openrag-test-20261118",
+      "started": "2026-11-18T04:34:25.027886516Z",
+      "image": "sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583"
+    },
+    {
+      "id": "262403da84e8859faad28b6a960b0b04877e1f99d53d39cf05b84ea3abb0d3f4",
+      "name": "/smart-factory-runtime-20261118-alertmanager-1",
+      "started": "2026-11-18T04:31:40.243496064Z",
+      "image": "sha256:220da6995a919b9ee6e0d3da7ca5f09802f3088007af56be22160314d2485b54"
+    },
+    {
+      "id": "a743956a74ffb24c5fdd721e276b7e18b57217b511ebeb11132483e32da10ce1",
+      "name": "/smart-factory-runtime-20261118-sink-1",
+      "started": "2026-11-18T04:31:17.061922315Z",
+      "image": "sha256:42f1689d6d6b906c7e829f9d9ec38491550344ac9adc01e464ff9a08df1ffb48"
+    },
+    {
+      "id": "6ec74b14433a744d5ab6ed18341b98b69a9f4ee420f52275dd19c34381ca0875",
+      "name": "/smart-factory-runtime-20261118-gitea-1",
+      "started": "2026-11-18T04:20:18.135946822Z",
+      "image": "sha256:815800d80f80d8a0af48e2769337a167290c46184442feded23e616c250a378c"
+    },
+    {
+      "id": "4bb0050af30984d5c60aba3d703b46071ab7a497469eef98e9027905f26960f1",
+      "name": "/di-logistics-test-20261118",
+      "started": "2026-11-18T02:13:09.193223505Z",
+      "image": "sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+    },
+    {
+      "id": "663a99d47ba3f02e64a07bd4183c74916655a10051da083883a5869ad0d2a10f",
+      "name": "/website-vps-db-1",
+      "started": "2026-11-18T01:07:28.791187214Z",
+      "image": "sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e"
+    },
+    {
+      "id": "0b729b3a0bb652fe738f20a3a663160dcd0e6a93771e2290e1f600394d631320",
+      "name": "/agr-development-db-1",
+      "started": "2026-11-18T01:07:27.343205711Z",
+      "image": "sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+    },
+    {
+      "id": "0e4a6a1ded86bf2535cde154927a2146466fed66ed19c2af6ad84ef7c2504800",
+      "name": "/sila-development-identity-1",
+      "started": "2026-11-18T01:07:27.931183338Z",
+      "image": "sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0"
+    },
+    {
+      "id": "eb32b4fa0b246e8c656b0d4370f3573439d2a2e57503fdc9e45a05da487122a1",
+      "name": "/banks360-development-oauth2-proxy-1",
+      "started": "2026-11-18T01:07:32.904052437Z",
+      "image": "sha256:d62e2d81c6f5048f652f67c302083be1272c181b971fad80e5a30ebe2b8b75d8"
+    },
+    {
+      "id": "e92be378b9a13631f9567199e452f2812104c21a0cf799159737f21b0efb59a0",
+      "name": "/banks360-development-session-store-1",
+      "started": "2026-11-18T01:07:32.868312196Z",
+      "image": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+    },
+    {
+      "id": "dce2f1b05ea8e78ea1b09a2961151bc9e6e45c2d819ddea70ace7658223d47ff",
+      "name": "/logistics-development-identity-1",
+      "started": "2026-11-18T01:07:27.353741495Z",
+      "image": "sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0"
+    },
+    {
+      "id": "ceeea6afd4707bc15216019e70a7b804ddff275abe91f0a95b13ac5d44523ebc",
+      "name": "/logistics-development-db-1",
+      "started": "2026-11-18T01:07:28.52150905Z",
+      "image": "sha256:c283403b800e73d9f416c5c2a967f5bc9fbcef91a82220a4ac56d926dcf48ee0"
+    },
+    {
+      "id": "4deb0310b4947e6ae7d15b9b9d62d120ea97ddd2d370cddb442344e2be5713e7",
+      "name": "/dynamic-development-db-1",
+      "started": "2026-11-18T01:07:32.884373592Z",
+      "image": "sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+    },
+    {
+      "id": "ab6c4d42af65bca5bb50a37c36a7fbe1f0f9dd172b25acc2094b03ea21f1030e",
+      "name": "/banks360-development-keycloak-1",
+      "started": "2026-11-18T01:07:31.22507083Z",
+      "image": "sha256:4883630ef9db14031cde3e60700c9a9a8eaf1b5c24db1589d6a2d43de38ba2a9"
+    },
+    {
+      "id": "ebb5f7261a8dccde4d60481f867887849f1b76f23ad91f320909c3a3403e9c55",
+      "name": "/banks360-development-identity-db-1",
+      "started": "2026-11-18T01:07:32.869896779Z",
+      "image": "sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015"
+    },
+    {
+      "id": "2112c504bc9af44719b347e5866102ebf1be8d1d99cd9597b21830e1f0832a7c",
+      "name": "/banks360-development-caddy-1",
+      "started": "2026-11-18T01:07:31.22507076Z",
+      "image": "sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0"
+    },
+    {
+      "id": "06151070d2edc1e23f7ae1a324635e6a097fba43d06cca22360ec104bcb2b5d4",
+      "name": "/treasury-development-db-1",
+      "started": "2026-11-18T01:07:32.54979312Z",
+      "image": "sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32"
+    },
+    {
+      "id": "1fcc71c949377b7e6ae8326dc9338acf6ec710eb50f275d5a50380e9fac51ef0",
+      "name": "/ecourt-development-db-1",
+      "started": "2026-11-18T01:07:32.869740533Z",
+      "image": "sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32"
+    },
+    {
+      "id": "7a2e5be890783b8fed8bd05c32d398f542f4766cdcbf9f89ca24e8777f34287f",
+      "name": "/assets-development-postgres-1",
+      "started": "2026-11-18T01:07:28.522799532Z",
+      "image": "sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5"
+    },
+    {
+      "id": "ac24989fa6d7458cda1bba0cd1fa7da365e41c197400f284277382277a49b3ec",
+      "name": "/sila-development-postgres-1",
+      "started": "2026-11-18T01:07:31.226402344Z",
+      "image": "sha256:e5d2edd28b1f8d40a0a6c0c9cdc545b19b56a0d5d88f94bc11a97d970d4700d0"
+    },
+    {
+      "id": "0a4d18b2033d1384259f15ad11eaec9434053981a6f83d28f9f2a17ae4263a98",
+      "name": "/ucad-development-postgres-1",
+      "started": "2026-11-18T01:07:30.992602225Z",
+      "image": "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
+    },
+    {
+      "id": "b20b9fe8cc3beb91171386323552123d720febed870dc3fe843d9e906236220a",
+      "name": "/ads-development-postgres-1",
+      "started": "2026-11-18T01:07:31.225781894Z",
+      "image": "sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f"
+    },
+    {
+      "id": "a704f1560e87f6b73d3c8ecebfdb9e8263aa57a9d41414e48a8e110a657e689b",
+      "name": "/ads-development-redis-1",
+      "started": "2026-11-18T01:07:28.951826823Z",
+      "image": "sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3"
+    },
+    {
+      "id": "f283ac4a3b5f4fefa667dd35c47642687447b754dabb290c3fe3cdb8ad7999e0",
+      "name": "/plusx-development-postgres-1",
+      "started": "2026-11-18T01:07:30.431013993Z",
+      "image": "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
+    },
+    {
+      "id": "8808c616303677d8b1cce5fb85c6fbe073f2c4938538c6f5c84c4c10127a1059",
+      "name": "/uip_postgres",
+      "started": "2026-11-18T01:07:31.016142565Z",
+      "image": "sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e"
+    },
+    {
+      "id": "8ba35fa5ad887169ed287bfcc252a6612d8d140ccf5ad1c85fe7286c503a9bc4",
+      "name": "/uip_eventbus",
+      "started": "2026-11-18T01:07:31.016159219Z",
+      "image": "sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927"
+    },
+    {
+      "id": "722ab8f51d1f64e8eaa85bfa1b2c2e8341ee0b22526b81570e5213c0d526ac7d",
+      "name": "/vps-auth-keycloak-1",
+      "started": "2026-11-18T01:07:32.268645702Z",
+      "image": "sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0"
+    },
+    {
+      "id": "757ffa6835d4be073e8a79a9c9e4524a785203ddabcb6618fbb10cbada928eab",
+      "name": "/vps-auth-postgres-1",
+      "started": "2026-11-18T01:07:32.897158025Z",
+      "image": "sha256:2006493727bd5277eece187319af1ef82b4cf82cf4fc1ed00da0775b646ac2a4"
+    }
+  ]
+}

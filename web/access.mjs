@@ -2,7 +2,7 @@ import {newRequestKey,h,root,api,field,selectField,check,brand,msg} from './ui.m
 
 function style(){if(!document.querySelector('link[data-access-style]'))document.head.append(h('link',{rel:'stylesheet',href:'/assets/access.css','data-access-style':'true'}));}
 export async function accessPage(){
-  style();document.documentElement.dir='rtl';document.documentElement.lang='ar';document.title='ابدأ تجربتك | Eventna إيفنتنا';
+  style();document.documentElement.dir='rtl';document.documentElement.lang='ar';document.title='ابدأ تجربتك | إيفنتنا';
   root.replaceChildren();
   const main=h('main',{class:'access-shell',id:'main-content'});
   root.append(h('a',{class:'skip-link',href:'#main-content'},'انتقل إلى المحتوى'),h('header',{class:'access-header'},brand(),h('a',{href:'/',class:'text-btn'},'استكشف الفعاليات')),main);
@@ -12,7 +12,7 @@ export async function accessPage(){
     h('article',{class:'access-choice'},h('span',{class:'access-number'},'02'),h('h2',{},'لدي حساب'),h('p',{},'ادخل برقم الهاتف وكلمة المرور. الأدوات المتاحة لك يحددها دورك وصلاحياتك.'),h('a',{href:'/admin',class:'text-btn'},'الدخول إلى مساحتي ←')),
     h('article',{class:'access-choice'},h('span',{class:'access-number'},'03'),h('h2',{},'أريد إنشاء مساحة'),h('p',{},'قدّم طلب حساب لجهة منظمة أو مشاركة. إنشاء الفعالية أو الصفحة يتم بعد اعتماد الحساب وبحسب صلاحياته.'),h('a',{href:'/account/signup',class:'text-btn'},'إنشاء حساب برقم الهاتف ←'),h('a',{href:'#account',class:'text-btn'},'طلب صلاحيات جهة ←')));
   const downloadState=h('div',{role:'status','aria-live':'polite'},h('h3',{},'تنزيل Android متوقف مؤقتًا'),h('p',{class:'notice'},'أُوقف توزيع حزمة المعاينة بعد بلاغ تحذير أمني على الهاتف، حتى اكتمال التحقيق والمراجعة. لا تتجاوز تحذير الحماية.'),h('a',{href:'/',class:'btn secondary'},'استخدم نسخة الويب'),h('p',{class:'muted small'},'يمكنك فتح الموقع في المتصفح واختيار إضافة إلى الشاشة الرئيسية إن كان الخيار متاحًا.'));
-  const downloads=h('section',{class:'access-download',id:'download'},h('div',{},h('span',{class:'access-kicker'},'خذ التجربة معك'),h('h2',{},'Eventna إيفنتنا على Android'),h('p',{},'تتوفر الفعاليات وبطاقة الزائر من المتصفح أثناء مراجعة حزمة Android.')),downloadState);
+  const downloads=h('section',{class:'access-download',id:'download'},h('div',{},h('span',{class:'access-kicker'},'خذ التجربة معك'),h('h2',{},'إيفنتنا على Android'),h('p',{},'تتوفر الفعاليات وبطاقة الزائر من المتصفح أثناء مراجعة حزمة Android.')),downloadState);
   const formHost=h('section',{class:'access-account',id:'account'},h('span',{class:'access-kicker'},'مساحتك القادمة'),h('h2',{},'إنشاء طلب حساب جهة'),h('p',{},'هذا طلب مراجعة؛ لا ينشئ حسابًا نشطًا ولا يمنح صلاحية إدارة فورًا. الزائر يستطيع المشاركة كضيف دون هذا الطلب.'));
   main.append(hero,choices,downloads,formHost);
   const role=selectField('نوع الحساب',[['organizer','جهة منظمة لفعالية'],['participant','جهة مشاركة في فعالية']],'organizer');

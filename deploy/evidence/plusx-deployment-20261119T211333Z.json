@@ -1,0 +1,166 @@
+{
+  "utc": "2026-11-19T21:13:32.598620+00:00",
+  "sha": "0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+  "http": {
+    "exact": {
+      "status": 200,
+      "url": "https://5.189.157.131/plusx/"
+    },
+    "/": {
+      "status": 200,
+      "url": "https://5.189.157.131/plusx/"
+    },
+    "/admin": {
+      "status": 200,
+      "url": "https://5.189.157.131/plusx/admin"
+    },
+    "/api/health/ready": {
+      "status": 200,
+      "url": "https://5.189.157.131/plusx/api/health/ready"
+    }
+  },
+  "readiness": {
+    "status": "ready",
+    "database": "postgresql",
+    "version": "1.0.1",
+    "build": "git-0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+    "schema_tables_current": true,
+    "critical_columns_current": true,
+    "schema_migrations_current": true,
+    "migration_count": 22,
+    "migration_expected": 22,
+    "migration_missing": [],
+    "migration_checksum_mismatch": [],
+    "certificates": {
+      "ready": true,
+      "capabilities": {
+        "render": {
+          "ready": true,
+          "required": false,
+          "code": "OK"
+        },
+        "accept_new": {
+          "ready": false,
+          "required": false,
+          "code": "CERTIFICATE_REQUESTS_PAUSED"
+        },
+        "delivery": {
+          "ready": true,
+          "required": false,
+          "code": "OK"
+        },
+        "export": {
+          "ready": true,
+          "required": false,
+          "code": "OK"
+        }
+      },
+      "probe_cache_seconds": 5
+    }
+  },
+  "login": [
+    {
+      "role": "platform",
+      "login": 200,
+      "me": 200,
+      "scope": "platform",
+      "must_change_password": false,
+      "cookie_secure_scoped": true,
+      "logout": 200,
+      "after_logout": 401
+    },
+    {
+      "role": "organizer",
+      "login": 200,
+      "me": 200,
+      "scope": "event-demo",
+      "must_change_password": true,
+      "cookie_secure_scoped": true,
+      "logout": 200,
+      "after_logout": 401
+    },
+    {
+      "role": "agency",
+      "login": 200,
+      "me": 200,
+      "scope": "agency-01",
+      "must_change_password": true,
+      "cookie_secure_scoped": true,
+      "logout": 200,
+      "after_logout": 401
+    },
+    {
+      "role": "agency",
+      "login": 200,
+      "me": 200,
+      "scope": "agency-02",
+      "must_change_password": true,
+      "cookie_secure_scoped": true,
+      "logout": 200,
+      "after_logout": 401
+    }
+  ],
+  "source_files_matched": 269,
+  "compose_action": "up -d --no-deps --no-build --no-recreate --wait app; existing matching app healthy; no rebuild required",
+  "containers": [
+    {
+      "name": "plusx-development-app-1",
+      "id": "e670ab8a81cc3211530fd5769f575cadb329d4b01116ad7e7379fbadb692e455",
+      "image": "sha256:75aa89422fea6626b036039b5867de72f09d7e53592fb29990903ae833b1ec33",
+      "status": "running",
+      "health": "healthy",
+      "restart_count": 0,
+      "volumes": [
+        "plusx-development_plusx_development_data"
+      ]
+    },
+    {
+      "name": "plusx-development-postgres-1",
+      "id": "f283ac4a3b5f4fefa667dd35c47642687447b754dabb290c3fe3cdb8ad7999e0",
+      "image": "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "status": "running",
+      "health": "healthy",
+      "restart_count": 0,
+      "volumes": [
+        "plusx-development_postgres_development_data"
+      ]
+    }
+  ],
+  "logs": {
+    "plusx-development-app-1": {
+      "window": "15m, max 300 lines",
+      "line_count": 0,
+      "error_marker_count": 0,
+      "note": "Raw logs omitted to avoid exposing credentials; status/count evidence only."
+    },
+    "plusx-development-postgres-1": {
+      "window": "15m, max 300 lines",
+      "line_count": 0,
+      "error_marker_count": 0,
+      "note": "Raw logs omitted to avoid exposing credentials; status/count evidence only."
+    }
+  },
+  "tls": "issuer=C = US, O = Let's Encrypt, CN = YE1\nnotBefore=Nov 18 16:59:31 2026 GMT\nnotAfter=Nov 25 08:59:30 2026 GMT\nX509v3 Subject Alternative Name: critical\n    IP Address:5.189.157.131\nsha256 Fingerprint=34:77:AA:63:05:01:EC:B9:59:9D:99:34:B4:1C:DC:DE:13:59:F9:56:5B:1B:2C:91:80:39:D7:9A:F2:D0:95:35\n",
+  "tls_trust": "Python urllib default trust and IP hostname verification passed for all HTTP and login checks. No TLS bypass.",
+  "certbot": {
+    "version": "certbot 5.10.0",
+    "timer": "active",
+    "service": "Result=success\nExecMainStatus=0",
+    "renewal": "Existing production ACME webroot lineage, newer certbot service override; no issuance forced."
+  },
+  "nginx": "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful",
+  "credential_file": {
+    "path": "/project/login/plusx.md",
+    "mode": "0o600",
+    "existing_credentials_preserved": true
+  },
+  "blockers": [],
+  "limitations": [
+    "Development deployment only; no production acceptance claim.",
+    "No browser smoke, core business tests, full test suite or hosted CI run.",
+    "No fetch/pull needed: task requested current source; no Git publication.",
+    "Application certificate requests remain paused, unrelated to TLS.",
+    "Transient command transport failures retried; no deployment mutation from failed calls."
+  ],
+  "preservation": "No source edits, resets, force pushes, merges, migrations, volume removal, database replacement, credential rotation, shared routing or TLS changes. Existing untracked evidence retained."
+}

@@ -3,7 +3,7 @@ import {P,message,footer,browserSeed} from './self-certificate-client.mjs';
 const states={registered:'سُجل طلبك ويجري تجهيزه.',processing:'يجري إعداد صورة شهادتك.',failed:'تعذر تجهيز شهادتك. احتفظ بالرابط وراجع الجهة المنظمة.'};
 const preparedFiles=new WeakMap();
 const issuedDate=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'غير متاح':new Intl.DateTimeFormat('ar',{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(date)+' UTC';};
-function shell(title){const main=h('main',{class:'selfcert-public'},h('a',{href:'/',class:'text-btn'},'Eventna إيفنتنا'),h('h1',{},title));root.replaceChildren(h('div',{class:'selfcert-page'},main,footer()));return main;}
+function shell(title){const main=h('main',{class:'selfcert-public'},h('a',{href:'/',class:'text-btn'},'إيفنتنا'),h('h1',{},title));root.replaceChildren(h('div',{class:'selfcert-page'},main,footer()));return main;}
 function notice(main,text){const n=h('p',{class:'notice',role:'status'},text);main.append(n);return n;}
 export async function selfCertificatePublic(kind,token){
  const main=shell(kind==='request'?'طلب شهادة مشاركة':kind==='verify'?'التحقق من الشهادة':'شهادة المشاركة');

@@ -21,3 +21,12 @@ secrets.*
 
 # Debug/preview APK binaries are never committed (removed 2026-11-16; withdrawn pending security review)
 artifacts/android/*.apk
+/secrets.development/
+
+# Host runtime and private credentials
+.local/
+.env.*
+!.env.*.example
+credentials.private.json
+*.pem
+*.key

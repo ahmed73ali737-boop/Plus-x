@@ -1,0 +1,70 @@
+{
+  "utc": "2026-11-19T21:33:50.286013+00:00",
+  "health": [
+    {
+      "name": "/plusx-development-app-1",
+      "image": "sha256:79dd42d70fd62d540ee8b0d73a40fd35bb011a90df50b6d236e20be30edaa6e3",
+      "revision": "0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+      "status": "running",
+      "health": "healthy",
+      "restarts": 0
+    },
+    {
+      "name": "/plusx-development-postgres-1",
+      "image": "sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "revision": null,
+      "status": "running",
+      "health": "healthy",
+      "restarts": 0
+    }
+  ],
+  "unrelated_containers_and_postgres_not_restarted": true,
+  "preserved_untracked_evidence": true,
+  "http": {
+    "http://127.0.0.1:14310/": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    },
+    "http://127.0.0.1:14310/admin": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    },
+    "http://127.0.0.1:14310/api/health/ready": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    },
+    "https://5.189.157.131/plusx/": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    },
+    "https://5.189.157.131/plusx/admin": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    },
+    "https://5.189.157.131/plusx/api/health/ready": {
+      "exit": 0,
+      "stdout": "HTTP=200 TLS=0",
+      "stderr": ""
+    }
+  },
+  "nginx_test": {
+    "exit": 0,
+    "stdout": "",
+    "stderr": "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful"
+  },
+  "git_diff_check": {
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "main_is_ancestor": true,
+  "head": "0d88259baccdcdf0cdb3a1dc992df1bee70b53ad",
+  "origin_main": "26be494d09c93deb6d632e3f552f6141f47481f1",
+  "final_status": "BLOCKED",
+  "blocker": "Production release acceptance is NOT VERIFIED; existing local-mode deployment retained without bypassing release gates."
+}
