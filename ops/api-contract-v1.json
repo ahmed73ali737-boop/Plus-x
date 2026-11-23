@@ -247,6 +247,12 @@
   "/api/auth/phone": [
     "post"
   ],
+  "/api/auth/phone/verify/check": [
+    "post"
+  ],
+  "/api/auth/phone/verify/start": [
+    "post"
+  ],
   "/api/auth/register": [
     "post"
   ],

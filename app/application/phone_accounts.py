@@ -71,6 +71,7 @@ def public_user(tx, user):
     result = {key: user[key] for key in ('id', 'name', 'role', 'scope_id')}
     result['email'] = None if user['email'].startswith('tel:') else user['email']
     result['phone'] = persistence.identity.phone_of(tx, user['id'])
+    result['phone_verified'] = bool(result['phone']) and persistence.identity.phone_is_verified(tx, user['id'], result['phone'])
     result['must_change_password'] = bool(user.get('must_change_password'))
     result['management_access'] = bool(management_access(tx, user))
     result['can_review_account_requests'] = can_review_accounts(tx, user)

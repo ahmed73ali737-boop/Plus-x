@@ -15,6 +15,14 @@ user_phones=Table('px_user_phones',metadata,
     Column('phone',String(24),primary_key=True),
     Column('user_id',String(64),ForeignKey('px_users.id'),unique=True,nullable=False),
     Column('created_at',String(64),nullable=False))
+phone_verifications=Table('px_phone_verifications',metadata,
+    Column('id',String(64),primary_key=True),
+    Column('user_id',String(64),ForeignKey('px_users.id'),nullable=False),
+    Column('phone',String(24),nullable=False),
+    Column('verification_id',String(100),nullable=False),
+    Column('created_at',String(64),nullable=False),
+    Column('verified_at',String(64)))
+Index('px_phone_verifications_user',phone_verifications.c.user_id,phone_verifications.c.created_at)
 imports=Table('px_imports',metadata,Column('id',String(64),primary_key=True),Column('site_id',String(64),ForeignKey('px_sites.id'),nullable=False),Column('user_id',String(64),ForeignKey('px_users.id'),nullable=False),Column('base_rev',Integer,nullable=False),Column('records',JSON,nullable=False),Column('errors',JSON,nullable=False),Column('state',String(30),nullable=False),Column('created_at',String(64),nullable=False))
 submissions=Table('px_submissions',metadata,Column('id',String(64),primary_key=True),Column('site_id',String(64),ForeignKey('px_sites.id'),nullable=False),Column('event_id',String(64)),Column('version',Integer,nullable=False),Column('kind',String(30),nullable=False),Column('visitor_id',String(64),nullable=False),Column('session_id',String(64),nullable=False),Column('source',String(20),nullable=False),Column('target',String(150)),Column('payload',JSON,nullable=False),Column('client_time',String(64)),Column('received_at',String(64),nullable=False),Column('fingerprint',String(64),nullable=False),Column('dedup_key',String(240),unique=True))
 Index('px_submissions_site_time',submissions.c.site_id,submissions.c.received_at)

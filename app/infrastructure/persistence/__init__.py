@@ -8,6 +8,7 @@ from __future__ import annotations
 
 def install_sql_persistence() -> None:
     from app.application.ports import persistence
+    from app.infrastructure.channel_gateway import ChannelGatewayPhoneVerifier
     from app.infrastructure.persistence.access_repository import SqlAccessRepository
     from app.infrastructure.persistence.account_request_repository import SqlAccountRequestRepository
     from app.infrastructure.persistence.audit_repository import SqlAuditLog
@@ -41,4 +42,5 @@ def install_sql_persistence() -> None:
         committee=SqlCommitteeRepository(),
         certificates=SqlCertificateRepository(),
         self_certificates=SqlSelfCertificateRepository(),
+        phone_verifier=ChannelGatewayPhoneVerifier(),
     )

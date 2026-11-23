@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, insert, select, update
 
 from app.domain.values import now
 from app.infrastructure.persistence.account_request_tables import request_workflows
-from app.infrastructure.persistence.tables import notifications, preferences, sessions, user_phones, users
+from app.infrastructure.persistence.tables import notifications, phone_verifications, preferences, sessions, user_phones, users
 
 
 def _one(tx, query):
@@ -92,6 +92,29 @@ class SqlIdentityRepository:
 
     def bind_phone(self, tx, phone, user_id):
         tx.execute(insert(user_phones).values(phone=phone, user_id=user_id, created_at=now()))
+
+    # Optional proof of phone ownership (the code itself lives in the Channel Gateway) -----
+    def phone_is_verified(self, tx, user_id, phone):
+        return tx.execute(select(phone_verifications.c.id).where(
+            phone_verifications.c.user_id == user_id, phone_verifications.c.phone == phone,
+            phone_verifications.c.verified_at.is_not(None)).limit(1)).first() is not None
+
+    def phone_verifications_since(self, tx, user_id, since):
+        return tx.execute(select(func.count()).select_from(phone_verifications).where(
+            phone_verifications.c.user_id == user_id, phone_verifications.c.created_at > since)).scalar()
+
+    def add_phone_verification(self, tx, row):
+        tx.execute(insert(phone_verifications).values(**row))
+
+    def pending_phone_verification(self, tx, user_id, phone, since):
+        return _one(tx, select(phone_verifications).where(
+            phone_verifications.c.user_id == user_id, phone_verifications.c.phone == phone,
+            phone_verifications.c.verified_at.is_(None), phone_verifications.c.created_at > since
+        ).order_by(phone_verifications.c.created_at.desc()).limit(1))
+
+    def mark_phone_verified(self, tx, verification_row_id, at):
+        tx.execute(update(phone_verifications).where(
+            phone_verifications.c.id == verification_row_id, phone_verifications.c.verified_at.is_(None)).values(verified_at=at))
 
     # Preferences and inbox --------------------------------------------------
     def preferences(self, tx, user_id):
