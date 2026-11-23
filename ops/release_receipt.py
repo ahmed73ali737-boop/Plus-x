@@ -138,6 +138,35 @@ CONTAINER_FORMAT = '''{"id":{{json .Id}},"image":{{json .Image}},"running":{{jso
 IMAGE_FORMAT = '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}}}'
 
 
+IMAGE_CONTENT_FORMAT = '{"id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"rootfs_type":{{json .RootFS.Type}},"layers":{{json .RootFS.Layers}}}'
+
+
+_OFFLINE_IMAGE = object()
+
+
+def validate_image_config(r, config_bytes, observed=_OFFLINE_IMAGE):
+    """Bind exact OCI config bytes to the signed digest and local layer metadata.
+
+    Does not read layer contents or prove their integrity on disk. Config bytes
+    may contain environment values; never emit them or include them in evidence.
+    """
+    require('sha256:' + digest(config_bytes) == r['image']['config_digest'],
+            'OCI_CONFIG_BYTES_MISMATCH')
+    config = strict_json(config_bytes)
+    require(type(config) is dict and config.get('os') == 'linux'
+            and config.get('architecture') == 'amd64', 'OCI_CONFIG_PLATFORM')
+    rootfs = config.get('rootfs')
+    require(type(rootfs) is dict and rootfs.get('type') == 'layers', 'OCI_CONFIG_ROOTFS')
+    layers = rootfs.get('diff_ids')
+    require(type(layers) is list and bool(layers) and all(
+        type(layer) is str and re.fullmatch('sha256:' + HEX, layer)
+        for layer in layers), 'OCI_CONFIG_LAYERS')
+    if observed is not _OFFLINE_IMAGE:
+        expected = {'id': r['image']['config_digest'], 'os': 'linux',
+                    'architecture': 'amd64', 'rootfs_type': 'layers', 'layers': layers}
+        require(observed == expected, 'LOCAL_IMAGE_CONTENT_MISMATCH')
+
+
 def inspect(kind, identity, template):
     return strict_json(run(['docker', kind, 'inspect', '--format', template, identity]))
 
@@ -214,7 +243,7 @@ def local_inputs(root, source, manifest_bytes, archive_bytes):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     paths = ['receipt', 'signature', 'public-key', 'manifest', 'archive',
-             'source-root', 'oci-manifest', 'attestation']
+             'source-root', 'oci-manifest', 'attestation', 'oci-config']
     for name in paths:
         p.add_argument('--' + name, type=Path)
     for name in ['trusted-key-sha256', 'source-sha', 'container-id']:
@@ -240,10 +269,14 @@ def main():
         validate(r, manifest_bytes, archive_bytes, a.source_sha)
         local_inputs(a.source_root, a.source_sha, manifest_bytes, archive_bytes)
         validate_oci(r, a.oci_manifest.read_bytes(), a.attestation.read_bytes())
+        config_bytes = a.oci_config.read_bytes()
+        validate_image_config(r, config_bytes)
         if not a.offline:
             c = inspect('container', a.container_id, CONTAINER_FORMAT)
             image = inspect('image', r['image']['config_digest'], IMAGE_FORMAT)
             rollback = inspect('image', r['rollback_image']['config_digest'], IMAGE_FORMAT)
+            content = inspect('image', c['image'], IMAGE_CONTENT_FORMAT)
+            validate_image_config(r, config_bytes, content)
             reconcile(r, c, image, rollback)
             stable_runtime(c, inspect('container', a.container_id, CONTAINER_FORMAT), a.container_id)
         source_check(a.source_root, a.source_sha)

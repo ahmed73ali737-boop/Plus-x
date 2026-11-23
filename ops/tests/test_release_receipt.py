@@ -104,7 +104,7 @@ class ReceiptTests(unittest.TestCase):
                 '--manifest', '/missing', '--archive', '/missing', '--receipt', '/missing',
                 '--signature', '/missing', '--public-key', '/missing',
                 '--trusted-key-sha256', H, '--container-id', 'e'*64,
-                '--oci-manifest', '/fixture', '--attestation', '/fixture']
+                '--oci-manifest', '/fixture', '--attestation', '/fixture', '--oci-config', '/fixture']
         with patch('sys.argv', argv), patch.object(g, 'source_check'), patch.object(g, 'inspect') as inspect, patch('sys.stdout', new_callable=io.StringIO):
             self.assertEqual(g.main(), 2)
             inspect.assert_not_called()
@@ -115,9 +115,9 @@ class ReceiptTests(unittest.TestCase):
                 '--manifest', '/fixture', '--archive', '/fixture', '--receipt', '/fixture',
                 '--signature', '/fixture', '--public-key', '/fixture',
                 '--trusted-key-sha256', H, '--container-id', 'e'*64,
-                '--oci-manifest', '/fixture', '--attestation', '/fixture']
+                '--oci-manifest', '/fixture', '--attestation', '/fixture', '--oci-config', '/fixture']
         changed = dict(c, started='restarted')
-        with patch('sys.argv', argv), patch.object(Path, 'exists', return_value=True), patch.object(g, 'source_check'), patch.object(g, 'local_inputs'), patch.object(g, 'validate_oci'), patch.object(g, 'authenticate', return_value=r), patch.object(Path, 'read_bytes', side_effect=[mb, ar, b'oci', b'attestation']), patch.object(g, 'inspect', side_effect=[c, im, rb, changed]), patch('sys.stdout', new_callable=io.StringIO) as out:
+        with patch('sys.argv', argv), patch.object(Path, 'exists', return_value=True), patch.object(g, 'source_check'), patch.object(g, 'local_inputs'), patch.object(g, 'validate_oci'), patch.object(g, 'validate_image_config'), patch.object(g, 'authenticate', return_value=r), patch.object(Path, 'read_bytes', side_effect=[mb, ar, b'oci', b'attestation', b'config']), patch.object(g, 'inspect', side_effect=[c, im, rb, {}, changed]), patch('sys.stdout', new_callable=io.StringIO) as out:
             self.assertEqual(g.main(), 2)
             self.assertEqual(json.loads(out.getvalue())['blockers'], ['RUNTIME_CHANGED'])
 

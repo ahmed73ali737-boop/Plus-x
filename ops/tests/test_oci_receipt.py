@@ -121,6 +121,12 @@ class BindingTests(unittest.TestCase):
         m, ar = setup.snapshot()
         mb = json.dumps(m).encode()
         r, _, _, _, _, _, oci, _ = bound_fixture()
+        config = g.canonical({'os': 'linux', 'architecture': 'amd64',
+            'rootfs': {'type': 'layers', 'diff_ids': ['sha256:' + H]}})
+        r['image']['config_digest'] = 'sha256:' + g.digest(config)
+        om = json.loads(oci); om['config']['digest'] = r['image']['config_digest']
+        oci = g.canonical(om)
+        r['image']['reference'] = 'example/plusx@sha256:' + g.digest(oci)
         r.update(source_sha=setup.sha, manifest_sha256=g.digest(mb),
                  context_sha256=g.digest(ar), build_argv=g.recipe(setup.sha),
                  dockerfile_sha256=m['files']['ops/Dockerfile.development']['sha256'])
@@ -135,7 +141,7 @@ class BindingTests(unittest.TestCase):
         ab = g.canonical(att); r['attestation_sha256'] = g.digest(ab)
         p = Path(setup.tmp.name)
         for name, data in [('manifest', mb), ('archive', ar), ('oci-manifest', oci),
-                           ('attestation', ab), ('receipt', g.canonical(r))]:
+                           ('attestation', ab), ('oci-config', config), ('receipt', g.canonical(r))]:
             (p/name).write_bytes(data)
         def openssl(*args):
             subprocess.run(['openssl', *args], check=True, capture_output=True)
@@ -144,7 +150,7 @@ class BindingTests(unittest.TestCase):
         openssl('dgst', '-sha256', '-sign', str(p/'test.key'), '-out', str(p/'signature'), str(p/'receipt'))
         command = ['python3', str(Path(g.__file__)), '--offline', '--source-root', str(setup.root),
                    '--source-sha', setup.sha, '--trusted-key-sha256', g.digest((p/'public-key').read_bytes())]
-        for name in ('manifest', 'archive', 'oci-manifest', 'attestation', 'receipt', 'signature', 'public-key'):
+        for name in ('manifest', 'archive', 'oci-manifest', 'attestation', 'receipt', 'signature', 'public-key', 'oci-config'):
             command.extend(['--' + name, str(p/name)])
         result = subprocess.run(command, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -153,6 +159,12 @@ class BindingTests(unittest.TestCase):
         self.assertFalse(report['release_allowed'])
         self.assertEqual(report['gate1'], 'UNVERIFIED')
         self.assertIn('LIVE_RUNTIME_AND_ROLLBACK_NOT_OBSERVED', report['blockers'])
+        (p/'oci-config').write_bytes(config + b' synthetic-secret')
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(json.loads(result.stdout)['blockers'], ['OCI_CONFIG_BYTES_MISMATCH'])
+        self.assertNotIn('synthetic-secret', result.stdout + result.stderr)
+        (p/'oci-config').write_bytes(config)
         # Even signed metadata cannot replace checkout/context reconciliation.
         setup.put('app/main.py', 'changed')
         result = subprocess.run(command, capture_output=True, text=True)

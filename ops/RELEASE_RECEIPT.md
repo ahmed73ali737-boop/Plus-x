@@ -75,7 +75,8 @@ python3 ops/release_receipt.py --offline \
   --receipt /private/build-receipt.json --signature /private/build-receipt.sig \
   --public-key /private/approved-builder-public.pem \
   --trusted-key-sha256 <independently-approved-PEM-hash> \
-  --oci-manifest /private/oci-manifest.json --attestation /private/statement.json
+  --oci-manifest /private/oci-manifest.json --attestation /private/statement.json \
+  --oci-config /private/oci-config.json
 ```
 
 `python3 ops/release_receipt.py --offline` is a safe prerequisite probe: no Docker,
@@ -138,3 +139,22 @@ Rollback is non-destructive: retain private evidence and leave the isolated
 candidate unselected. Main, both prior candidates and live state are unchanged;
 no runtime rollback, volume removal, dirty-tree reset or default-branch edit is
 needed. Future deployment requires separately verified immutable rollback evidence.
+
+## Config byte and local layer binding (2026-11-23)
+
+The continuation of `a29125daa8245df593c81735c688a529cc7e45b0` requires
+`--oci-config` in both modes. Its exact bytes must hash to the config digest
+in the authenticated receipt (already reconciled with the OCI manifest).
+The config must declare linux/amd64 and a nonempty, ordered SHA-256 rootfs
+DiffID chain. Live inspection independently compares that chain, rootfs type,
+platform and image ID with Docker metadata selected by the observed container
+image ID. Missing or mismatched fields fail closed. This adds no receipt fields
+and does not relax any existing gate. Old invocations without config bytes block.
+
+Config artifacts can contain sensitive environment values: keep them private;
+this checker never prints their contents. Docker inspection selects only image
+ID, OS, architecture and rootfs metadata, never image environment or history.
+The comparison authenticates config bytes and compares daemon metadata; it does
+not read or rehash stored layers, authenticate the rollback receipt, establish
+full effective configuration, or prove the builder used the claimed dependencies.
+G1 and G4 remain unproven. No deployment or runtime rollback is performed.
