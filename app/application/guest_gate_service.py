@@ -15,7 +15,7 @@ from app.application.audit_service import new_id
 from app.application.guest_service import event_guest_by_number, list_event_guests
 from app.application.invitation_service import admission_use, consume_entitlement, entitlement_status, get_policy, lock_policy
 from app.application.ports import persistence
-from app.domain import Conflict, DomainError, Forbidden, NotFound, fail, now, text
+from app.domain import DomainError, NotFound, fail, now, text
 from app.domain.access_control import AccessPolicy
 from app.domain.gate import (
     ACCEPTED,
@@ -29,6 +29,10 @@ from app.domain.gate import (
     blocked_status,
     checkpoint_key,
     offline_scan_time,
+    require_invitation_when_managed,
+    require_scan_replay,
+    require_unmanaged_quantity,
+    require_valid_admission,
     scan_mode,
 )
 from app.domain.guests import registration_status, staff_guest_view
@@ -89,8 +93,7 @@ def validate_guest(tx, event_or_id, guest_number: str, checkpoint: str = 'main',
     if check_admission:
         try:
             admission = entitlement_status(tx, event, guest, body)
-            if get_policy(tx, event_id)['enabled'] and not admission['managed']:
-                fail('INVITATION_REQUIRED', Forbidden)
+            require_invitation_when_managed(get_policy(tx, event_id)['enabled'], admission)
         except DomainError as error:
             return {'status': 'invalid', 'reason': error.code, 'guest': view, 'presence': presence}
     return {
@@ -103,11 +106,8 @@ def _duplicate_scan_result(tx, event_id: str, guest_number: str, scan_id: str, m
                            existing: dict, quantity=1) -> dict:
     """An exact replay of an already recorded scan is idempotent; anything else conflicts."""
     use = admission_use(tx, scan_id)
-    if use and use['quantity'] != quantity:
-        fail('SCAN_ID_CONFLICT', Conflict)
-    if (existing['event_id'] != event_id or existing['guest_number'] != guest_number.upper()
-            or existing['direction'] != mode or existing['checkpoint'] != checkpoint):
-        fail('SCAN_ID_CONFLICT', Conflict)
+    require_scan_replay(existing, use, event_id=event_id, guest_number=guest_number, mode=mode,
+                        checkpoint=checkpoint, quantity=quantity)
     replay_guest = event_guest_by_number(tx, event_id, guest_number)
     if not replay_guest:
         fail('GUEST_NOT_REGISTERED', NotFound)
@@ -177,16 +177,15 @@ def _record_checkin(tx, event_or_id, guest_number: str, body: dict, *, scanner_i
             'reason': validated.get('reason'), 'mode': VALIDATE, 'direction': None, 'checkpoint': checkpoint,
             'presence': validated['presence'], 'guest': guest, 'admission': validated.get('admission'),
         }
-    if validated['status'] != 'valid':
-        fail(validated.get('reason') or 'ACCESS_DENIED', Forbidden)
+    require_valid_admission(validated)
 
     presence = _presence(tx, event_id, guest['id'])
     admission = validated.get('admission') or {'managed': False}
     managed = bool(admission.get('managed')) and mode == ENTRY
     if managed:
         admission = consume_entitlement(tx, event, raw_guest, {**body, 'scan_id': scan_id})
-    elif body.get('quantity', 1) != 1:
-        fail('ADMISSION_QUANTITY_INVALID')
+    else:
+        require_unmanaged_quantity(body.get('quantity', 1))
 
     transition = presence.pass_gate(mode, checkpoint, scan_id, policy, entitlement_managed=managed, at=now())
     if not (transition.accepted and persistence.presence.save(tx, presence, transition)):

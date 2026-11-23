@@ -190,3 +190,30 @@ def device_checkpoint_allowed(device_metadata, checkpoint: str) -> None:
     allowed = (device_metadata or {}).get('checkpoints')
     if allowed is not None and (not isinstance(allowed, list) or checkpoint not in allowed):
         fail('DEVICE_CHECKPOINT_SCOPE', Forbidden)
+
+
+def require_scan_replay(existing: dict, use: dict | None, *, event_id: str, guest_number: str, mode: str,
+                        checkpoint: str, quantity) -> None:
+    """A scan id is idempotent only for the exact same scan; any difference is a conflict."""
+    if use and use['quantity'] != quantity:
+        fail('SCAN_ID_CONFLICT', Conflict)
+    if (existing['event_id'] != event_id or existing['guest_number'] != guest_number.upper()
+            or existing['direction'] != mode or existing['checkpoint'] != checkpoint):
+        fail('SCAN_ID_CONFLICT', Conflict)
+
+
+def require_invitation_when_managed(policy_enabled: bool, admission: dict) -> None:
+    """When managed admission is on, only an invited guest's entitlement admits."""
+    if policy_enabled and not admission['managed']:
+        fail('INVITATION_REQUIRED', Forbidden)
+
+
+def require_valid_admission(validated: dict) -> None:
+    if validated['status'] != 'valid':
+        fail(validated.get('reason') or 'ACCESS_DENIED', Forbidden)
+
+
+def require_unmanaged_quantity(quantity) -> None:
+    """Without an entitlement a scan admits exactly one person."""
+    if quantity != 1:
+        fail('ADMISSION_QUANTITY_INVALID')
