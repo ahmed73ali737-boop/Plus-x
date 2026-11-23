@@ -18,7 +18,7 @@ from hashlib import sha256
 from typing import Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app.domain.errors import Conflict, Gone, NotFound, fail
+from app.domain.errors import Conflict, Gone, NotFound, Unavailable, fail
 from app.domain.values import number, stamp, text
 
 FIELDS = ('participant_name', 'course_title', 'issuer_name', 'grade', 'training_hours', 'issue_date', 'serial')
@@ -287,3 +287,51 @@ def require_same_replacement(existing_link: dict, replacement_id: str) -> None:
 def require_replacement_recorded(recorded: bool) -> None:
     if not recorded:
         fail('CERTIFICATE_ALREADY_REPLACED', Conflict)
+
+
+# Rendering and embedded-image limits (imaging itself is an adapter) -----------------------------------
+
+IMAGE_DATA_PREFIXES = ('data:image/png;base64,', 'data:image/jpeg;base64,')
+MAX_IMAGE_DATA_LENGTH = 1_400_000
+MAX_IMAGE_PIXELS = 4_000_000
+MAX_NORMALIZED_IMAGE_BYTES = 1_000_000
+MAX_RENDER_PIXELS = 18_000_000
+
+
+def require_image_reference(raw) -> str:
+    """Only bounded inline PNG/JPEG data URLs are accepted; URLs are never fetched."""
+    if not isinstance(raw, str) or len(raw) > MAX_IMAGE_DATA_LENGTH or not raw.startswith(IMAGE_DATA_PREFIXES):
+        fail('CERTIFICATE_IMAGE_INVALID')
+    return raw
+
+
+def require_image_within_limits(image_format: str | None, width: int, height: int) -> None:
+    if image_format not in ('PNG', 'JPEG') or width * height > MAX_IMAGE_PIXELS:
+        fail('CERTIFICATE_IMAGE_LIMIT')
+
+
+def require_normalized_image_size(size_bytes: int) -> None:
+    if size_bytes > MAX_NORMALIZED_IMAGE_BYTES:
+        fail('CERTIFICATE_IMAGE_LIMIT')
+
+
+def unreadable_image() -> None:
+    fail('CERTIFICATE_IMAGE_INVALID')
+
+
+def require_text_inside_canvas(bbox, width: int, height: int) -> None:
+    """Every text layer must lie fully inside the certificate canvas."""
+    left, top, right, bottom = bbox
+    if left < 0 or top < 0 or right > width or bottom > height:
+        fail('CERTIFICATE_TEXT_OVERFLOW')
+
+
+def require_font_version(snapshot_hash: str, current_hash: str) -> None:
+    """A certificate frozen with another font build cannot be re-rendered faithfully."""
+    if snapshot_hash != current_hash:
+        fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', Unavailable)
+
+
+def require_render_size(width: int, height: int) -> None:
+    if width * height > MAX_RENDER_PIXELS:
+        fail('CERTIFICATE_RENDER_SIZE_LIMIT')

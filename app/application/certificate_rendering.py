@@ -10,8 +10,10 @@ import io
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, features
 import qrcode
-from app.domain import fail, Unavailable
-from app.domain.certificates import Certificate, resolve_placeholders
+from app.domain.certificates import (
+    Certificate, require_font_version, require_image_reference, require_image_within_limits,
+    require_normalized_image_size, require_render_size, require_text_inside_canvas, resolve_placeholders, unreadable_image,
+)
 
 FONT = Path(__file__).resolve().parents[2] / 'web/fonts/CertificateSans.ttf'
 
@@ -55,36 +57,33 @@ def validate_layout(design, data):
         content = resolve_placeholders(layer['text'], data)
         content, font, options = text_layout(content, layer, layer['size'])
         left, top, right, bottom = draw.textbbox((layer['x'], layer['y']), content, font=font, **options)
-        if left < 0 or top < 0 or right > design['width'] or bottom > design['height']:
-            fail('CERTIFICATE_TEXT_OVERFLOW')
+        require_text_inside_canvas((left, top, right, bottom), design['width'], design['height'])
 
 
 def image_data(raw):
     """Normalize uploads to bounded metadata-free PNG; never fetch URLs."""
-    if not isinstance(raw, str) or len(raw) > 1400000 or not raw.startswith(('data:image/png;base64,', 'data:image/jpeg;base64,')):
-        fail('CERTIFICATE_IMAGE_INVALID')
+    require_image_reference(raw)
     try:
         data = base64.b64decode(raw.split(',', 1)[1], validate=True)
         with Image.open(io.BytesIO(data)) as im:
-            if im.format not in ('PNG', 'JPEG') or im.width * im.height > 4000000:
-                fail('CERTIFICATE_IMAGE_LIMIT')
+            require_image_within_limits(im.format, im.width, im.height)
             im.load()
             result = io.BytesIO()
             im.convert('RGBA').save(result, format='PNG')
-        if len(result.getvalue()) > 1000000: fail('CERTIFICATE_IMAGE_LIMIT')
+        require_normalized_image_size(len(result.getvalue()))
         return 'data:image/png;base64,' + base64.b64encode(result.getvalue()).decode()
     except (ValueError, OSError, Image.DecompressionBombError):
-        fail('CERTIFICATE_IMAGE_INVALID')
+        unreadable_image()
 
 
 def render(row, verification_url, output_format='PNG'):
     Certificate.require_valid(row)
-    if row['snapshot'].get('font_hash', font_hash()) != font_hash(): fail('CERTIFICATE_FONT_VERSION_UNAVAILABLE', Unavailable)
+    require_font_version(row['snapshot'].get('font_hash', font_hash()), font_hash())
     design, data = row['snapshot']['design'], row['snapshot']['data']
     # 3508px across a 297mm landscape page is approximately 300 DPI.
     scale = 3508 / design['width']
     width, height = round(design['width'] * scale), round(design['height'] * scale)
-    if width * height > 18000000: fail('CERTIFICATE_RENDER_SIZE_LIMIT')
+    require_render_size(width, height)
     page = Image.new('RGB', (width, height), design['background'])
     draw = ImageDraw.Draw(page)
 
