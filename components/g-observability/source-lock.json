@@ -10,7 +10,8 @@
     },
     {
       "path": "requirements-observability.txt",
-      "sha256": "eec817d230ce4a59fb6cf4f31e28e1962c42604217bef34bd75a8d25324d4a68"
+      "sha256": "7f3c4747a498a98b7ee7007737a8de2a5e067c68bf15012339cd14e9ca57e88b",
+      "localModification": "PulseX local security update for CVE-2026-126360. Keep the original upstream provenance and upgrade the compatible OpenTelemetry family to 1.45.2 / 0.66b2."
     }
   ],
   "endpointProtocol": "http/protobuf",

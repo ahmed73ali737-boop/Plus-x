@@ -89,7 +89,9 @@
     {
       "source_pr": 21,
       "path": "components/g-observability/source-lock.json",
-      "blob_sha": "54be131a6cf32e3af37213c5beea0a8d6830de9e"
+      "blob_sha": "da644d2a615fde3a47f76b94ec20ca7d24ba49aa",
+      "source_blob_sha": "54be131a6cf32e3af37213c5beea0a8d6830de9e",
+      "local_modification": "Record the PulseX OpenTelemetry security update while preserving the canonical source hashes."
     },
     {
       "source_pr": 21,
@@ -99,7 +101,9 @@
     {
       "source_pr": 21,
       "path": "requirements-observability.txt",
-      "blob_sha": "5cedf0b04bb1894f067e9eb3006ad8174e82bb0a"
+      "blob_sha": "89c6d84406788df91036efbb258430f40625ad75",
+      "source_blob_sha": "5cedf0b04bb1894f067e9eb3006ad8174e82bb0a",
+      "local_modification": "PulseX local security update for CVE-2026-126360. Keep the original upstream provenance and upgrade the compatible OpenTelemetry family to 1.45.2 / 0.66b2."
     },
     {
       "source_pr": 21,

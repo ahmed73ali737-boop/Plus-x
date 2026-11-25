@@ -146,7 +146,7 @@ def application_rule_checks() -> dict[str, int]:
         calls = sum(1 for node in ast.walk(ast.parse(path.read_text(encoding='utf-8')))
                     if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'fail')
         if calls:
-            counts[str(path.relative_to(ROOT))] = calls
+            counts[path.relative_to(ROOT).as_posix()] = calls
     return counts
 
 

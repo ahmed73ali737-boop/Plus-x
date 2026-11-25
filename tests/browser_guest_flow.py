@@ -8,7 +8,7 @@ import tempfile
 import time
 import urllib.request
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect, sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT=Path(__file__).resolve().parents[1]
 TEMP=Path(tempfile.mkdtemp(prefix="pulsex-guest-browser-"))
@@ -107,7 +107,7 @@ try:
             page.get_by_role("heading",name=title,exact=True,level=1).wait_for()
             assert page.locator(selector).count()==1
             assert title in page.locator(".site-topbar .brand").inner_text()
-            assert "Powered by Eventna إيفنتنا" in page.locator(".platform-attribution").inner_text()
+            expect(page.locator(".platform-attribution")).to_have_text("Powered by إيفنتنا · Live Experience Platform")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
             mark("brand_exhibition_"+slug)
         page.screenshot(path=str(ROOT/"qa/rts-live.png"),full_page=False)

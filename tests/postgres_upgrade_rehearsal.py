@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from sqlalchemy import create_engine, insert, inspect, select, text
 from sqlalchemy.engine import make_url
-from app.db import sites, guests, event_guests, guest_checkins
+from app.db import make_engine, sites, guests, event_guests, guest_checkins
 from app.domain import default_config, now
 from app.core.migrations import MIGRATION_PATHS, expected_migration_checksums
 from app.application.guest_service import event_guest_by_number
@@ -46,7 +46,7 @@ def main():
         for name in names:
             with control.connect() as c:c.exec_driver_sql('CREATE DATABASE "'+name+'"')
             created.append(name)
-            engines.append(create_engine(parsed.set(database=name)))
+            engines.append(make_engine(parsed.set(database=name).render_as_string(hide_password=False)))
         source,restored=engines
         with source.begin() as c:
             runner.execute_script(c,(ROOT/'ops/001_full_schema_postgres.sql').read_text())

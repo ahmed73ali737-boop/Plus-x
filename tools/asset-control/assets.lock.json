@@ -11,13 +11,13 @@
       "path": "components",
       "upstreamRepository": "ahmed73ali737-boop/Plus-x",
       "upstreamRevision": "5a960ab18d439a3f70928ae4e79b45ad2f994d8d",
-      "localVersion": "1.0.0",
+      "localVersion": "1.0.1",
       "ownership": "system-local",
       "origin": "self",
       "updatePolicy": "explicit-reviewed-upgrade",
       "files": {
         "g-observability/source-lock.json": {
-          "gitBlob": "54be131a6cf32e3af37213c5beea0a8d6830de9e",
+          "gitBlob": "da644d2a615fde3a47f76b94ec20ca7d24ba49aa",
           "executable": false
         }
       }
