@@ -21,11 +21,12 @@ Website: https://eventna.app | [Deployment guide](ops/eventna/README.md)
 - مواقع وتجارب معرض مستقلة بصريًا ووظيفيًا لـ **Tharawat / Easy / RTS** فوق محرك Eventna إيفنتنا المشترك.
 
 ### التشغيل على Windows
-شغّل:
+جهّز بيئة Python أولًا باستخدام `python -m tools.prepare_runtime --profile local`، ثم شغّل:
 `Start-Windows.cmd`
 
 ### التشغيل على Linux
 ```bash
+python3 -m tools.prepare_runtime --profile local
 chmod +x Start-Linux.sh
 ./Start-Linux.sh
 ```
@@ -74,3 +75,32 @@ chmod +x Start-Linux.sh
 | شاشة النتائج العامة | `/live/demo` |
 
 التطبيق Web/PWA قابل للتثبيت من المتصفح المدعوم. يوجد الآن مشروع Android وحزمة APK معاينة بواجهة بدء عربية وماسح QR محلي، تتصل بخادم Eventna إيفنتنا الحالي؛ راجع [دليل Android](android/README_AR.md). لا توجد حزمة MSI مؤكدة. حسابات التشغيل التجريبي تُنشأ محليًا في ملف credentials المحدد؛ لا تستخدمها للإنتاج. أدوار الإدارة الحالية: المنصة والمنظم والجهة وصلاحيات البوابة واللجان المحددة، مع صلاحيات نطاقية؛ وجودها لا يثبت اكتمال جميع الأدوار المستقبلية.
+
+## English onboarding
+
+Eventna supports event organizers, participating organizations, visitors and authorized gate operators. Its source includes event content, guest registration and QR passes, scoped administration, offline synchronization, reports and SDK clients. Review the [unification evidence](docs/UNIFICATION_20261019_AR.md) and [production readiness record](PRODUCTION_READINESS_AR.md) for acceptance boundaries.
+
+### Local setup
+
+From the repository root, prepare the isolated, hash-locked Python runtime before starting the application.
+
+On Linux with Python 3 installed, run the Linux commands above. On Windows, run the following commands in a terminal with Python available.
+
+```bat
+python -m tools.prepare_runtime --profile local
+Start-Windows.cmd
+```
+
+Open <http://127.0.0.1:4310>. The visitor application is at `/`, administration at `/admin`, and the demo guest registration and gate scanner at `/e/demo/guest` and `/e/demo/scan`. Gate scanning requires an authorized device. Use locally generated credentials for the development instance.
+
+For Docker deployment, follow the [deployment guide](ops/eventna/README.md) and configure the required environment values in [compose.yaml](compose.yaml), including the database password, guest identity secret, public domain and bootstrap administrator. Production startup has explicit acceptance gates.
+
+### Architecture and API references / المعمارية وواجهات التكامل
+
+- [Architecture and dependency boundaries / المعمارية](ARCHITECTURE_AR.md)
+- [API and SDK guide / دليل الواجهات](SDK_API_AR.md)
+- [Generated OpenAPI document / مواصفات OpenAPI](ops/openapi.generated.json)
+- [Python and JavaScript SDKs / مكتبات التكامل](sdk/README.md)
+- [Delivery and operator guide / دليل التشغيل والاستخدام](DELIVERY_GUIDE_AR.md)
+
+The SDKs cover guest registration, synchronization, visitor status and gate operations. Authentication uses cookies and CSRF protection. Gate clients use the device token header described in the SDK guide. Field devices, venue networking and production acceptance require their own recorded verification.
