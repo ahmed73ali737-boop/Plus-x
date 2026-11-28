@@ -25,7 +25,7 @@ def recovery_subnet(existing):
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     project='px-recovery-'+uuid.uuid4().hex[:10]
-    env={**os.environ,'RECOVERY_DB_PASSWORD':secrets.token_hex(24),
+    env={**os.environ,'RECOVERY_DB_PASSWORD':secrets.token_hex(24),'SEED_DEMO':'true',
          'PULSEX_SOURCE_SHA':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()}
     command=['docker','compose','-p',project,'-f',str(ROOT/'ops/compose.recovery.yaml')]
     report={'status':'failed','source_sha':env['PULSEX_SOURCE_SHA'],'project':project,

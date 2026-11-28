@@ -25,7 +25,8 @@ services:
       REQUIRE_POSTGRES: "false"
       PULSEX_ENV: test
       PUBLIC_ORIGIN: http://127.0.0.1:18080
-      SEED_DEMO: "true"
+      # Demo accounts share one password; opt in explicitly (tests/runtime_recovery_acceptance.py does).
+      SEED_DEMO: ${SEED_DEMO:-false}
       WEB_WORKERS: "1"
       CREDENTIALS_PATH: /app/data/recovery-accounts.json
     ports: ["127.0.0.1:14310:4310"]
